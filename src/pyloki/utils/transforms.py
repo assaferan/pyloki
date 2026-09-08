@@ -561,6 +561,46 @@ def cheby_to_taylor(alpha_param_vec: np.ndarray, t_s: float) -> np.ndarray:
 
 
 @njit(cache=True, fastmath=True)
+def economize_taylor_params(
+    taylor_param_vec: np.ndarray,
+    t_s: float,
+    n_keep: int,
+) -> np.ndarray:
+    """Return the near-minimax degree-(n_keep - 1) approximation of an exact Taylor
+    expansion over [-t_s, t_s], expressed back in the same Taylor/monomial basis.
+
+    Computed via Chebyshev economization: convert to Chebyshev coefficients on the
+    given half-span, zero the highest-order coefficients above order n_keep - 1, and
+    convert back. Unlike naive truncation (dropping the highest-order Taylor terms
+    directly), this accounts for how the discarded high-order content couples into
+    the retained low-order terms over the full interval, rather than matching
+    derivatives only at the expansion point.
+
+    Parameters
+    ----------
+    taylor_param_vec : np.ndarray
+        Parameter vector of shape (..., n_params), ordered [d_k_max, ..., d_1, d_0].
+    t_s : float
+        Scale factor for the transformation (half the time span of validity).
+    n_keep : int
+        Number of lowest-order coefficients to retain. If ``n_keep >= n_params``,
+        the input is returned unchanged (no-op).
+
+    Returns
+    -------
+    np.ndarray
+        Economized Taylor parameters, same shape as the input.
+    """
+    n_params = taylor_param_vec.shape[-1]
+    if n_keep >= n_params:
+        return taylor_param_vec
+    alpha = taylor_to_cheby(taylor_param_vec, t_s)
+    alpha = alpha.copy()
+    alpha[..., : n_params - n_keep] = 0.0
+    return cheby_to_taylor(alpha, t_s)
+
+
+@njit(cache=True, fastmath=True)
 def cheby_to_taylor_full(alpha_full_vec: np.ndarray, t_s: float) -> np.ndarray:
     """Transform Chebyshev coefficients and its errors to Taylor series basis.
 
