@@ -253,10 +253,14 @@ worth **8x** in final-level grid cells and **~2x** in total leaves explored. App
 grid-efficiency gain is not unexploited; it is the default.
 
 **A dedicated Chebyshev basis also already exists** (`src/pyloki/core/chebyshev.py`,
-`poly_basis="chebyshev"`). At this config its branching pattern is *worse*:
-`poly_chebyshev_moving` explores 3600 total leaves against 1752 for coarsened
-`poly_taylor_moving`. One config and a pattern estimate rather than a measured run, so
-not a general claim — but it is not free headroom either.
+`poly_basis="chebyshev"`). At this config it explores 3600 total leaves against 1752 for
+coarsened `poly_taylor_moving`.
+
+> **CORRECTED — see §11.** This paragraph originally concluded from that leaf count that
+> the Chebyshev basis "is not free headroom either". That was wrong. The two grids do not
+> honor the same tolerance, so their leaf counts are not comparable: Chebyshev explores
+> more leaves because it *keeps* the stated tolerance, while the coarsened Taylor grid
+> explores fewer because its cells are too large by an exponentially growing factor.
 
 **And the specific "remaining gap" in the note does not correspond to a real operation.**
 It argued each grid point is built by Taylor point-matching rather than being "the true
@@ -268,12 +272,13 @@ lookup, not a modeling step. So the distinction has no purchase in either place:
 construction there is no target function to fit, and in `resolve` the compression does
 not affect the retained model.
 
-**Net conclusion of the whole thread.** The §3.2 observation was correct as approximation
-theory and had no actionable target in this codebase. The economization is reverted; the
-`economize_taylor_params` utility and its parity tests are kept as documented, tested,
-uncalled helpers. The one durable outcome is unrelated to the original question: the
-`prune_dyp_tree` SIGSEGV (§4), found only because the experiment needed the pruning path
-to run.
+**Net conclusion for the resolve step.** The §3.2 observation had no actionable target
+*there*. The economization is reverted; `economize_taylor_params` and its parity tests are
+kept as documented, tested, uncalled helpers. The `prune_dyp_tree` SIGSEGV (§4) was found
+only because the experiment needed the pruning path to run.
+
+But the observation does have a real target one level up — in the choice of enumeration
+basis, not in how a single projection is computed. See §11.
 
 ## 10. Status of the work
 
@@ -283,3 +288,78 @@ Branches: `main` tracks upstream; `Chebyshev` holds this thread; `paper-notes` t
 paper questions; `fix-prune-segfault` is PR #3.
 
 Remaining open from earlier sessions: ~10 unanswered questions in `paper/QUESTIONS.md`.
+
+## 11. The Taylor default runs an exponentially looser tolerance than advertised
+
+This supersedes the wrong claim flagged in §9, and is the most consequential finding in
+this thread after the segfault. Prompted by the obvious question the earlier sections
+never asked: why convert back to Taylor at all — why not enumerate in Chebyshev
+throughout?
+
+### The answer to that question: it already does
+
+`poly_basis="chebyshev"` genuinely enumerates in the Chebyshev basis end to end:
+
+- `poly_chebyshev_seed` converts **once**, at seeding (`taylor_to_cheby_full`).
+- `poly_chebyshev_branch_batch` moves between intervals with `shift_cheby_full` and
+  branches directly on `alpha_k`. No Taylor round-trip.
+- `poly_cheb_step_vec` takes no `tobs` argument at all — that is the whole point.
+
+The one remaining Taylor conversion, in `poly_chebyshev_resolve_batch`, is structurally
+forced twice over: the FFA fold is indexed by physical `(accel, freq)`, an index space
+fixed when the data was folded, so a Chebyshev coefficient cannot be looked up in it; and
+`cheby_to_taylor_param_shift` is simultaneously performing an *interval* change from the
+accumulated span down to the single added segment, which is needed in any basis.
+
+### The step rules are not equivalent, and the difference is exponential
+
+```python
+# psr_utils.poly_cheb_step_vec  — uniform, no tobs dependence
+dparams = eta / nbins                      # identical for every order
+
+# psr_utils.poly_taylor_step_f  — order- and tobs-dependent, plus a factor
+dparams_f = dphi * fact(k + 1) / (tobs - t_ref) ** (k + 1)
+if use_cheby:
+    dparams_f = 2**k * dparams_f
+```
+
+Because `|T_k| <= 1` on the interval, a phase tolerance maps directly onto a coefficient
+tolerance in the Chebyshev basis: the error metric is diagonal and isotropic. The `2**k`
+factor is a scalar attempt to retro-fit that gain onto a Taylor grid.
+
+Worst-case sup-norm phase error per grid cell, as a multiple of the nominal `eta/nbins`
+(`scratch/econ_experiment/grid_guarantee.py`):
+
+| poly_order | Taylor + `2**k` | Taylor raw | Chebyshev |
+|---|---|---|---|
+| 2 | 1.5x | 1.0x | 1.0x |
+| 3 | 3.5x | 1.5x | 1.5x |
+| 4 | **7.5x** | 2.0x | 2.0x |
+| 5 | **15.5x** | 2.5x | 2.5x |
+
+Chebyshev grows linearly, `n/2` — just the sum of `n` half-steps. Taylor with coarsening
+grows as `(2**n - 1)/2`, exponentially. Taylor *raw* lands exactly on the Chebyshev
+values, which identifies `2**k` as the entire source of the discrepancy. The grid is
+rectangular, so all coefficients can sit at half-step simultaneously: the worst case is
+attainable, not a loose bound.
+
+### Consequences
+
+- The default configuration (`poly_basis="taylor"`, `use_cheby_coarsening=True`
+  everywhere in `config.py`) silently searches at a tolerance ~7.5x looser than the
+  requested `eta` at `poly_order=4`, and ~15.5x at `poly_order=5`.
+- `use_cheby_coarsening` is **not** plumbed into the live branch step.
+  `poly_taylor_branch_batch` calls `poly_taylor_step_d_vec` without it, so `use_cheby`
+  takes its default of `True`. The flag only affects `generate_branching_pattern` and the
+  `config.py` grid-count estimates. There is therefore no way to run the "Taylor raw"
+  column above without a code change.
+- Comparing leaf counts between bases at equal `eta` compares different guarantees. This
+  is the error corrected in §9.
+
+### Caveats, stated honestly
+
+Worst-case attainable is not the same as typical: the *sensitivity* cost depends on how
+often a signal lands near a cell corner, which this analysis does not address. It is also
+possible `2**k` was empirically tuned against exactly that, in which case the defect is
+the docstring calling it a "Chebyshev coarsening factor" rather than the number itself.
+Measuring the recovered-SNR difference between the two bases is the next step (§12).
