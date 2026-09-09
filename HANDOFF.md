@@ -96,7 +96,7 @@ out `(401,1)` instead of `(401,)` and `phi_naive - phi_exact` broadcast to a
 *spread* across the segment — `freq*tseg/2` after midpoint alignment — which is exactly
 the nonsensical `149.796` reported for both methods.
 
-Fixed in `resolve_probe2.py` (old version kept as `.py.bak`) by evaluating the exact
+Fixed in `resolve_probe2.py` by evaluating the exact
 polynomial directly, as `tests/test_transforms.py` already did.
 
 **With shapes fixed, the metric works and the ratio is clean: economization reduces
