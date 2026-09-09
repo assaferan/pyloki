@@ -224,3 +224,62 @@ says this.
    in `economize_taylor_params`.
 5. Still open from the previous session: ~10 unanswered questions in `paper/QUESTIONS.md`,
    and its uncommitted §3.2 answer.
+
+## 9. The redirect to grid construction: the headroom was already taken
+
+Decision taken after §7: stop economizing in `resolve` (done, `taylor.py` is byte-identical
+to upstream again) and redirect the idea to grid construction, where the `QUESTIONS.md`
+§3.2 note said the real payoff was — "a coarser grid, or lower `k_max`, for the same
+tolerance". Investigating that target first, before writing anything, found there is
+nothing left to build.
+
+**The coarsening is already implemented and on by default.** `psr_utils.poly_taylor_step_f`:
+
+```python
+dparams_f = dphi * maths.fact(k + 1) / (tobs - t_ref) ** (k + 1)
+if use_cheby:          # default True, everywhere in config.py
+    dparams_f = 2**k * dparams_f
+```
+
+Measured at the §6 config (`scratch/econ_experiment/grid_efficiency.py`):
+
+| | dparams ratio | final-level grid | total leaves |
+|---|---|---|---|
+| `use_cheby=False` | — | `[1, 4, 2, 1143]` = 9144 | 3480 |
+| `use_cheby=True` | `[8, 4, 2, 1]` | `[1, 1, 1, 1143]` = 1143 | 1752 |
+
+The step ratio is exactly `2**k` for the k-th derivative. The coarsening is already
+worth **8x** in final-level grid cells and **~2x** in total leaves explored. Appendix D's
+grid-efficiency gain is not unexploited; it is the default.
+
+**A dedicated Chebyshev basis also already exists** (`src/pyloki/core/chebyshev.py`,
+`poly_basis="chebyshev"`). At this config its branching pattern is *worse*:
+`poly_chebyshev_moving` explores 3600 total leaves against 1752 for coarsened
+`poly_taylor_moving`. One config and a pattern estimate rather than a measured run, so
+not a general claim — but it is not free headroom either.
+
+**And the specific "remaining gap" in the note does not correspond to a real operation.**
+It argued each grid point is built by Taylor point-matching rather than being "the true
+minimax/Chebyshev-projected polynomial of the same degree". But grid points are not
+approximations of anything: they are candidate models laid down to *cover* a parameter
+volume. Minimax-vs-Taylor is a statement about compressing a *known* function to lower
+degree — which is exactly what `resolve` does, and §7 established that `resolve` is a
+lookup, not a modeling step. So the distinction has no purchase in either place: in grid
+construction there is no target function to fit, and in `resolve` the compression does
+not affect the retained model.
+
+**Net conclusion of the whole thread.** The §3.2 observation was correct as approximation
+theory and had no actionable target in this codebase. The economization is reverted; the
+`economize_taylor_params` utility and its parity tests are kept as documented, tested,
+uncalled helpers. The one durable outcome is unrelated to the original question: the
+`prune_dyp_tree` SIGSEGV (§4), found only because the experiment needed the pruning path
+to run.
+
+## 10. Status of the work
+
+Merged upstream: PR #1 (stale test refs), PR #2 (first CI workflow).
+Open upstream: PR #3 (the SIGSEGV fix), CI green on 3.12/3.13/3.14.
+Branches: `main` tracks upstream; `Chebyshev` holds this thread; `paper-notes` the
+paper questions; `fix-prune-segfault` is PR #3.
+
+Remaining open from earlier sessions: ~10 unanswered questions in `paper/QUESTIONS.md`.
