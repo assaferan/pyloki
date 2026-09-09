@@ -1,7 +1,8 @@
 # Phase 0 — Pipeline notes
 
 Base commit: `6b11aba` (identical to `upstream/main`; includes merged PRs #1 and #2).
-Branch `metric-gridding`, worktree `.claude/worktrees/metric-gridding`.
+Branch `metric-gridding`, worktree `worktrees/metric-gridding` (a child of the repo root,
+excluded from git via `.git/info/exclude` rather than a tracked `.gitignore` rule).
 
 Every claim below was checked by reading the code at this commit. Plan facts that were
 wrong or incomplete are flagged **CORRECTION** / **ADDITION**.
