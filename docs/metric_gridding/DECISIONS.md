@@ -31,18 +31,24 @@ These are **observed from the code**, not chosen, and any metric code must match
   `mismatch()` will return a pure number. *To be confirmed against Phase 1 test 4
   (empirical S/N loss) before being treated as settled.*
 
-- **D3 — How to run anything in this worktree (important).** The repo's `.venv` lives in
-  the **main** checkout and its editable install resolves `import pyloki` to
-  `/Users/assaferan/Documents/GitHub/pyloki/src/pyloki` — i.e. **the main checkout's
-  source, on whatever branch it happens to be**, not this worktree's. Running `pytest`
-  here without care silently tests the wrong code. Verified. Always shadow it:
+- **D3 — This worktree has its own `.venv`; always use it.**
 
   ```sh
-  PYTHONPATH=$PWD/src /Users/assaferan/Documents/GitHub/pyloki/.venv/bin/python -m pytest
+  .venv/bin/python -m pytest        # from worktrees/metric-gridding
   ```
 
-  Confirmed to resolve to the worktree source and give `25 passed` at `2bc0455`.
-  (A dedicated venv in the worktree would also work but duplicates ~1 GB of deps.)
+  Baseline at `fb3d413`: **25 passed**.
+
+  *Why it needs saying.* The repo's top-level `.venv` (in the parent checkout) is an
+  editable install that resolves `import pyloki` to the **parent checkout's** `src/` —
+  i.e. whatever branch that checkout happens to be on, not this worktree's. Using it
+  from here silently tests the wrong source. Verified, not hypothetical.
+
+  An earlier revision of this entry recommended `PYTHONPATH=$PWD/src <parent>/.venv/...`
+  instead. Do not use that: the worktree-isolation guard refuses inline `PYTHONPATH`
+  before a `python` invocation, so the advice was unusable. Hence the local venv
+  (built from `/opt/homebrew/bin/python3.13`, which has tkinter —
+  `detection/schemes.py` imports it at module scope). `.venv` is already gitignored.
 
 ## Open questions (carried from Phase 0, need a human answer)
 
