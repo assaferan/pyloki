@@ -28,8 +28,9 @@ These are **observed from the code**, not chosen, and any metric code must match
   (C6). Rather than track a loose factor, `g` will be **defined so that
   `m = δᵀ g δ` is directly the dimensionless fractional S/N loss**, with any `(2π)²`
   folded into `g` itself. `poly_phase_metric` will state this in its docstring and
-  `mismatch()` will return a pure number. *To be confirmed against Phase 1 test 4
-  (empirical S/N loss) before being treated as settled.*
+  `mismatch()` will return a pure number. **Confirmed in Phase 1** (D6, D10): `m` is
+  the fractional amplitude loss and matches a direct measurement to 0.5% once the
+  harmonic weight is applied.
 
 - **D3 — This worktree has its own `.venv`; always use it.**
 
@@ -86,9 +87,10 @@ These are **observed from the code**, not chosen, and any metric code must match
   rather than buried. **Flag for the human:** if the intended convention is power, change
   the `2 * np.pi**2` constant in `metric.py` to `4 * np.pi**2` and halve every `m_max`.
 
-- **D7 — `nbins` is accepted but unused by `poly_phase_metric`.** `g` does not depend on
-  `nbins`; it enters only through `m_max_from_eta` (via `eta/nbins`). The argument is
-  kept because the plan's API specifies it. It could be dropped in Phase 4.
+- **D7 — `nbins` is used only when `ducy` is given.** `g` is independent of `nbins` for
+  the single-harmonic metric, and `poly_phase_metric` raises if `ducy` is passed without
+  it. Superseded in part by D10: with a `ducy`, `nbins` sets the harmonic cutoff and the
+  argument is no longer dead.
 
 - **D8 — Phase 1 test 5 ratios (the exit criterion), and what they say.**
   Ellipsoid axis extent ÷ box half-width, per axis, in leaf order
@@ -112,42 +114,64 @@ These are **observed from the code**, not chosen, and any metric code must match
   gaps along the short ones, which is exactly the `conservative`-vs-`aggressive`
   dilemma, and why the gap cost measured in the notes grows with `poly_order`.
 
-- **D9 — Harmonic weighting is NOT optional; measured (bears on O4).** Plan test 4's
-  duty-cycle diagnostic, boxcar-scored folded profile vs the single-harmonic metric, at
-  `m_target = 4e-3`, `poly_order=4`:
+- **D9 — Harmonic weighting is NOT optional (bears on O4).** A fundamental-only metric
+  badly under-predicts the real S/N loss, because folding with wrong parameters
+  multiplies harmonic `n` by `kappa_n = <exp(2*pi*i*n*dPhi)>`, so the penalty grows as
+  `n**2`. Measured under-prediction at `poly_order=4`, ideal matched filter, against the
+  single-harmonic `m`: a factor of `~25` at `ducy=0.1`, tracking `harmonic_weight` to
+  within 15%. So `m_max` cannot be a single global constant. Resolved as O5(a) / D10.
 
-  | ducy | `A/A₀` | actual loss ÷ `m` |
+  > **CORRECTED.** The first version of this entry gave a table of `loss/m` = 0.22 /
+  > 2.16 / 7.52 / 37.2 for `ducy` = 0.5 / 0.2 / 0.1 / 0.05, and those numbers were
+  > **wrong**. They came from modelling mis-parameterised folding as circular convolution
+  > of the profile with a *histogram* of `dPhi`, which has a hard resolution floor of one
+  > phase bin: the rms `dPhi` there was ~0.9 bins, right at the limit, and at smaller
+  > offsets the kernel collapses to a delta function and the model reports *exactly zero*
+  > smearing. The replacement computes `kappa_n` directly from the time samples with no
+  > binning (`tests/test_metric.py::matched_filter_loss`). Two further errors were found
+  > and fixed while chasing this: the comparison must mean-subtract `dPhi`, because
+  > `poly_phase_metric` projects out the constant-phase mode (otherwise `Re(kappa_n)`
+  > charges the mean as loss and the ratio comes out ~1.45x high, and integer bin-shift
+  > maximisation does not fix it because the mean is a small fraction of a bin); and the
+  > boxcar filter is the wrong validation target (see D10).
+
+- **D10 — `harmonic_weight(nbins, ducy, weighting=...)`, defaulting to `"power"`**
+  (resolves O5(a), the human's answer). `g` is scaled by a single scalar `<n**2>`:
+
+  | ducy | `"power"` (default) | `"cross"` |
   |---|---|---|
-  | 0.50 | 0.999108 | 0.22 |
-  | 0.20 | 0.991343 | 2.16 |
-  | 0.10 | 0.969917 | **7.52** |
-  | 0.05 | 0.851051 | **37.2** |
+  | 0.50 | 1.59 | 0.685 |
+  | 0.20 | 6.99 | 2.44 |
+  | 0.10 | 25.4 | 12.1 |
+  | 0.05 | 102.2 | 37.0 |
 
-  A fundamental-only metric **under-predicts the real loss by ~7.5x at `ducy=0.1`** (the
-  plan's `ref_ducy`) and ~37x at 0.05, and over-predicts by ~4x for a broad `ducy=0.5`
-  pulse. The scaling is roughly `ducy**-2.2`, consistent with an `n**2`-weighted sum over
-  the ~`1/ducy` harmonics a narrow boxcar carries.
+  - `"power"` weights by `|p_n|**2` (ideal matched filter). **Validated**: with the
+    corrected measurement, `loss / m` is **0.995-0.998** across `ducy` 0.05-0.5.
+  - `"cross"` weights by `Re(b_n^* p_n)`, the cross-spectrum with the boxcar filter the
+    search actually scores with, and is 2-3x smaller — nominally closer to the pipeline.
 
-  Consequence: `m_max` cannot be a single global constant. Either `g` carries a harmonic
-  weighting factor set by the search's `ducy_max`, or `m_max` is chosen per duty cycle.
-  **This needs a decision before Phase 2 sizes any leaf** — see O5.
-
-  Caveat on the measurement: folding with wrong parameters is modelled here as circular
-  convolution of the profile with the histogram of `dPhi` over the observation, which
-  assumes the drift is slow compared with one rotation. It is a good approximation in
-  this regime but is not the full FFA path, so treat the factors as indicative to ~10%,
-  not exact.
+  `"power"` is the default despite `"cross"` being nominally more faithful, for two
+  reasons. It is the one that can be validated: a boxcar has sinc sidelobes, so
+  `Re(b_n^* p_n)` is **negative** for some `n`, attenuating those harmonics can
+  *increase* the score, and boxcar loss is therefore **not monotonic in smearing** —
+  measured directly it returns a small *negative* loss at `ducy=0.1`. And for a
+  *covering* criterion over-predicting the loss is the safe direction, since it yields
+  smaller leaves. Phase 3's recalibration is the place to decide whether the 2-3x that
+  `"cross"` would claim is worth taking.
 
 ## Open questions (carried from Phase 0, need a human answer)
 
-- **O5 — How should the harmonic weighting enter?** (new, from D9). Options: (a) fold a
-  `ducy`-dependent factor into `g` inside `poly_phase_metric`, so `m` predicts boxcar
-  loss directly for the configured `ducy_max`; (b) keep `g` single-harmonic and make
-  `m_max` a per-duty-cycle budget chosen by the caller; (c) sum explicitly over
-  harmonics with the profile's power spectrum, which is most faithful and most
-  expensive. Recommendation: (a) for Phase 2, because leaf sizing needs one number and
-  the search already has `ducy_max` in `PulsarSearchConfig`; revisit if Phase 3 shows
-  the `ducy` spread matters.
+- ~~**O5 — How should the harmonic weighting enter?**~~
+  **RESOLVED (human, 2026-09-09): (a), fold it into `g`.** Implemented as D10. Note the
+  implementation ended up equivalent to the plan's option (c) in spirit — the factor
+  *is* computed from the profile's spectrum — but collapsed to one scalar `<n**2>` up
+  front, so there is no per-harmonic cost at branch time.
+
+- **O6 — `"power"` or `"cross"` weighting for production?** (new, from D10). `"power"`
+  is the validated, conservative default and `"cross"` claims a 2-3x looser grid but
+  cannot be validated in isolation because boxcar loss is non-monotonic in smearing.
+  Phase 3 should settle this against real injection-recovery rather than a model. Not
+  blocking Phase 2: it is one keyword.
 
 - **O1 — Phase 3 blocker.** Every `prune_dyp_tree` call segfaults on this base
   (numba cannot box the heterogeneous stats dict; fixed on `fix-prune-segfault`,
@@ -219,9 +243,9 @@ Findings worth acting on:
     at poly_order=5). Quantifies why the tiling dilemma worsens with order.
   - D9: single-harmonic m under-predicts real boxcar loss by ~7.5x at ducy=0.1.
     m_max cannot be one global constant. Blocks Phase 2 leaf sizing.
-Open questions: O1 (Phase 3 needs PR #3), O5 (new, harmonic weighting) — O5
-  should be answered before Phase 2 starts.
-Next session starts at: Phase 2, after O5. Phase 2 design decisions to make
+Open questions: O1 (Phase 3 needs PR #3), O6 (new: power vs cross weighting,
+  not blocking).
+Next session starts at: Phase 2. Phase 2 design decisions to make
   first are listed in metric_PLAN.md (metric storage, lattice, meaning of
   column 1); note Phase 0 found world_tree.py does not interpret column 1, so
   option (a) is cheaper than the plan assumed.
