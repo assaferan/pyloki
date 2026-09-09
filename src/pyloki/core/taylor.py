@@ -214,19 +214,12 @@ def poly_taylor_resolve_batch(
     """
     t0_cur, _ = coord_cur
     t0_init, _ = coord_init
-    t0_add, half_width_add = coord_add
+    t0_add, _ = coord_add
 
     param_vec_batch = leaves_batch[:, :-1, 0]
     f0_batch = leaves_batch[:, -1, 0]
 
     dvec_t_add = transforms.shift_taylor_params(param_vec_batch, t0_add - t0_cur)
-    # NB: with a single order dropped (poly_order=3) accel and delay come out
-    # identical to naive truncation -- see economize_taylor_params for why.
-    dvec_t_add = transforms.economize_taylor_params(
-        dvec_t_add,
-        half_width_add,
-        n_keep=3,
-    )
     dvec_t_init = transforms.shift_taylor_params(param_vec_batch, t0_init - t0_cur)
     accel_new_batch = dvec_t_add[:, -3]
     vel_new_batch = dvec_t_add[:, -2] - dvec_t_init[:, -2]
@@ -259,19 +252,12 @@ def poly_taylor_fixed_resolve_batch(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Resolve a batch of leaf params to find the closest grid index and phase shift."""
     t0_init, _ = coord_init
-    t0_add, half_width_add = coord_add
+    t0_add, _ = coord_add
 
     param_vec_batch = leaves_batch[:, :-1, 0]
     f0_batch = leaves_batch[:, -1, 0]
 
     dvec_t_add = transforms.shift_taylor_params(param_vec_batch, t0_add - t0_init)
-    # NB: with a single order dropped (poly_order=3) accel and delay come out
-    # identical to naive truncation -- see economize_taylor_params for why.
-    dvec_t_add = transforms.economize_taylor_params(
-        dvec_t_add,
-        half_width_add,
-        n_keep=3,
-    )
     accel_new_batch = dvec_t_add[:, -3]
     vel_new_batch = dvec_t_add[:, -2]
     freq_new_batch = f0_batch * (1 - vel_new_batch / C_VAL)
@@ -311,15 +297,8 @@ def poly_taylor_ascend_resolve_batch(
     param_idx_batch_arr = np.empty((n_leaves, nsegments, n_params), dtype=np.int64)
     relative_phase_batch_arr = np.empty((n_leaves, nsegments), dtype=np.float64)
     for isegment in range(nsegments):
-        t0_seg, half_width_seg = coord_segments[isegment]
+        t0_seg, _ = coord_segments[isegment]
         dvec_t_seg = transforms.shift_taylor_params(param_vec_batch, t0_seg - t0_cur)
-        # NB: with a single order dropped (poly_order=3) accel and delay come out
-        # identical to naive truncation -- see economize_taylor_params for why.
-        dvec_t_seg = transforms.economize_taylor_params(
-            dvec_t_seg,
-            half_width_seg,
-            n_keep=3,
-        )
         accel_new_batch = dvec_t_seg[:, -3]
         freq_new_batch = f0_batch * (1 - dvec_t_seg[:, -2] / C_VAL)
         delay_batch = dvec_t_seg[:, -1] / C_VAL
