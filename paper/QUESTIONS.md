@@ -23,6 +23,44 @@ Running list of questions to revisit later, cross-referenced against the pyloki 
    minimize? Is there a better approximation (e.g. Fourier/Chebyshev) that would achieve
    better results?
 
+   > **Answered (2026-09-08, revised again — treating `Phi(t)` as a genuinely unknown
+   > smooth function, not an assumed Taylor series):**
+   >
+   > **Taylor and Chebyshev, truncated at the same order `k_max`, are not competing
+   > families.** A degree-≤`k_max` polynomial in the monomial basis `(t-t_c)^k` and the
+   > same polynomial in the Chebyshev basis `T_k(x)` are the identical `(k_max+1)`-dim
+   > vector space, just different coordinates for it. So switching basis doesn't change
+   > which `Φ(t)` the grid can reach — only how efficiently (how few points) it can
+   > guarantee reaching them, since monomial coordinates are badly conditioned/correlated
+   > while Chebyshev coordinates are nearly diagonal. That's what Appendix D buys: a
+   > grid-*efficiency* gain, not a modeling gain. The real question is why a degree-`k_max`
+   > polynomial family at all (in any basis), for approximating an unknown smooth `Φ(t)`
+   > on `[0, Tobs]`.
+   >
+   > **That does have a real (non-assumed) answer from approximation theory:** for a
+   > smooth/analytic function on a finite, *non-periodic* interval, polynomial
+   > approximation is close to the best possible finite-parameter scheme (Jackson-type
+   > theorems: best degree-`n` polynomial error decays geometrically in `n` for analytic
+   > functions). Truncated Fourier/trigonometric approximation is optimal only for
+   > genuinely *periodic* functions; on a finite non-periodic window it suffers
+   > Gibbs-type boundary artifacts and only converges algebraically — i.e. it's worse for
+   > a generic smooth function on a bounded interval. (Chebyshev approximation is in fact
+   > equivalent to a cosine-Fourier series under `t = cos θ`, which handles the
+   > non-periodic boundary correctly by reflection — "Fourier done right for a finite
+   > window.") So polynomial-degree-`k_max` is close to optimal independent of any
+   > physical assumption about `Φ(t)`.
+   >
+   > **Remaining gap:** even granting the polynomial family, each grid point is still
+   > built by literal Taylor-point-matching (matching `k_max` derivatives at `t_ref`),
+   > not by fitting the true minimax/Chebyshev-projected polynomial of the same degree.
+   > These generically differ, and the minimax one has strictly smaller worst-case
+   > sup-norm error for the same degree (the "Chebyshev economization" result — Taylor
+   > truncation is *not* the best degree-`n` approximation, Chebyshev truncation nearly
+   > is). Appendix D fixes the conditioning/correlation problem (grid spacing), but does
+   > not replace derivative-matching with a genuine minimax fit at the level of what each
+   > candidate `Φ(t)` actually is — so there is, in principle, additional unexploited
+   > headroom (a coarser grid, or lower `k_max`, for the same tolerance).
+
 ## Section 3.1/3.2 — Coherent/polynomial phase model
 
 1. In the formula for `Phi(t)`, we need `Phi_ref`. Do we get it from the data? Do we
