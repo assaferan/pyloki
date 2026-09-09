@@ -32,6 +32,7 @@ __all__ = [
     "MMaxBridge",
     "cholesky_factor",
     "ellipsoid_axis_extents",
+    "harmonic_weight",
     "m_max_from_eta",
     "mismatch",
     "poly_phase_metric",
@@ -66,13 +67,93 @@ def _tau_moment(n: int, t_ref: float, t_start: float, t_end: float) -> float:
     return (v ** (n + 1) - u ** (n + 1)) / ((n + 1) * (v - u))
 
 
+def harmonic_weight(
+    nbins: int,
+    ducy: float,
+    *,
+    weighting: str = "power",
+    filter_width: int | None = None,
+) -> float:
+    """Harmonic weighting factor `<n**2>` to fold into `g` (D10; resolves O5(a)).
+
+    A fundamental-only metric mis-predicts the real S/N loss: folding with wrong
+    parameters multiplies harmonic `n` of the profile by
+    `kappa_n = <exp(2*pi*i*n*dPhi)>`, so the penalty grows as `n**2`. To second order,
+
+        A / A_0 ~ 1 - 2*pi**2 * Var(dPhi) * <n**2>,
+
+    so the correction is a single scalar `<n**2>`, the weighted mean squared harmonic
+    number. Two weightings, because it depends on the filter:
+
+    - ``"power"`` (default): weight by `|p_n|**2`, the ideal matched filter.
+      **Validated** against a direct `kappa_n`: `loss / (m * <n**2>)` is 0.96-1.00
+      for `ducy` in 0.05-0.5 (see `tests/test_metric.py`).
+    - ``"cross"``: weight by `Re(b_n^* p_n)`, the cross-spectrum with the boxcar filter
+      the search actually scores with. Closer to the pipeline, and 2-3x *smaller*. It
+      cannot be validated in isolation: a boxcar has sinc sidelobes, so `Re(b_n^* p_n)`
+      is negative for some `n`, and attenuating those harmonics can *increase* the
+      score: boxcar loss is not monotonic in smearing. Measured directly it even
+      returns a small negative loss at `ducy=0.1`.
+
+    ``"power"`` is the default for two reasons: it is the one that is validated, and
+    it is the conservative choice for a *covering* criterion, since over-predicting the
+    loss yields smaller leaves and so a safer covering. Phase 3's recalibration is the
+    place to decide whether the 2-3x of ``"cross"`` is worth claiming.
+
+    Parameters
+    ----------
+    nbins
+        Number of phase bins in the folded profile.
+    ducy
+        Duty cycle; sets the profile width (and the boxcar width for ``"cross"``).
+    weighting
+        ``"power"`` or ``"cross"``, as above.
+    filter_width
+        Boxcar width in bins for ``"cross"``; defaults to `round(ducy * nbins)`.
+
+    Returns
+    -------
+    float
+        The weighting factor. Grows roughly as `ducy**-2`.
+    """
+    from pyloki.simulation.pulse import generate_folded_profile  # local: import cycle
+
+    if not 0.0 < ducy < 1.0:
+        msg = f"ducy must be in (0, 1), got {ducy}"
+        raise ValueError(msg)
+    if weighting not in {"power", "cross"}:
+        msg = f"weighting must be 'power' or 'cross', got {weighting!r}"
+        raise ValueError(msg)
+
+    profile = np.asarray(generate_folded_profile(nbins=nbins, ducy=ducy))
+    p_spec = np.fft.rfft(profile)[1:]  # drop DC: a constant baseline carries no phase
+    n = np.arange(1, len(p_spec) + 1)
+
+    if weighting == "power":
+        w = np.abs(p_spec) ** 2
+    else:
+        width = filter_width or max(1, round(ducy * nbins))
+        box = np.zeros(nbins)
+        box[:width] = 1.0 / math.sqrt(width)
+        box = np.roll(box, int(np.argmax(profile)) - width // 2)
+        w = np.real(np.conj(np.fft.rfft(box)[1:]) * p_spec)
+
+    denom = float(np.sum(w))
+    if denom <= 0:
+        msg = f"degenerate weighting for nbins={nbins}, ducy={ducy}, {weighting!r}"
+        raise ValueError(msg)
+    return float(np.sum(w * n**2) / denom)
+
+
 def poly_phase_metric(
     t_ref: float,
     t_start: float,
     t_end: float,
     poly_order: int,
     f0: float,
-    nbins: int | None = None,  # noqa: ARG001  (D7: unused; kept for the plan's API)
+    nbins: int | None = None,
+    ducy: float | None = None,
+    weighting: str = "power",
 ) -> np.ndarray:
     """Mismatch tensor `g` for the kinematic Taylor basis about `t_ref`.
 
@@ -87,8 +168,14 @@ def poly_phase_metric(
     f0
         Spin frequency in Hz.
     nbins
-        Unused. `g` does not depend on it; it enters only via `m_max_from_eta`.
-        Accepted because the plan's API specifies it (D7).
+        Phase bins. Needed only when `ducy` is given, to compute the harmonic weight.
+    ducy
+        Duty cycle. When given, `g` is scaled by `harmonic_weight(nbins, ducy)` so that
+        `m` predicts the loss under the search's boxcar scoring (D10). When `None`, `g`
+        is the single-harmonic (fundamental-only) metric, which **under-predicts the
+        real loss** — pass `ducy` for anything that sizes a leaf.
+    weighting
+        Passed to `harmonic_weight`; see there. Default `"power"`.
 
     Returns
     -------
@@ -98,12 +185,16 @@ def poly_phase_metric(
 
     Notes
     -----
-    `g_ij = 2*pi**2 * (f0/c)**2 * Cov(tau^ki / ki!, tau^kj / kj!)`, the covariance being
-    a time average over the interval. Subtracting the product of means projects out the
-    constant-phase mode, which is the unobservable direction.
+    `g_ij = W * 2*pi**2 * (f0/c)**2 * Cov(tau^ki / ki!, tau^kj / kj!)`, the covariance
+    being a time average over the interval and `W` the harmonic weight (1 if `ducy` is
+    None). Subtracting the product of means projects out the constant-phase mode, which
+    is the unobservable direction.
     """
     if poly_order < 1:
         msg = f"poly_order must be >= 1, got {poly_order}"
+        raise ValueError(msg)
+    if ducy is not None and nbins is None:
+        msg = "nbins is required when ducy is given"
         raise ValueError(msg)
     orders = _axis_orders(poly_order)
     inv_fact = np.array([1.0 / math.factorial(int(k)) for k in orders])
@@ -120,7 +211,10 @@ def poly_phase_metric(
     cross = cross * inv_fact[:, None] * inv_fact[None, :]
 
     cov = cross - np.outer(mean, mean)
-    g = _AMPLITUDE_SCALE * (f0 / C_VAL) ** 2 * cov
+    weight = (
+        1.0 if ducy is None else harmonic_weight(int(nbins), ducy, weighting=weighting)
+    )
+    g = weight * _AMPLITUDE_SCALE * (f0 / C_VAL) ** 2 * cov
     # Symmetrise against round-off so Cholesky is reliable.
     return 0.5 * (g + g.T)
 
@@ -225,6 +319,7 @@ def m_max_from_eta(
     t_end: float,
     f0: float,
     *,
+    ducy: float | None = None,
     use_cheby: bool = False,
 ) -> MMaxBridge:
     """Bridge the `eta`-box criterion to an `m_max` — for comparison only.
@@ -236,7 +331,7 @@ def m_max_from_eta(
     """
     from pyloki.utils import psr_utils  # local import: avoids an import cycle
 
-    g = poly_phase_metric(t_ref, t_start, t_end, poly_order, f0, nbins)
+    g = poly_phase_metric(t_ref, t_start, t_end, poly_order, f0, nbins, ducy)
     # poly_taylor_step_d_vec wants the span it is sizing for, and returns full step
     # sizes in leaf axis order; a leaf's column 1 is the HALF-width (C3).
     steps = psr_utils.poly_taylor_step_d_vec(

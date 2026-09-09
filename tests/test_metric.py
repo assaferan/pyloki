@@ -32,6 +32,38 @@ def time_grid(t_start: float, t_end: float, n: int) -> np.ndarray:
     return t_start + (np.arange(n) + 0.5) * h
 
 
+def matched_filter_loss(d_phi: np.ndarray, nbins: int, ducy: float) -> float:
+    """Fractional matched-filter amplitude loss from a phase error, computed exactly.
+
+    Harmonic `n` of the profile is multiplied by `kappa_n = <exp(2*pi*i*n*dPhi)>`,
+    evaluated straight from the time samples with no small-angle expansion, and weighted
+    by `|p_n|**2` (ideal matched filter).
+
+    Two details matter, and both cost a day if got wrong:
+
+    1. `dPhi` is **mean-subtracted**, because `poly_phase_metric` projects out the
+       constant-phase mode. Without it `Re(kappa_n)` charges the mean of `dPhi` as loss,
+       which the search absorbs as a phase shift, and the comparison comes out ~1.45x
+       high. Maximising over integer bin shifts does not fix it: the mean here is a
+       small fraction of one phase bin.
+    2. There is no histogram. An earlier version convolved the profile with a histogram
+       of `dPhi`, which has a hard floor of one phase bin — once the phase spread fell
+       below `1/nbins`, every sample landed in one bin, the kernel became a delta
+       function and the model reported *exactly zero* smearing.
+    """
+    from pyloki.simulation.pulse import generate_folded_profile
+
+    profile = np.asarray(generate_folded_profile(nbins=nbins, ducy=ducy))
+    p_spec = np.fft.rfft(profile)[1:]
+    n = np.arange(1, len(p_spec) + 1)
+    weights = np.abs(p_spec) ** 2
+    centred = d_phi - d_phi.mean()
+    kappa = np.array(
+        [np.mean(np.exp(2j * np.pi * float(k) * centred)) for k in n]
+    )
+    return 1.0 - float(np.sum(weights * np.real(kappa)) / np.sum(weights))
+
+
 def phase_cycles(delta: np.ndarray, t: np.ndarray, t_ref: float, poly_order: int):
     """Phase difference in cycles from a coefficient offset, evaluated directly.
 
@@ -361,3 +393,97 @@ class TestSanityAgainstCurrentSpacing:
         # Axis i carries order k = poly_order - i, and the coarsening is 2**(k-1)
         # because poly_taylor_step_f applies 2**k over k = 0.. for [f_k..f_0] reversed.
         np.testing.assert_allclose(ratio, 2.0 ** np.arange(poly_order - 1, -1, -1))
+
+
+class TestHarmonicWeight:
+    """O5(a) / D10 — the ducy-dependent factor folded into `g`."""
+
+    def test_grows_as_pulse_narrows(self) -> None:
+        weights = [metric.harmonic_weight(NBINS, d) for d in (0.5, 0.2, 0.1, 0.05)]
+        assert all(b > a for a, b in zip(weights, weights[1:], strict=False))
+        assert weights[0] > 0
+
+    def test_roughly_inverse_square_in_ducy(self) -> None:
+        w_a = metric.harmonic_weight(NBINS, 0.2)
+        w_b = metric.harmonic_weight(NBINS, 0.05)
+        # 4x narrower should cost roughly 4**2 = 16x, within a factor of 2.
+        assert 8.0 < w_b / w_a < 32.0, f"{w_b / w_a}"
+
+    def test_rejects_bad_ducy(self) -> None:
+        for bad in (0.0, 1.0, -0.1, 1.5):
+            with pytest.raises(ValueError, match="ducy"):
+                metric.harmonic_weight(NBINS, bad)
+
+    def test_metric_scales_by_the_weight(self) -> None:
+        args = (33.5, 0.0, 67.1, 4, F0)
+        g_plain = metric.poly_phase_metric(*args, NBINS, None)
+        g_ducy = metric.poly_phase_metric(*args, NBINS, 0.1)
+        np.testing.assert_allclose(
+            g_ducy, metric.harmonic_weight(NBINS, 0.1) * g_plain, rtol=1e-12
+        )
+
+    def test_ducy_requires_nbins(self) -> None:
+        with pytest.raises(ValueError, match="nbins is required"):
+            metric.poly_phase_metric(33.5, 0.0, 67.1, 4, F0, None, 0.1)
+
+    @pytest.mark.parametrize("ducy", [0.5, 0.2, 0.1, 0.05])
+    def test_weighted_metric_predicts_measured_loss(self, ducy, capsys) -> None:
+        """The point of the weighting: `loss / m` must be ~1, across duty cycles.
+
+        Uses the ideal matched filter, which is the case the second-order expansion
+        describes unambiguously and where every term `|p_n|**2` is positive so the loss
+        is monotonic in smearing. The boxcar filter the search really uses is *not*
+        monotonic (sinc sidelobes make `Re(b_n^* p_n)` negative for some `n`), which is
+        why the default weighting is `"power"` — see `harmonic_weight`.
+        """
+        poly_order = 4
+        t_ref, t_start, t_end = 33.5, 0.0, 67.1
+        g = metric.poly_phase_metric(
+            t_ref, t_start, t_end, poly_order, F0, NBINS, ducy
+        )
+        raw = RNG.normal(size=poly_order)
+        direction = raw / np.linalg.norm(raw)
+        delta = direction * math.sqrt(2e-3 / metric.mismatch(g, direction))
+        m = metric.mismatch(g, delta)
+
+        t = time_grid(t_start, t_end, 200_000)
+        d_phi = phase_cycles(delta, t, t_ref, poly_order)
+        loss = matched_filter_loss(d_phi, NBINS, ducy)
+        factor = loss / m
+
+        with capsys.disabled():
+            print(f"\n  ducy={ducy:.2f}  m={m:.3e}  loss={loss:.3e}"
+                  f"  loss/m={factor:.4f}")
+        # Residual is the 4th-order term in kappa, which bites first for narrow pulses.
+        assert 0.90 < factor < 1.10, f"ducy={ducy}: loss/m={factor:.4f}"
+
+    def test_unweighted_metric_badly_under_predicts(self) -> None:
+        """Why the weighting is not optional: without it, `m` is off by ~25x."""
+        poly_order, ducy = 4, 0.1
+        t_ref, t_start, t_end = 33.5, 0.0, 67.1
+        g_plain = metric.poly_phase_metric(
+            t_ref, t_start, t_end, poly_order, F0, NBINS, None
+        )
+        raw = RNG.normal(size=poly_order)
+        direction = raw / np.linalg.norm(raw)
+        delta = direction * math.sqrt(2e-4 / metric.mismatch(g_plain, direction))
+
+        t = time_grid(t_start, t_end, 200_000)
+        d_phi = phase_cycles(delta, t, t_ref, poly_order)
+        loss = matched_filter_loss(d_phi, NBINS, ducy)
+        factor = loss / metric.mismatch(g_plain, delta)
+        # Should be ~ harmonic_weight, i.e. ~25 at ducy=0.1 -- not ~1.
+        expected = metric.harmonic_weight(NBINS, ducy)
+        assert factor > 10.0, f"expected large under-prediction, got {factor:.3f}"
+        np.testing.assert_allclose(factor, expected, rtol=0.15)
+
+    def test_cross_weighting_is_smaller_than_power(self) -> None:
+        for ducy in (0.5, 0.2, 0.1, 0.05):
+            w_pow = metric.harmonic_weight(NBINS, ducy, weighting="power")
+            w_crs = metric.harmonic_weight(NBINS, ducy, weighting="cross")
+            assert w_crs < w_pow
+            assert 1.5 < w_pow / w_crs < 4.0, f"ducy={ducy}: {w_pow / w_crs}"
+
+    def test_rejects_bad_weighting(self) -> None:
+        with pytest.raises(ValueError, match="weighting"):
+            metric.harmonic_weight(NBINS, 0.1, weighting="matched")
