@@ -453,7 +453,7 @@ matches Chebyshev at `eta=1` (roughly `eta=0.267` at `poly_order=4`), compared o
 `scratch/econ_experiment/run_basis_eta.py` is prepared for exactly this and has not been
 run.
 
-### Bottom line
+### Bottom line (SUPERSEDED by §14 — these runs used `tiling_strategy="aggressive"`, which penalizes the Chebyshev basis ~3.5x more than Taylor and reverses the conclusion)
 
 §11 stands as a documentation/defaults defect: `use_cheby_coarsening=True` is the default
 and silently searches at 1.5-6.1x the requested tolerance, growing with `poly_order`, and
@@ -536,3 +536,89 @@ EP-score deficit is the thread to pull.
 
 Data: `replicates_basis.jsonl` (calibrated), `replicates_basis_uncal.jsonl` (the §12 set,
 kept for comparison).
+
+## 14. The EP-score deficit explained: it is `tiling_strategy`, and §12/§13 were confounded
+
+The §13 open thread is resolved. The Chebyshev EP-score deficit is **not** a property of
+the basis. It is an artifact of `tiling_strategy="aggressive"`, which every experiment in
+§12 and §13 used — inherited from the previous session's `run_search.py`, and also the
+codebase default (`config.py:415`).
+
+### Mechanism
+
+`tiling_strategy` controls how leaf *uncertainties* propagate when parameters are shifted
+between intervals. `"aggressive"` keeps only the transform matrix diagonal
+(`errors * abs(diag(t_mat))`) and is documented as "leaves large sensitivity gaps".
+
+That is nearly harmless in the Taylor basis: `shift_taylor_params`' matrix is
+lower-triangular with **unit diagonal** (the diagonal exponent is `t**0/0!`), so
+diagonal-only tracking carries each coefficient's own error across intact. The Chebyshev
+interval-change matrix has non-unit diagonal and heavy off-diagonal mixing between
+orders, so diagonal-only tracking **underestimates** the leaf uncertainty. The grid then
+under-refines, the true signal falls outside the leaf's claimed cell, and coherence is
+lost on later segment additions — which is exactly the observed signature: Chebyshev led
+on per-stage score at stages 1-2 and then *dropped* at the final stage.
+
+Independent confirmation: Chebyshev + `quadrature` at `branch_max=16` fails with the
+guarded `ValueError: Invalid input: increase branch_max` (`psr_utils.py:365`). Correct
+error propagation demands far more branches than `aggressive` was generating. All runs
+below use `branch_max=128`.
+
+### Result: 5 paired replicates, ref_seg=3, final-stage max EP score
+
+| config | mean | sd |
+|---|---|---|
+| taylor + aggressive | 11.572 | 0.346 |
+| taylor + conservative | 12.156 | 0.274 |
+| chebyshev + aggressive | 10.474 | 0.779 |
+| chebyshev + conservative | **12.502** | 0.197 |
+
+| paired contrast | delta | 95% CI | p | consistency |
+|---|---|---|---|---|
+| cost of `aggressive` in Taylor | **+0.584** | [+0.290, +0.878] | 0.005 | 5/5 |
+| cost of `aggressive` in Chebyshev | **+2.028** | [+1.145, +2.911] | 0.003 | 5/5 |
+| cheby − taylor, both `aggressive` (§12/§13 setup) | **−1.098** | [−1.674, −0.522] | 0.006 | 0/5 |
+| cheby − taylor, both `conservative` | **+0.346** | [+0.206, +0.486] | 0.002 | 5/5 |
+
+**The sign reverses.** Under `aggressive` Chebyshev loses by 1.10 (reproducing §12/§13);
+under matched error propagation it wins by 0.35. So the §11 grid advantage does
+materialize — §12/§13 were measuring the tiling strategy, not the basis.
+
+### But `aggressive` is a tradeoff, not simply a defect
+
+Pruning time and leaf counts (FFA is shared, so pruning time is the comparable part):
+
+| config | score | prune time | leaves (log2) |
+|---|---|---|---|
+| taylor + aggressive | 11.65 | **1.2 s** | 15.09 |
+| taylor + conservative | 11.92 | 10.3 s | 21.61 |
+| chebyshev + aggressive | 10.62 | 3.0 s | 15.58 |
+| chebyshev + conservative | 12.24 | **32.1 s** | 22.65 |
+
+`aggressive` buys roughly 9-11x less pruning time (and ~90-135x fewer leaves) for 0.58
+(Taylor) or 2.03 (Chebyshev) of score. That is a real, documented speed/sensitivity
+tradeoff, so the default is defensible. What is notable is that **its cost is ~3.5x
+larger in the Chebyshev basis**, which is what confounded §12/§13.
+
+On value for money, Chebyshev's win does not obviously survive: `taylor + conservative`
+reaches 12.16 in 10.3 s, while `chebyshev + conservative` reaches 12.50 in 32.1 s — 3.1x
+the cost for +0.35. `taylor + conservative` looks like the better operating point at this
+configuration.
+
+### Caveats
+
+`ref_seg=3` was chosen because §13's diagnostic showed the deficit largest there, so the
+*magnitudes* are from a selected condition and may be inflated; the *signs* reproduced
+5/5. Timings are single runs (runtime was low-variance earlier, sd ~2%), one dataset
+scale, `poly_order=4`, n=5. The per-stage diagnostic across all four `ref_seg` values is
+in `diag_stages.py`; the tiling comparison in `diag_tiling.py`; replicates in
+`replicate_tiling.py` / `analyze_tiling.py` and `replicates_tiling.jsonl`.
+
+### What this means for the earlier sections
+
+- §11 (the `2**k` coarsening searching 1.5-6.1x looser than requested) stands untouched.
+- §12/§13's "Chebyshev buys no sensitivity" is **superseded**: it held only under
+  `aggressive` tiling. Under matched error propagation Chebyshev is better on score,
+  though worse per unit compute.
+- The most broadly useful finding is the quantified cost of the default `aggressive`
+  strategy: 0.58 of score in the Taylor basis, at this configuration, for ~9x speed.

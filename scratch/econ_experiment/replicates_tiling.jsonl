@@ -1,0 +1,5 @@
+{"rep": 0, "taylor_aggressive": 11.23, "taylor_conservative": 11.94, "chebyshev_aggressive": 9.95, "chebyshev_conservative": 12.41}
+{"rep": 1, "taylor_aggressive": 11.19, "taylor_conservative": 12.04, "chebyshev_aggressive": 9.49, "chebyshev_conservative": 12.47}
+{"rep": 2, "taylor_aggressive": 11.87, "taylor_conservative": 12.55, "chebyshev_aggressive": 10.81, "chebyshev_conservative": 12.73}
+{"rep": 3, "taylor_aggressive": 11.92, "taylor_conservative": 12.33, "chebyshev_aggressive": 11.5, "chebyshev_conservative": 12.66}
+{"rep": 4, "taylor_aggressive": 11.65, "taylor_conservative": 11.92, "chebyshev_aggressive": 10.62, "chebyshev_conservative": 12.24}
