@@ -590,6 +590,33 @@ def economize_taylor_params(
     -------
     np.ndarray
         Economized Taylor parameters, same shape as the input.
+
+    Notes
+    -----
+    Parity limitation. Dropping order ``k`` perturbs only those retained coefficients
+    that share the parity of ``k``: a Chebyshev polynomial of even (odd) order expands
+    into even (odd) monomials only, so the discarded high-order content couples back
+    exclusively into same-parity Taylor terms. When exactly one order is dropped
+    (``n_params - n_keep == 1``) the result is therefore bit-identical to naive
+    truncation for every retained coefficient of opposite parity.
+
+    This matters for the ``resolve`` step in ``pyloki.core.taylor``, which always calls
+    this with ``n_keep=3`` to project onto the 2-parameter (accel, freq) FFA grid:
+
+    - ``poly_order=3`` (jerk search): ``n_params=4``, so only jerk (order 3, odd) is
+      dropped. Accel (order 2) and delay (order 0) are even, hence **unchanged** --
+      economization moves the velocity/frequency term alone, and the resolved accel
+      cell is exactly what naive truncation would have picked.
+    - ``poly_order>=4`` (snap and above): two or more orders are dropped, spanning both
+      parities, and the accel coefficient does change.
+
+    The regime where truncation error is largest is unfortunately the one where this
+    buys least: the dropped-order phase error is dominated by the *jerk* term (it
+    enters at ``t_s**3`` against snap's ``t_s**4``, and is the lowest order dropped),
+    so a ``poly_order=3`` search is where the error matters most yet accel is untouched.
+    Where two orders are dropped, the sup-norm phase error over the segment falls to
+    ~0.244 of naive truncation, measured scale-invariantly across six octaves of
+    segment duration.
     """
     n_params = taylor_param_vec.shape[-1]
     if n_keep >= n_params:

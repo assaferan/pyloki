@@ -57,3 +57,34 @@ class TestEconomizeTaylorParams:
         t_s = 1.5
         result = transforms.economize_taylor_params(d_vec, t_s, n_keep=5)
         np.testing.assert_array_equal(result, d_vec)
+
+    def test_parity_limitation_when_one_order_dropped(self) -> None:
+        # Dropping a single order perturbs only the retained coefficients sharing its
+        # parity; opposite-parity coefficients are bit-identical to naive truncation.
+        t_s = 3.7
+        for k_max in range(2, 7):
+            n_params = k_max + 1
+            d_vec = self.rng.random(n_params) * 10.0
+            econ = transforms.economize_taylor_params(d_vec, t_s, n_keep=k_max)
+            for order in range(k_max):
+                idx = n_params - 1 - order
+                if (order - k_max) % 2:  # opposite parity to the dropped order
+                    assert econ[idx] == pytest.approx(d_vec[idx], abs=1e-12), (
+                        f"k_max={k_max}, order={order} should be untouched"
+                    )
+                else:
+                    assert econ[idx] != d_vec[idx], (
+                        f"k_max={k_max}, order={order} should have moved"
+                    )
+
+    def test_poly_order_3_leaves_accel_and_delay_untouched(self) -> None:
+        # The resolve step's poly_order=3 case: d_vec is [jerk, accel, vel, delay] and
+        # n_keep=3 drops jerk alone (order 3, odd). Accel (order 2) and delay (order 0)
+        # are even, so economization cannot move them -- the resolved accel grid cell is
+        # exactly what naive truncation picks. Only vel (order 1) changes.
+        d_vec = np.array([6.0, 500.0, 12.0, 3.0])  # jerk, accel, vel, delay
+        econ = transforms.economize_taylor_params(d_vec, 4.2, n_keep=3)
+
+        assert econ[1] == d_vec[1]  # accel: bit-identical
+        assert econ[3] == d_vec[3]  # delay: bit-identical
+        assert econ[2] != d_vec[2]  # vel: moved
