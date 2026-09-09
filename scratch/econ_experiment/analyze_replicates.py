@@ -6,7 +6,7 @@ import pathlib
 import numpy as np
 from scipy import stats
 
-BASE = pathlib.Path("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment")
+BASE = pathlib.Path(__file__).resolve().parent
 rows = [json.loads(x) for x in (BASE / "replicates.jsonl").read_text().splitlines() if x.strip()]
 n = len(rows)
 print(f"paired replicates: n = {n}\n")

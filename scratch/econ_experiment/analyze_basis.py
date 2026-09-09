@@ -6,7 +6,7 @@ import pathlib
 import numpy as np
 from scipy import stats
 
-BASE = pathlib.Path("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment")
+BASE = pathlib.Path(__file__).resolve().parent
 import sys
 SRC = sys.argv[1] if len(sys.argv) > 1 else "replicates_basis.jsonl"
 rows = [json.loads(x) for x in

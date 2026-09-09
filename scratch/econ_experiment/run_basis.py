@@ -25,7 +25,7 @@ from pyloki.io.timeseries import TimeSeries
 from pyloki.periodogram import ScatteredPeriodogram
 from pyloki.prune import prune_dyp_tree
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("basis", choices=["taylor", "chebyshev"])

@@ -10,7 +10,9 @@ import pathlib
 import re
 import shutil
 
-REPO = pathlib.Path("/Users/assaferan/Documents/GitHub/pyloki")
+# Derived from this file's location, NOT hardcoded: with several worktrees of this
+# repo checked out side by side, a fixed path would copy some other branch's src.
+REPO = pathlib.Path(__file__).resolve().parents[2]
 DEST = REPO / "scratch/econ_experiment/variant_naive"
 
 shutil.rmtree(DEST, ignore_errors=True)

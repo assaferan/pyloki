@@ -1,3 +1,4 @@
+import pathlib
 """Test whether the Chebyshev EP-score deficit is caused by tiling_strategy.
 
 diag_stages.py showed Taylor's final-stage score is stable across ref_seg
@@ -28,7 +29,7 @@ from pyloki.ffa import DynamicProgramming
 from pyloki.io.timeseries import TimeSeries
 from pyloki.prune import prune_dyp_tree
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 REF_SEG = 3
 BRANCH_MAX = 128
 LINE = re.compile(r"Prune level:\s*(\d+), seg_idx:\s*(\d+).*?max:\s*([0-9.]+)")

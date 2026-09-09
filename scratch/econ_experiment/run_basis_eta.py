@@ -1,3 +1,4 @@
+import pathlib
 """Cost-at-matched-tolerance variant of run_basis.py, with eta exposed.
 
 The plain basis comparison is confounded: chebyshev explores ~2x the leaves, so a
@@ -36,7 +37,7 @@ from pyloki.io.timeseries import TimeSeries
 from pyloki.periodogram import ScatteredPeriodogram
 from pyloki.prune import prune_dyp_tree
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("basis", choices=["taylor", "chebyshev"])

@@ -37,7 +37,7 @@ cfg = PulseSignalConfig(
 )
 tim_data = cfg.generate(shape="gaussian")
 
-out = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment/data_snap.npz"
+out = "<repo>/scratch/econ_experiment/data_snap.npz"
 np.savez(
     out, ts_e=tim_data.ts_e, ts_v=tim_data.ts_v, dt=tim_data.dt,
     period=PERIOD, accel=ACCEL, jerk=JERK, snap=snap, freq=cfg.freq,

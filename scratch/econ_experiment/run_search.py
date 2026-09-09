@@ -11,9 +11,9 @@ from pyloki.periodogram import ScatteredPeriodogram
 from pyloki.prune import prune_dyp_tree
 
 variant = sys.argv[1]  # "economized" or "naive"
-outdir = f"/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment/results_{variant}/"
+outdir = f"<repo>/scratch/econ_experiment/results_{variant}/"
 
-d = np.load("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment/data.npz")
+d = np.load("<repo>/scratch/econ_experiment/data.npz")
 ts_e, ts_v, dt = d["ts_e"], d["ts_v"], float(d["dt"])
 period, accel, jerk, freq, nsamps = (
     float(d["period"]), float(d["accel"]), float(d["jerk"]), float(d["freq"]), int(d["nsamps"]),

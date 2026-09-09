@@ -15,8 +15,8 @@ import sys
 
 import numpy as np
 
-BASE = pathlib.Path("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment")
-PY = "/Users/assaferan/Documents/GitHub/pyloki/.venv/bin/python"
+BASE = pathlib.Path(__file__).resolve().parent
+PY = sys.executable
 OUT = BASE / "replicates.jsonl"
 KEYS = ("best_score", "best_score_ep", "closest_score", "closest_score_ep", "n_cands")
 

@@ -4,7 +4,7 @@ import pathlib
 
 import numpy as np
 
-BASE = pathlib.Path("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment")
+BASE = pathlib.Path(__file__).resolve().parent
 
 rows = {}
 for variant in ("naive", "econ"):

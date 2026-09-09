@@ -1,3 +1,4 @@
+import pathlib
 """Sup-norm PHASE error of the resolve step: naive truncation vs Chebyshev economization.
 
 Two fixes relative to the earlier version of this script (kept as .bak):
@@ -27,7 +28,7 @@ from pyloki.io.timeseries import TimeSeries
 from pyloki.utils import transforms
 from pyloki.utils.misc import C_VAL
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 d = np.load(f"{BASE}/data.npz")
 ts_e, ts_v, dt = d["ts_e"], d["ts_v"], float(d["dt"])
 freq_true, nsamps = float(d["freq"]), int(d["nsamps"])
