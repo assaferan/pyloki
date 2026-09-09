@@ -30,12 +30,12 @@ counting from the end: row `[-1]` = `f_0` (col 0) and basis flag (col 1); row `[
 `poly_order` branchable axes. Branching uses `n_params = poly_order`
 (`core/taylor.py:106`).
 
-**ADDITION (tests on other branches).** `tests/test_transforms.py` and
-`tests/test_prune.py` exist on sibling branches (`Chebyshev`, `fix-prune-segfault`) but
-not here. `test_prune.py` is the only end-to-end pruning coverage anywhere and it
-depends on the `prune.py` SIGSEGV fix (PR #3, open upstream). **Phase 3 cannot run at
-all on this base** — every `prune_dyp_tree` call segfaults until PR #3 lands or
-`fix-prune-segfault` is merged in. Phases 0-2 are unaffected.
+**ADDITION (tests), updated after the rebase.** At the original base `6b11aba` the only
+tests were `cheby.py`, `mat_inv_tests.py` and `test_maths.py`, and **Phase 3 could not run
+at all** because every `prune_dyp_tree` call segfaulted. Both facts are now stale:
+upstream merged PR #3 as `2b4b80c`, this branch is rebased onto it, and `tests/test_prune.py`
+(the only end-to-end pruning coverage) arrived with it. Suite is 79 passed and Phase 3 is
+unblocked. `tests/test_transforms.py` still exists only on the sibling `Chebyshev` branch.
 
 ## 2. Consumers of leaf column 1 (the half-width)
 
@@ -148,8 +148,8 @@ bridge constant is not universal across `poly_order`. Recorded as an open questi
 
 ## 7. Open questions for the human (Phase 0 exit gate)
 
-1. **Phase 3 is blocked on PR #3.** Pruning segfaults on this base. Merge
-   `fix-prune-segfault` into `metric-gridding` when Phase 3 starts, or wait for the PR?
+1. ~~**Phase 3 is blocked on PR #3.**~~ Resolved: merged upstream as `2b4b80c`, branch
+   rebased, pruning runs. See DECISIONS.md O1.
 2. **`m_max` bridge.** Match along the best-conditioned axis, or by matched ellipsoid
    volume? §5 above argues neither is canonical. Recommendation: report **both** in
    Phase 1 test 5 and pick after seeing the ratios.
