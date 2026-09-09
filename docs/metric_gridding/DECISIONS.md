@@ -21,8 +21,8 @@ These are **observed from the code**, not chosen, and any metric code must match
 - **D1 — Base branch.** `metric-gridding` is cut from `6b11aba` = `upstream/main`, not
   from the `Chebyshev` working branch. Rationale: the plan's ground rule is "do not
   modify existing behaviour", so a clean upstream base keeps the eventual diff reviewable
-  and upstreamable. Consequence: pruning segfaults on this base until PR #3 lands
-  (see open question O1).
+  and upstreamable. The consequence that pruning segfaulted on this base is **gone**:
+  PR #3 merged upstream as `2b4b80c` and this branch is rebased onto it (O1).
 
 - **D2 — `2π` handling.** The codebase carries phase in cycles with no `2π`
   (C6). Rather than track a loose factor, `g` will be **defined so that
@@ -84,8 +84,8 @@ These are **observed from the code**, not chosen, and any metric code must match
   amplitude because the plan cites Owen (1996) / Allen et al. (2013), where the match is
   the normalised overlap and `m = 1 − match` is amplitude-like. `test_metric.py` checks
   the amplitude relation and *also* reports the power one, so the factor of 2 is visible
-  rather than buried. **Flag for the human:** if the intended convention is power, change
-  the `2 * np.pi**2` constant in `metric.py` to `4 * np.pi**2` and halve every `m_max`.
+  rather than buried. **CONFIRMED by the human (2026-09-09): amplitude is fine.** D6 is
+  settled; no change to the `2 * np.pi**2` constant.
 
 - **D7 — `nbins` is used only when `ducy` is given.** `g` is independent of `nbins` for
   the single-harmonic metric, and `poly_phase_metric` raises if `ducy` is passed without
@@ -173,10 +173,10 @@ These are **observed from the code**, not chosen, and any metric code must match
   Phase 3 should settle this against real injection-recovery rather than a model. Not
   blocking Phase 2: it is one keyword.
 
-- **O1 — Phase 3 blocker.** Every `prune_dyp_tree` call segfaults on this base
-  (numba cannot box the heterogeneous stats dict; fixed on `fix-prune-segfault`,
-  upstream PR #3, open). Phases 0-2 are unaffected. Merge the fix branch when Phase 2
-  ends, or wait for the PR to land?
+- ~~**O1 — Phase 3 blocker.**~~ **RESOLVED (2026-09-09): upstream PR #3 merged**
+  (`2b4b80c`), so the fix arrived by fast-forward rather than needing a branch merge.
+  This branch was rebased onto it. Pruning now runs on this base and `tests/test_prune.py`
+  comes in from upstream: the suite is **79 passed**. Phase 3 is unblocked.
 
 - ~~**O2 — `m_max` bridge.**~~ **RESOLVED (human, 2026-09-09): compute both.**
   See D4.
@@ -243,8 +243,9 @@ Findings worth acting on:
     at poly_order=5). Quantifies why the tiling dilemma worsens with order.
   - D9: single-harmonic m under-predicts real boxcar loss by ~7.5x at ducy=0.1.
     m_max cannot be one global constant. Blocks Phase 2 leaf sizing.
-Open questions: O1 (Phase 3 needs PR #3), O6 (new: power vs cross weighting,
-  not blocking).
+Open questions: O6 (new: power vs cross weighting, not blocking).
+Resolved after the fact: O1 (PR #3 merged upstream as 2b4b80c; branch rebased,
+  79 passed) and D6 (human confirmed amplitude).
 Next session starts at: Phase 2. Phase 2 design decisions to make
   first are listed in metric_PLAN.md (metric storage, lattice, meaning of
   column 1); note Phase 0 found world_tree.py does not interpret column 1, so
