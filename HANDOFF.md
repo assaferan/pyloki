@@ -422,12 +422,28 @@ is flat and the EP score moved the wrong way. Two candidate explanations, untest
    typical error falls from 3.05x to 0.80x of `eta/nbins`, i.e. from ~3 phase bins to
    ~0.8 of one. If the profile is ~6.4 bins wide, going from 3 bins of smear to 0.8 may
    sit where the score is insensitive.
-2. Something else in the Chebyshev path costs what the grid gains. The EP score being
-   consistently *worse* (0/8) points this way and is the single most suspicious result
-   here. I do not understand `score_ep`'s definition well enough to say whether that is
-   a real sensitivity loss or a bookkeeping difference between the two report paths
-   (`poly_chebyshev_report_batch` applies its own gauge transform after
-   `cheby_to_taylor_full`). **Understand `score_ep` before acting on any of this.**
+2. Something else in the Chebyshev path costs what the grid gains.
+
+**`score_ep` vs `score`, now resolved** (this downgrades the alarm above):
+
+- **`score_ep`** is the survivor's score at the end of the EP pruning pass, accumulated
+  incrementally as the tree grew segment by segment. `ascend_func`
+  (`dyn_poly_taylor.py:589`) snapshots it with
+  `world_tree.scores_ep[:n] = world_tree.scores[:n]` immediately *before* overwriting
+  `scores`. It is what the pruning thresholds acted on, so it is a property of the
+  **search trajectory**.
+- **`score`** is "Score (Integrated)" (`periodogram.py:439`). After pruning,
+  `_do_ascend` re-resolves every survivor against *all* segments
+  (`poly_taylor_ascend_resolve_batch` over `coord_segments`), re-accumulates the fold
+  coherently from scratch (`shift_add_ascend_batch`) and re-scores. It is a
+  **path-independent** evaluation of the final parameter set. `_do_ascend` runs
+  unconditionally at the end when `ascend_levels` is None (`prune.py:591`), which was
+  the case in both arms.
+
+So the integrated score is the correct metric for "does this basis recover signal
+better", and a flat integrated score with a lower EP score means *different route, same
+destination*. The 0/8 EP result was over-flagged above as "the single most suspicious
+result"; it is largely expected.
 
 **The leaf-count confound is still open.** Chebyshev explores ~44% more candidates, so
 even a positive score result could have been "more trials" rather than a better grid. The
@@ -445,3 +461,78 @@ the flag is not plumbed into the live branch step. That is worth reporting regar
 §12 says the fix for it is not simply "switch to `poly_basis="chebyshev"`" -- that buys the
 grid property but no measured sensitivity, costs 14% more time, and makes the EP score
 worse for reasons not yet understood.
+
+## 13. §12 re-run with a calibrated threshold ladder: the null holds, and tighter
+
+§12 had a real flaw. `run_basis.py` passed a hardcoded `np.linspace(1.5, 6.0, nstages)`
+as the threshold ladder, inherited from the previous session's `run_search.py`. At this
+config the calibrated ladder is nothing like it:
+
+| | stage 1 | stage 2 | stage 3 |
+|---|---|---|---|
+| hardcoded (both arms) | 1.50 | 3.75 | **6.00** |
+| taylor, calibrated | 3.69 | 4.55 | **2.37** |
+| chebyshev, calibrated | 4.18 | 4.55 | **2.64** |
+
+It was effectively inverted: far too permissive early, far too strict at the end. A
+final-stage threshold of 6.00 against a calibrated 2.37 discards exactly the marginal
+candidates a grid-quality comparison depends on, so §12 risked having suppressed the
+effect it was looking for. Candidate counts confirm the throttling: ~7k under the
+hardcoded ladder against ~43k under the calibrated one.
+
+Note `thresholding.evaluate_scheme` does **not** produce a ladder — it takes one and
+reports how it performs. The optimizer is `determine_scheme(survive_probs, ...)`. The
+ladder here is built the way `examples/optimal_thresholds.ipynb` builds its "constant"
+scheme: survival probability per stage `= 1 / branching_factor`, so the survivor
+population stays constant. That is basis-adaptive (Chebyshev branches 192 in stage 1
+against Taylor's 32, so it must prune harder) and it **equalizes computational load**,
+which incidentally settles the §12 leaf-count confound. Derived once by
+`make_thresholds.py` and cached, because `determine_scheme` uses an unseeded RNG and
+re-deriving per replicate would inject threshold noise into a paired comparison.
+
+### Result: 8 paired replicates, calibrated ladder
+
+Validity gate first: no replicate saturated `max_sugg = 2**16` (taylor peaked at 92% of
+the cap, chebyshev at 79%), so neither arm was truncated.
+
+| metric | taylor | chebyshev | mean delta | sd | p | cheby wins |
+|---|---|---|---|---|---|---|
+| best score (integrated) | 11.4711 | 11.3904 | **-0.0807** | 0.235 | 0.36 | 4/8 |
+| best score_ep | 11.1353 | 9.1510 | **-1.9843** | 0.909 | **0.00046** | **0/8** |
+| closest-to-true score | 6.8125 | 7.2318 | +0.4192 | 1.598 | 0.48 | 4/8 |
+| n candidates | 43323 | 44484 | +1162 | 14784 | 0.83 | 6/8 |
+| runtime (s) | 8.40 | 9.67 | +1.27 | 0.161 | 1e-07 | 8/8 |
+
+**The confound is now closed by construction.** Candidate population went from a 1.44x
+imbalance under the hardcoded ladder to **1.03x** — the two arms carry the same number of
+candidates. So this is a matched-load comparison, not "one arm got more trials".
+
+**The null is unchanged and now tighter.** Integrated best score: delta -0.081,
+95% CI [-0.277, +0.116], i.e. any Chebyshev gain above ~1% of score is excluded. The
+calibrated ladder revealed no hidden effect; the §12 conclusion survives its own
+methodological objection.
+
+**The EP-score deficit is robust and grew.** -1.98 (against -1.40 uncalibrated), 0/8 in
+both threshold regimes, p=0.0005. Since `score_ep` is the pruning-path score (§12), this
+says the Chebyshev trajectory accumulates consistently lower partial-fold scores while
+arriving at parameters of equal final quality. A concrete hypothesis worth testing: the
+Chebyshev per-stage resolve/phase bookkeeping is mildly lossy and the final `ascend`
+re-integration recovers it. Not investigated.
+
+### Standing conclusion on the basis question
+
+- §11 stands: `use_cheby_coarsening=True` is the default and searches at 1.5-6.1x the
+  requested tolerance, growing with `poly_order`, and the flag is not plumbed into the
+  live branch step. A documentation/defaults defect worth reporting upstream.
+- §12/§13 stand: switching to `poly_basis="chebyshev"` fixes the grid geometry
+  (confirmed deterministically, 2.3-6.6x better typical coverage) but buys **no measured
+  integrated sensitivity**, at matched candidate load, for 15% more runtime, with a
+  consistently worse pruning-path score.
+
+So the grid defect is real and the obvious remedy does not pay for itself here. Whether
+that is because the phase accuracy is irrelevant at this configuration, or because
+something in the Chebyshev path gives back what the grid gains, is unresolved — the
+EP-score deficit is the thread to pull.
+
+Data: `replicates_basis.jsonl` (calibrated), `replicates_basis_uncal.jsonl` (the §12 set,
+kept for comparison).

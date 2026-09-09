@@ -12,6 +12,7 @@ Usage: python run_basis.py <taylor|chebyshev>
 """
 
 import argparse
+import pathlib
 import shutil
 import sys
 import time
@@ -19,7 +20,6 @@ import time
 import numpy as np
 
 from pyloki.config import ParamLimits, PulsarSearchConfig
-from pyloki.detection import thresholding
 from pyloki.ffa import DynamicProgramming
 from pyloki.io.timeseries import TimeSeries
 from pyloki.periodogram import ScatteredPeriodogram
@@ -75,11 +75,21 @@ print(f"[{args.basis}] kind={kind} pattern={np.array2string(np.asarray(branching
 print(f"[{args.basis}] predicted total leaves={cum.sum():.4g} peak={cum.max():.4g}",
       flush=True)
 
-thresholds = np.linspace(1.5, 6.0, len(branching_pattern))
-thresholding.evaluate_scheme(
-    thresholds, branching_pattern, ref_ducy=0.1, nbins=nbins,
-    ntrials=1024, snr_final=9.0, ducy_max=0.5, wtsp=1.2,
-)
+# Calibrated ladder, derived once per basis by make_thresholds.py (survival
+# probability 1/branching_factor per stage, so the survivor population stays
+# constant). This replaces a hardcoded np.linspace(1.5, 6.0, nstages) inherited from
+# run_search.py, whose final-stage threshold of 6.0 against a calibrated ~2.4 was
+# discarding exactly the marginal candidates a grid comparison depends on.
+thr_file = f"{BASE}/thresholds_{args.basis}.npy"
+if not pathlib.Path(thr_file).exists():
+    print(f"FATAL: {thr_file} missing -- run make_thresholds.py first")
+    sys.exit(3)
+thresholds = np.load(thr_file)
+if len(thresholds) != len(branching_pattern):
+    print(f"FATAL: cached ladder has {len(thresholds)} stages, "
+          f"branching pattern has {len(branching_pattern)}; re-run make_thresholds.py")
+    sys.exit(3)
+print(f"[{args.basis}] thresholds={np.round(thresholds, 4)}", flush=True)
 
 outdir = f"{BASE}/results_basis_{args.basis}/"
 shutil.rmtree(outdir, ignore_errors=True)
