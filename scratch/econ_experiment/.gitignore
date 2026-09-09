@@ -1,0 +1,8 @@
+# Generated artifacts: regenerate with the scripts, don't track.
+__pycache__/
+*.npz
+*.bak
+results_*/
+# Full copy of src/pyloki with the economize calls stripped; rebuild with
+# build_variant_naive.py, which must be re-run after any change to src/.
+variant_naive/
