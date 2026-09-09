@@ -7,8 +7,10 @@ import numpy as np
 from scipy import stats
 
 BASE = pathlib.Path("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment")
+import sys
+SRC = sys.argv[1] if len(sys.argv) > 1 else "replicates_basis.jsonl"
 rows = [json.loads(x) for x in
-        (BASE / "replicates_basis.jsonl").read_text().splitlines() if x.strip()]
+        (BASE / SRC).read_text().splitlines() if x.strip()]
 n = len(rows)
 print(f"paired replicates: n = {n}\n")
 if n < 2:
