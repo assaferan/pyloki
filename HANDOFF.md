@@ -363,3 +363,85 @@ often a signal lands near a cell corner, which this analysis does not address. I
 possible `2**k` was empirically tuned against exactly that, in which case the defect is
 the docstring calling it a "Chebyshev coarsening factor" rather than the number itself.
 Measuring the recovered-SNR difference between the two bases is the next step (§12).
+
+## 12. Chebyshev basis end-to-end: better grid, no sensitivity gain
+
+Follow-up to §11. Both arms run the same source and differ only in `poly_basis` (and the
+matching `generate_branching_pattern` kind), so no `variant_naive` is involved.
+
+**Note:** the `Chebyshev` branch has `fix-prune-segfault` merged into it, because none of
+this runs without the §4 fix and PR #3 is not merged upstream yet. Expect that merge to
+drop out on a rebase once #3 lands.
+
+### The grid property is real, and measurable without noise
+
+`scratch/econ_experiment/grid_mismatch.py` places a signal at a uniformly random position
+inside one grid cell (20000 draws) and computes the sup-norm phase error over the segment
+against the nearest grid point, using the code's own step rules. No folding, no
+thresholding, no noise. Errors in units of the nominal `eta/nbins`:
+
+| poly_order | taylor mean | cheby mean | ratio | taylor p95 | cheby p95 |
+|---|---|---|---|---|---|
+| 3 | 1.52x | **0.65x** | 2.3 | 2.66x | 1.08x |
+| 4 | 3.05x | **0.80x** | 3.9 | 5.34x | 1.26x |
+| 5 | 6.11x | **0.94x** | 6.6 | 10.74x | 1.42x |
+
+Chebyshev holds the *typical* error below the tolerance it was asked for; the Taylor
+default exceeds its own stated tolerance by 1.5-6.1x typically and up to 10.7x at p95.
+This is the §11 prediction confirmed for the typical case, not just the worst-case bound.
+
+### But it does not improve recovered sensitivity
+
+8 paired replicates (`replicate_basis.py`, `analyze_basis.py`):
+
+| metric | taylor | chebyshev | mean delta | sd | p | cheby wins |
+|---|---|---|---|---|---|---|
+| best score (integrated) | 11.7305 | 11.7283 | **-0.0022** | 0.168 | 0.97 | 2/8 |
+| best score_ep | 11.5305 | 10.1265 | **-1.4039** | 0.969 | **0.0046** | **0/8** |
+| closest-to-true score | 7.3828 | 8.5402 | +1.1574 | 2.373 | 0.21 | 5/8 |
+| n candidates | 7109 | 10232 | +3122 | 1532 | 0.0007 | 8/8 |
+| runtime (s) | 8.58 | 9.77 | +1.20 | 0.144 | 6e-08 | 8/8 |
+
+Read by metric stability, which differs by more than an order of magnitude:
+
+- **Integrated score is the well-resolved metric** (sd 0.17; one replicate suffices to
+  resolve an effect of 0.5) and shows **no difference whatsoever**: -0.002, p=0.97.
+- **EP score is significantly worse for Chebyshev**: -1.40, 0/8 replicates, p=0.0046.
+- **Closest-to-true score is unusable at this sample size**: sd 2.37, deltas ranging
+  -3.45 to +3.26, needing n~177 to resolve an effect of 0.5. An early single run of
+  +3.09 on this metric was an outlier and should not be quoted.
+- Chebyshev costs 1.14x the runtime and yields ~44% more candidates, both rock solid
+  (8/8, p<1e-3).
+
+### Interpretation, and what is still unresolved
+
+A better-covered grid did not produce a better detection statistic. The integrated score
+is flat and the EP score moved the wrong way. Two candidate explanations, untested:
+
+1. The extra phase accuracy is irrelevant at this configuration. At `poly_order=4` the
+   typical error falls from 3.05x to 0.80x of `eta/nbins`, i.e. from ~3 phase bins to
+   ~0.8 of one. If the profile is ~6.4 bins wide, going from 3 bins of smear to 0.8 may
+   sit where the score is insensitive.
+2. Something else in the Chebyshev path costs what the grid gains. The EP score being
+   consistently *worse* (0/8) points this way and is the single most suspicious result
+   here. I do not understand `score_ep`'s definition well enough to say whether that is
+   a real sensitivity loss or a bookkeeping difference between the two report paths
+   (`poly_chebyshev_report_batch` applies its own gauge transform after
+   `cheby_to_taylor_full`). **Understand `score_ep` before acting on any of this.**
+
+**The leaf-count confound is still open.** Chebyshev explores ~44% more candidates, so
+even a positive score result could have been "more trials" rather than a better grid. The
+efficiency claim in §11 is specifically that Chebyshev reaches a given tolerance *more
+cheaply*. Testing it needs a third arm: Taylor with `eta` reduced until its cell error
+matches Chebyshev at `eta=1` (roughly `eta=0.267` at `poly_order=4`), compared on cost.
+`scratch/econ_experiment/run_basis_eta.py` is prepared for exactly this and has not been
+run.
+
+### Bottom line
+
+§11 stands as a documentation/defaults defect: `use_cheby_coarsening=True` is the default
+and silently searches at 1.5-6.1x the requested tolerance, growing with `poly_order`, and
+the flag is not plumbed into the live branch step. That is worth reporting regardless.
+§12 says the fix for it is not simply "switch to `poly_basis="chebyshev"`" -- that buys the
+grid property but no measured sensitivity, costs 14% more time, and makes the EP score
+worse for reasons not yet understood.
