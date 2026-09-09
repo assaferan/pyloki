@@ -18,8 +18,8 @@ from pathlib import Path
 
 import numpy as np
 
-BASE = Path("/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment")
-PY = "/Users/assaferan/Documents/GitHub/pyloki/.venv/bin/python"
+BASE = Path(__file__).resolve().parent
+PY = sys.executable
 OUT = BASE / "replicates_tiling.jsonl"
 REF_SEG, BRANCH_MAX = 3, 128
 LINE = re.compile(r"Prune level:\s*(\d+), seg_idx:\s*(\d+).*?max:\s*([0-9.]+)")

@@ -1,3 +1,4 @@
+import pathlib
 """End-to-end SNR comparison at poly_order=4: naive truncation vs economization.
 
 Both variants read the SAME data_snap.npz. The variant is selected by which pyloki
@@ -18,7 +19,7 @@ import time
 
 import numpy as np
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("variant", choices=["econ", "naive"])

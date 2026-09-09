@@ -20,7 +20,7 @@ print(f"tobs = {cfg.tobs:.3f} s, freq = {cfg.freq:.6f} Hz")
 tim_data = cfg.generate(shape="gaussian")
 
 np.savez(
-    "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment/data.npz",
+    "<repo>/scratch/econ_experiment/data.npz",
     ts_e=tim_data.ts_e,
     ts_v=tim_data.ts_v,
     dt=tim_data.dt,

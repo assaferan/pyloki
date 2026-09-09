@@ -1,3 +1,4 @@
+import pathlib
 """Derive a calibrated threshold ladder per basis, once, and cache it.
 
 run_basis.py originally passed a hardcoded np.linspace(1.5, 6.0, nstages), inherited
@@ -22,7 +23,7 @@ from pyloki.detection import thresholding
 from pyloki.ffa import DynamicProgramming
 from pyloki.io.timeseries import TimeSeries
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 NTRIALS = 8192  # high, for a stable ladder
 
 d = np.load(f"{BASE}/data_snap.npz")

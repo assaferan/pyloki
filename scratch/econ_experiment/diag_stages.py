@@ -1,3 +1,4 @@
+import pathlib
 """Localize the EP-score deficit: is the Chebyshev drop tied to the LAST STAGE, or to
 the specific segment added there?
 
@@ -24,7 +25,7 @@ from pyloki.ffa import DynamicProgramming
 from pyloki.io.timeseries import TimeSeries
 from pyloki.prune import prune_dyp_tree
 
-BASE = "/Users/assaferan/Documents/GitHub/pyloki/scratch/econ_experiment"
+BASE = str(pathlib.Path(__file__).resolve().parent)
 
 d = np.load(f"{BASE}/data_snap.npz")
 dt = float(d["dt"])
