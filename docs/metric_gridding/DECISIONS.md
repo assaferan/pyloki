@@ -31,6 +31,19 @@ These are **observed from the code**, not chosen, and any metric code must match
   `mismatch()` will return a pure number. *To be confirmed against Phase 1 test 4
   (empirical S/N loss) before being treated as settled.*
 
+- **D3 — How to run anything in this worktree (important).** The repo's `.venv` lives in
+  the **main** checkout and its editable install resolves `import pyloki` to
+  `/Users/assaferan/Documents/GitHub/pyloki/src/pyloki` — i.e. **the main checkout's
+  source, on whatever branch it happens to be**, not this worktree's. Running `pytest`
+  here without care silently tests the wrong code. Verified. Always shadow it:
+
+  ```sh
+  PYTHONPATH=$PWD/src /Users/assaferan/Documents/GitHub/pyloki/.venv/bin/python -m pytest
+  ```
+
+  Confirmed to resolve to the worktree source and give `25 passed` at `2bc0455`.
+  (A dedicated venv in the worktree would also work but duplicates ~1 GB of deps.)
+
 ## Open questions (carried from Phase 0, need a human answer)
 
 - **O1 — Phase 3 blocker.** Every `prune_dyp_tree` call segfaults on this base
@@ -68,7 +81,7 @@ Done:
     feeds B(s) so "metric" forces recalibration.
   - Current vs target invariant written down, with the sup-norm/mean-square
     non-equivalence made explicit.
-Conventions fixed: C1-C6 above (all observed, not chosen); D1, D2.
+Conventions fixed: C1-C6 above (all observed, not chosen); D1, D2, D3.
 Corrections to the plan:
   - `validate` is a no-op in the Taylor path and consumes column 1 not at all.
   - `world_tree.py` never interprets column 1 (only column 0 and whole rows),
