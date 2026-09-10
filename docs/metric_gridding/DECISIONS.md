@@ -187,17 +187,45 @@ These are **observed from the code**, not chosen, and any metric code must match
   `core/chebyshev.py:60` already uses that slot for a velocity width in its own layout,
   so writing a parent interval there would couple the two layouts silently.
 
-## Blocked in Phase 2 (needs a plan change)
+- **D14 — The metric branch is split at the stage/batch seam, which unblocks Phase 2
+  step 6 without moving Phase 4 forward.** (Plan amended 2026-09-10.)
 
-- **Phase 2 step 6 (dispatch) cannot be completed as scheduled.**
-  `dynamic/dyn_poly_taylor.py::branch_func` is `@njit(cache=True, fastmath=True)`, so it
-  cannot call a pure-NumPy branch. The covering needs `eigh`, Cholesky solves and a
-  recursive enumeration, none of which survive `nopython`. The plan schedules
-  numba-isation for **Phase 4**, so the ordering is wrong: either Phase 4's numba work
-  moves ahead of the dispatch wiring, or the dispatch goes through an
-  `objmode`/`@njit(forceobj)` shim. **Not worked around here** — the function and its
-  tests are complete and directly tested, but `tiling_strategy="metric"` is still inert
-  at the dispatch level. Flagged for the human.
+  The blocker: `dynamic/dyn_poly_taylor.py::branch_func` is
+  `@njit(cache=True, fastmath=True)` and cannot call a covering that needs `eigh`,
+  Cholesky solves and a recursive enumeration. As the plan was written, step 6 depended
+  on the numba-isation scheduled for **Phase 4** — an ordering error, since Phase 4 is
+  gated on Phase 3, which is gated on step 6.
+
+  Moving Phase 4 forward is not necessary, because D11 already says the covering depends
+  only on the *stage* and never on the leaves. So the branch splits along that seam:
+
+  - `metric_branch_tables(...)` — plain Python, all the linear algebra and the
+    enumeration, **once per stage**.
+  - `poly_taylor_branch_metric_apply(leaves, offsets_unit, extents_unit)` — `@njit`, a
+    broadcast add and a `1 / f0` rescale, **once per batch**.
+
+  Verified rather than assumed: the njit half compiles in nopython mode, is callable
+  from an `@njit` caller *and* from inside a `prange` (the context that produced the
+  earlier SIGABRT), and agrees with its `py_func` to ~1 ulp — `fastmath` contracts the
+  multiply-add, so the two are **not** bit-identical, and the test asserts `rtol=1e-14`
+  rather than equality. `TestNjitDispatch` pins all of this.
+
+  Consequence for Phase 4: numba-ising `metric.py` is no longer a prerequisite for
+  anything, and is mostly unnecessary — what stays in Python is per-stage, not per-leaf,
+  so it is off the hot path.
+
+## Still to do in Phase 2 (step 6b)
+
+- **The per-stage precompute hook is not wired up, so `tiling_strategy="metric"` is
+  still inert end-to-end.** `coord_cur` and `coord_prev` are pure functions of
+  `prune_level` via `MiddleOutScheme`, so the whole schedule is known in Python: compute
+  the tables once per level in `prune.py::execute_iter` (which already holds
+  `self.prune_level` and the scheme) and thread them to `branch_func` as plain arrays.
+  Two routes, to pick when implementing: (i) add a `branch_offsets` argument to the
+  `branch` structref method, which touches the shared signature in `dyn_poly_taylor.py`,
+  `dyn_poly_cheby.py` and `dyn_circular_taylor.py`; or (ii) carry the table as a mutable
+  structref field, which needs a setter. (i) is more churn but explicit. Neither changes
+  anything for `aggressive`.
 
 ## Phase 2 findings
 
@@ -370,10 +398,19 @@ Exit criterion: coverage green (0 uncovered at poly_order 2-4, worst mismatch
   0.90-0.98 of m_max, guaranteed by construction not by sampling); redundancy
   known and factorised exactly into lattice thickness x retention dilation;
   aggressive path untouched.
-Two things the human needs to decide:
-  - Phase 2 step 6 is BLOCKED: branch_func is @njit and cannot dispatch to a
-    pure-NumPy branch. Phase 4's numba work has to move ahead of it, or the
-    dispatch needs an objmode shim. tiling_strategy="metric" is inert for now.
+Phase 2 step 6 unblocked (D14, plan amended): branch_func being @njit does
+  NOT require moving Phase 4 forward. Split the branch at the stage/batch seam
+  -- metric_branch_tables (Python, per stage) + poly_taylor_branch_metric_apply
+  (@njit, per batch) -- since D11 already showed the covering depends only on
+  the stage. Verified callable from @njit and from inside a prange. Step 6b
+  (the per-stage precompute hook in prune.py) is still to do, so
+  tiling_strategy="metric" remains inert end-to-end.
+Also done: installed ruff (was in the dev extra but absent) and made src/ and
+  the metric tests clean; added tests/**/*.py per-file-ignores for S101/T201,
+  without which pytest asserts fail lint -- upstream's own test_prune.py does.
+  ruff format left alone: nothing in the repo is format-clean and ruff warns
+  COM812 conflicts with the formatter.
+One thing the human needs to decide:
   - Redundancy is a Phase 3 design question that is already answerable: the
     metric covering costs 45x the volume bound and ~90x the box strategy at
     poly_order=4, and poly_order=5 exceeds a 500k cap. A_4* buys 2.8x;

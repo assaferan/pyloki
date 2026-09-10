@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from numba import njit, prange
 from scipy.special import gamma
 
 from pyloki.config import PulsarSearchConfig
@@ -80,6 +81,31 @@ def cover_stats(
         covers.append(n_cov)
         worst = max(worst, float(np.max(np.min(m_to, axis=1)) / m_max))
     return uncovered, float(np.concatenate(covers).mean()), worst
+
+
+@njit(cache=True, fastmath=True)
+def njit_caller(
+    leaves_batch: np.ndarray, offsets: np.ndarray, extents: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Stand-in for `dyn_poly_taylor.branch_func`, which is `@njit` too."""
+    return taylor.poly_taylor_branch_metric_apply(leaves_batch, offsets, extents)
+
+
+@njit(cache=True, fastmath=True, parallel=True)
+def njit_parallel_caller(
+    leaves_batch: np.ndarray,
+    offsets: np.ndarray,
+    extents: np.ndarray,
+    n_rep: int,
+) -> float:
+    """Pruning branches inside a `prange`; nested regions have bitten before."""
+    total = 0.0
+    for _ in prange(n_rep):
+        out, _origins = taylor.poly_taylor_branch_metric_apply(
+            leaves_batch, offsets, extents,
+        )
+        total += out[0, 0, 0]
+    return total
 
 
 def cubic_thickness(n_dim: int) -> float:
@@ -365,6 +391,67 @@ class TestBranchContract:
             taylor.poly_taylor_branch_metric_batch(
                 leaves, (0.0, T_CHILD), (0.0, T_PARENT), NBINS, DUCY, 3, M_MAX, 5,
             )
+
+
+class TestNjitDispatch:
+    """The Phase 2 step 6 unblock: an `@njit` caller must be able to branch.
+
+    `dyn_poly_taylor.branch_func` is `@njit(cache=True, fastmath=True)`, so the
+    original pure-NumPy branch could not be dispatched from it. The branch is now split
+    into `metric_branch_tables` (Python, once per stage: eigh, Cholesky, Fincke-Pohst)
+    and `poly_taylor_branch_metric_apply` (`@njit`, once per batch: a broadcast add and
+    a 1/f0 rescale). These tests pin that the njit half really is reachable.
+    """
+
+    def _tables_and_leaves(
+        self, poly_order: int,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        offsets, extents = taylor.metric_branch_tables(
+            T_PARENT, T_CHILD, NBINS, DUCY, poly_order, M_MAX, 500_000,
+        )
+        leaves = np.zeros((4, poly_order + 2, 2))
+        leaves[:, :-2, 0] = RNG.normal(scale=1e-3, size=(4, poly_order))
+        leaves[:, -2, 0] = np.arange(4.0)
+        leaves[:, -1, 0] = F0
+        leaves[1, -1, 0] = 2.0 * F0  # distinct f0, exercising the rescale
+        return offsets, extents, leaves
+
+    def test_callable_from_an_njit_function(self) -> None:
+        offsets, extents, leaves = self._tables_and_leaves(3)
+        out, origins = njit_caller(leaves, offsets, extents)
+        assert out.shape == (len(leaves) * len(offsets), 3 + 2, 2)
+        assert len(origins) == len(out)
+        # Guard: compiled in nopython mode, not an object-mode fallback.
+        assert njit_caller.nopython_signatures
+
+    def test_callable_inside_a_prange(self) -> None:
+        offsets, extents, leaves = self._tables_and_leaves(2)
+        value = njit_parallel_caller(leaves, offsets, extents, 4)
+        assert np.isfinite(value)
+
+    def test_agrees_with_the_pure_python_implementation(self) -> None:
+        """Only to `fastmath` tolerance: FMA contraction costs about one ulp."""
+        offsets, extents, leaves = self._tables_and_leaves(3)
+        out_njit, org_njit = taylor.poly_taylor_branch_metric_apply(
+            leaves, offsets, extents,
+        )
+        out_py, org_py = taylor.poly_taylor_branch_metric_apply.py_func(
+            leaves, offsets, extents,
+        )
+        np.testing.assert_array_equal(org_njit, org_py)
+        np.testing.assert_allclose(out_njit, out_py, rtol=1e-14, atol=0)
+
+    def test_tables_depend_only_on_the_stage(self) -> None:
+        """D11: no leaf state enters the tables, so one call per stage suffices."""
+        first = taylor.metric_branch_tables(
+            T_PARENT, T_CHILD, NBINS, DUCY, 3, M_MAX, 500_000,
+        )
+        second = taylor.metric_branch_tables(
+            T_PARENT, T_CHILD, NBINS, DUCY, 3, M_MAX, 500_000,
+        )
+        np.testing.assert_array_equal(first[0], second[0])
+        np.testing.assert_array_equal(first[1], second[1])
+        assert len(first[0]) > 1, "single child would make this vacuous"
 
 
 class TestAggressiveUntouched:
