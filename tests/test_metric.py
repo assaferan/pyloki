@@ -6,12 +6,15 @@ than asserted tightly.
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import numpy as np
 import pytest
 
 from pyloki.core import metric
+from pyloki.simulation.pulse import generate_folded_profile
+from pyloki.utils import transforms
 from pyloki.utils.misc import C_VAL
 
 RNG = np.random.default_rng(20260909)
@@ -51,20 +54,20 @@ def matched_filter_loss(d_phi: np.ndarray, nbins: int, ducy: float) -> float:
        below `1/nbins`, every sample landed in one bin, the kernel became a delta
        function and the model reported *exactly zero* smearing.
     """
-    from pyloki.simulation.pulse import generate_folded_profile
-
     profile = np.asarray(generate_folded_profile(nbins=nbins, ducy=ducy))
     p_spec = np.fft.rfft(profile)[1:]
     n = np.arange(1, len(p_spec) + 1)
     weights = np.abs(p_spec) ** 2
     centred = d_phi - d_phi.mean()
     kappa = np.array(
-        [np.mean(np.exp(2j * np.pi * float(k) * centred)) for k in n]
+        [np.mean(np.exp(2j * np.pi * float(k) * centred)) for k in n],
     )
     return 1.0 - float(np.sum(weights * np.real(kappa)) / np.sum(weights))
 
 
-def phase_cycles(delta: np.ndarray, t: np.ndarray, t_ref: float, poly_order: int):
+def phase_cycles(
+    delta: np.ndarray, t: np.ndarray, t_ref: float, poly_order: int,
+) -> np.ndarray:
     """Phase difference in cycles from a coefficient offset, evaluated directly.
 
     `Phi = f0 * [(t - t_ref) - d(t)/c]`, so an offset `delta` in the coefficients gives
@@ -103,7 +106,7 @@ class TestMetricBasics:
         delta = RNG.normal(size=4) * np.array([1e-3, 1e-2, 1e-1, 1e0])
         w = chol.T @ delta
         np.testing.assert_allclose(
-            metric.mismatch(g, delta), float(w @ w), rtol=1e-10
+            metric.mismatch(g, delta), float(w @ w), rtol=1e-10,
         )
 
 
@@ -161,14 +164,12 @@ class TestEpochShiftCovariance:
 
         # Same absolute interval, expansion moved to t_ref + delta_t.
         g_direct = metric.poly_phase_metric(
-            t_ref + delta_t, t_start, t_end, poly_order, F0, NBINS
+            t_ref + delta_t, t_start, t_end, poly_order, F0, NBINS,
         )
         np.testing.assert_allclose(g_shifted, g_direct, rtol=1e-8)
 
     def test_shift_matrix_matches_transforms_module(self) -> None:
         """The metric's `T` must be the same matrix the codebase already shifts with."""
-        from pyloki.utils import transforms
-
         poly_order, delta_t = 4, 7.25
         # Full vector including d_0, shifted by the production routine.
         d_full = RNG.normal(size=poly_order + 1)
@@ -178,7 +179,7 @@ class TestEpochShiftCovariance:
         # which is only true because the full matrix is lower triangular with d_0 last.
         t_block = metric.shift_matrix(delta_t, poly_order)
         np.testing.assert_allclose(
-            t_block @ d_full[:poly_order], shifted_full[:poly_order], rtol=1e-10
+            t_block @ d_full[:poly_order], shifted_full[:poly_order], rtol=1e-10,
         )
 
     def test_mismatch_is_invariant_under_shift(self) -> None:
@@ -214,11 +215,11 @@ class TestEllipsoidInvariance:
         boundary = np.sqrt(m_max) * np.linalg.solve(chol.T, unit.T).T
 
         np.testing.assert_allclose(
-            metric.mismatch(g, boundary), np.full(200, m_max), rtol=1e-8
+            metric.mismatch(g, boundary), np.full(200, m_max), rtol=1e-8,
         )
         mapped = boundary @ t_mat.T
         np.testing.assert_allclose(
-            metric.mismatch(g_new, mapped), np.full(200, m_max), rtol=1e-8
+            metric.mismatch(g_new, mapped), np.full(200, m_max), rtol=1e-8,
         )
 
     def test_ellipsoid_axis_extents_touch_the_boundary(self) -> None:
@@ -234,7 +235,7 @@ class TestEllipsoidInvariance:
 
 
 class TestEmpiricalSnrLoss:
-    """Plan test 4 — does `m` actually predict the S/N loss?"""
+    """Plan test 4: whether `m` actually predicts the S/N loss."""
 
     @pytest.mark.parametrize("m_target", [1e-4, 1e-3, 1e-2])
     def test_single_harmonic_amplitude_loss(self, m_target: float) -> None:
@@ -285,15 +286,15 @@ class TestEmpiricalSnrLoss:
         # And our g is the amplitude one.
         np.testing.assert_allclose(m_amp, metric.mismatch(g, delta), rtol=2e-3)
 
-    def test_duty_cycle_dependence_is_reported(self, capsys) -> None:
+    def test_duty_cycle_dependence_is_reported(
+        self, capsys: pytest.CaptureFixture[str],
+    ) -> None:
         """Boxcar-scored folded profile vs the single-harmonic prediction (O4).
 
         Narrow pulses carry power at higher harmonics, so they lose more S/N than the
         fundamental-only estimate. This measures the effective harmonic weighting rather
         than assuming it; the numbers feed O4 and DECISIONS.md.
         """
-        from pyloki.detection.thresholding import generate_folded_profile
-
         poly_order = 4
         t_ref, t_start, t_end = 33.5, 0.0, 67.1
         g = metric.poly_phase_metric(t_ref, t_start, t_end, poly_order, F0, NBINS)
@@ -311,14 +312,14 @@ class TestEmpiricalSnrLoss:
             # Folding with the wrong parameters smears the profile by the distribution
             # of d_phi over the observation: circular convolution with that histogram.
             hist, _ = np.histogram(
-                np.mod(d_phi, 1.0), bins=NBINS, range=(0.0, 1.0), density=False
+                np.mod(d_phi, 1.0), bins=NBINS, range=(0.0, 1.0), density=False,
             )
             kernel = hist / hist.sum()
             smeared = np.real(
-                np.fft.ifft(np.fft.fft(profile) * np.fft.fft(kernel))
+                np.fft.ifft(np.fft.fft(profile) * np.fft.fft(kernel)),
             )
             # Boxcar-matched amplitude, the same statistic the search maximises.
-            width = max(1, int(round(ducy * NBINS)))
+            width = max(1, round(ducy * NBINS))
             box = np.ones(width) / math.sqrt(width)
             best = max(
                 float(np.dot(np.roll(smeared, -s)[:width], box)) for s in range(NBINS)
@@ -346,14 +347,16 @@ class TestSanityAgainstCurrentSpacing:
     """Plan test 5 — ratios against the existing box. Reported, loosely asserted."""
 
     @pytest.mark.parametrize("poly_order", [2, 3, 4, 5])
-    def test_extents_within_orders_of_magnitude(self, poly_order, capsys) -> None:
+    def test_extents_within_orders_of_magnitude(
+        self, poly_order: int, capsys: pytest.CaptureFixture[str],
+    ) -> None:
         eta, t_start, t_end = 1.0, 0.0, 67.108864
         t_ref = 0.0  # poly_taylor_step_d_vec is called with t_ref=0 in branch
         bridge_raw = metric.m_max_from_eta(
-            eta, NBINS, poly_order, t_ref, t_start, t_end, F0, use_cheby=False
+            eta, NBINS, poly_order, t_ref, t_start, t_end, F0, use_cheby=False,
         )
         bridge_cheby = metric.m_max_from_eta(
-            eta, NBINS, poly_order, t_ref, t_start, t_end, F0, use_cheby=True
+            eta, NBINS, poly_order, t_ref, t_start, t_end, F0, use_cheby=True,
         )
         g = metric.poly_phase_metric(t_ref, t_start, t_end, poly_order, F0, NBINS)
 
@@ -384,10 +387,10 @@ class TestSanityAgainstCurrentSpacing:
         """The two bridges must differ exactly by the documented 2**k per axis (D5)."""
         eta, poly_order = 1.0, 4
         raw = metric.m_max_from_eta(
-            eta, NBINS, poly_order, 0.0, 0.0, 67.108864, F0, use_cheby=False
+            eta, NBINS, poly_order, 0.0, 0.0, 67.108864, F0, use_cheby=False,
         )
         chb = metric.m_max_from_eta(
-            eta, NBINS, poly_order, 0.0, 0.0, 67.108864, F0, use_cheby=True
+            eta, NBINS, poly_order, 0.0, 0.0, 67.108864, F0, use_cheby=True,
         )
         ratio = chb.box_half_widths / raw.box_half_widths
         # Axis i carries order k = poly_order - i, and the coarsening is 2**(k-1)
@@ -400,7 +403,7 @@ class TestHarmonicWeight:
 
     def test_grows_as_pulse_narrows(self) -> None:
         weights = [metric.harmonic_weight(NBINS, d) for d in (0.5, 0.2, 0.1, 0.05)]
-        assert all(b > a for a, b in zip(weights, weights[1:], strict=False))
+        assert all(b > a for a, b in itertools.pairwise(weights))
         assert weights[0] > 0
 
     def test_roughly_inverse_square_in_ducy(self) -> None:
@@ -419,7 +422,7 @@ class TestHarmonicWeight:
         g_plain = metric.poly_phase_metric(*args, NBINS, None)
         g_ducy = metric.poly_phase_metric(*args, NBINS, 0.1)
         np.testing.assert_allclose(
-            g_ducy, metric.harmonic_weight(NBINS, 0.1) * g_plain, rtol=1e-12
+            g_ducy, metric.harmonic_weight(NBINS, 0.1) * g_plain, rtol=1e-12,
         )
 
     def test_ducy_requires_nbins(self) -> None:
@@ -427,7 +430,9 @@ class TestHarmonicWeight:
             metric.poly_phase_metric(33.5, 0.0, 67.1, 4, F0, None, 0.1)
 
     @pytest.mark.parametrize("ducy", [0.5, 0.2, 0.1, 0.05])
-    def test_weighted_metric_predicts_measured_loss(self, ducy, capsys) -> None:
+    def test_weighted_metric_predicts_measured_loss(
+        self, ducy: float, capsys: pytest.CaptureFixture[str],
+    ) -> None:
         """The point of the weighting: `loss / m` must be ~1, across duty cycles.
 
         Uses the ideal matched filter, which is the case the second-order expansion
@@ -439,7 +444,7 @@ class TestHarmonicWeight:
         poly_order = 4
         t_ref, t_start, t_end = 33.5, 0.0, 67.1
         g = metric.poly_phase_metric(
-            t_ref, t_start, t_end, poly_order, F0, NBINS, ducy
+            t_ref, t_start, t_end, poly_order, F0, NBINS, ducy,
         )
         raw = RNG.normal(size=poly_order)
         direction = raw / np.linalg.norm(raw)
@@ -462,7 +467,7 @@ class TestHarmonicWeight:
         poly_order, ducy = 4, 0.1
         t_ref, t_start, t_end = 33.5, 0.0, 67.1
         g_plain = metric.poly_phase_metric(
-            t_ref, t_start, t_end, poly_order, F0, NBINS, None
+            t_ref, t_start, t_end, poly_order, F0, NBINS, None,
         )
         raw = RNG.normal(size=poly_order)
         direction = raw / np.linalg.norm(raw)

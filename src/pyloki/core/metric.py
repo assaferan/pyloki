@@ -26,6 +26,7 @@ from typing import NamedTuple
 
 import numpy as np
 
+from pyloki.utils import psr_utils
 from pyloki.utils.misc import C_VAL
 
 __all__ = [
@@ -46,7 +47,7 @@ _AMPLITUDE_SCALE = 2.0 * np.pi**2
 
 
 def _axis_orders(poly_order: int) -> np.ndarray:
-    """Derivative order carried by each axis, in leaf order (C1).
+    """Return the derivative order carried by each axis, in leaf order (C1).
 
     `[poly_order, ..., 2, 1]` — reverse `k`, and `d_0` excluded.
     """
@@ -116,7 +117,10 @@ def harmonic_weight(
     float
         The weighting factor. Grows roughly as `ducy**-2`.
     """
-    from pyloki.simulation.pulse import generate_folded_profile  # local: import cycle
+    # Local import: pyloki.simulation.pulse imports pyloki.core, and core/__init__
+    # reaches this module via taylor, so a top-level import here is a cycle
+    # whenever pulse is the entry point.
+    from pyloki.simulation.pulse import generate_folded_profile  # noqa: PLC0415
 
     if not 0.0 < ducy < 1.0:
         msg = f"ducy must be in (0, 1), got {ducy}"
@@ -201,7 +205,7 @@ def poly_phase_metric(
 
     # First moments <tau^k / k!> per axis, and cross moments <tau^(ki+kj)>.
     mean = np.array(
-        [_tau_moment(int(k), t_ref, t_start, t_end) for k in orders]
+        [_tau_moment(int(k), t_ref, t_start, t_end) for k in orders],
     ) * inv_fact
     cross = np.empty((poly_order, poly_order), dtype=np.float64)
     for i in range(poly_order):
@@ -245,7 +249,7 @@ def ellipsoid_axis_extents(g: np.ndarray, m_max: float) -> np.ndarray:
 
 
 def shift_matrix(delta_t: float, n_params: int) -> np.ndarray:
-    """The Taylor re-centring matrix `T(delta_t)` restricted to the branchable axes.
+    """Build the Taylor re-centring matrix `T(delta_t)` for the branchable axes.
 
     Built exactly as `transforms.shift_taylor_errors` builds it, then restricted to the
     leading `n_params x n_params` block. That restriction is exact rather than an
@@ -259,7 +263,7 @@ def shift_matrix(delta_t: float, n_params: int) -> np.ndarray:
     powers = np.tril(idx[:, np.newaxis] - idx)
     fact = np.vectorize(math.factorial)(powers).astype(np.float64)
     return np.asarray(
-        delta_t**powers / fact * np.tril(np.ones_like(powers)), dtype=np.float64
+        delta_t**powers / fact * np.tril(np.ones_like(powers)), dtype=np.float64,
     )
 
 
@@ -329,8 +333,6 @@ def m_max_from_eta(
     not inherit the `2**k` coarsening. Pass `use_cheby=True` to bridge against the box
     the existing strategies actually use today.
     """
-    from pyloki.utils import psr_utils  # local import: avoids an import cycle
-
     g = poly_phase_metric(t_ref, t_start, t_end, poly_order, f0, nbins, ducy)
     # poly_taylor_step_d_vec wants the span it is sizing for, and returns full step
     # sizes in leaf axis order; a leaf's column 1 is the HALF-width (C3).
