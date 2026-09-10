@@ -226,17 +226,34 @@ def poly_taylor_branch_metric_batch(
     the offsets scale as `1 / f0` and the enumeration -- much the most expensive part --
     runs once per stage rather than once per distinct `f0` in the batch.
     """
-    n_batch = leaves_batch.shape[0]
-    n_params = poly_order
     _, t_obs_cur = coord_cur
     _, t_obs_prev = coord_prev
+    offsets_unit, extents_unit = metric_branch_tables(
+        t_obs_prev, t_obs_cur, nbins, ducy, poly_order, m_max, branch_max,
+    )
+    return poly_taylor_branch_metric_apply(leaves_batch, offsets_unit, extents_unit)
 
-    param_cur_batch = leaves_batch[:, :-2, 0]
-    d0_cur_batch = leaves_batch[:, -2, 0]
-    f0_batch = leaves_batch[:, -1, 0]
-    basis_flag_batch = leaves_batch[:, -1, 1]
 
-    # Enumerate once at f0 = 1, then rescale per leaf by 1 / f0.
+def metric_branch_tables(
+    t_obs_prev: float,
+    t_obs_cur: float,
+    nbins: int,
+    ducy: float,
+    poly_order: int,
+    m_max: float,
+    branch_max: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Per-stage covering tables: child offsets at `f0 = 1`, and child axis extents.
+
+    Everything expensive lives here -- `eigh`, Cholesky solves and the Fincke-Pohst
+    enumeration -- and none of it depends on the leaves. The tables are a function of
+    the *stage* alone (`t_obs_prev`, `t_obs_cur`, `nbins`, `ducy`, `poly_order`,
+    `m_max`), because the metric is exactly proportional to `f0**2` (D11), so a leaf's
+    own `f0` enters only as a `1 / f0` rescaling.
+
+    That is what lets the numba-hostile part run once per stage in Python while the
+    per-batch work stays in `poly_taylor_branch_metric_apply`, which is `@njit`.
+    """
     g_parent = metric.poly_phase_metric(
         0.0, 0.0, t_obs_prev, poly_order, 1.0, nbins, ducy,
     )
@@ -247,23 +264,48 @@ def poly_taylor_branch_metric_batch(
         g_parent, g_child, m_max, max_children=branch_max,
     )
     extents_unit = metric.ellipsoid_axis_extents(g_child, m_max)
-    n_child = offsets_unit.shape[0]
+    return np.ascontiguousarray(offsets_unit), np.ascontiguousarray(extents_unit)
 
-    scale = (1.0 / f0_batch)[:, np.newaxis, np.newaxis]
-    children = param_cur_batch[:, np.newaxis, :] + offsets_unit[np.newaxis] * scale
-    batch_origins = np.repeat(np.arange(n_batch), n_child)
+
+@njit(cache=True, fastmath=True)
+def poly_taylor_branch_metric_apply(
+    leaves_batch: np.ndarray,
+    offsets_unit: np.ndarray,
+    extents_unit: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Apply per-stage covering tables to a batch of leaves.
+
+    The numba-compatible half of the metric branch: a broadcast add and a `1 / f0`
+    rescale, with no linear algebra and no enumeration. `offsets_unit` and
+    `extents_unit` come from `metric_branch_tables`, which runs once per stage.
+
+    Splitting the branch here is what unblocks dispatch from the `@njit`
+    `dyn_poly_taylor.branch_func`: see DECISIONS.md D14.
+    """
+    n_batch = leaves_batch.shape[0]
+    n_child = offsets_unit.shape[0]
+    n_params = offsets_unit.shape[1]
 
     n_branch = n_batch * n_child
     leaves_branch_batch = np.zeros((n_branch, n_params + 2, 2), dtype=np.float64)
-    leaves_branch_batch[:, :-2, 0] = children.reshape(n_branch, n_params)
-    # The child's per-axis half-widths: the bounding box of its mismatch ellipsoid,
-    # so downstream consumers of the dparam column keep a meaningful width (C3).
-    leaves_branch_batch[:, :-2, 1] = (
-        extents_unit[np.newaxis, :] / f0_batch[batch_origins][:, np.newaxis]
-    )
-    leaves_branch_batch[:, -2, 0] = d0_cur_batch[batch_origins]
-    leaves_branch_batch[:, -1, 0] = f0_batch[batch_origins]
-    leaves_branch_batch[:, -1, 1] = basis_flag_batch[batch_origins]
+    batch_origins = np.empty(n_branch, dtype=np.int64)
+
+    for i in range(n_batch):
+        f0 = leaves_batch[i, -1, 0]
+        inv_f0 = 1.0 / f0
+        for c in range(n_child):
+            row = i * n_child + c
+            batch_origins[row] = i
+            for j in range(n_params):
+                leaves_branch_batch[row, j, 0] = (
+                    leaves_batch[i, j, 0] + offsets_unit[c, j] * inv_f0
+                )
+                # The child's per-axis half-widths: the bounding box of its mismatch
+                # ellipsoid, so consumers of the dparam column keep a width (C3).
+                leaves_branch_batch[row, j, 1] = extents_unit[j] * inv_f0
+            leaves_branch_batch[row, -2, 0] = leaves_batch[i, -2, 0]
+            leaves_branch_batch[row, -1, 0] = f0
+            leaves_branch_batch[row, -1, 1] = leaves_batch[i, -1, 1]
     return leaves_branch_batch, batch_origins
 
 

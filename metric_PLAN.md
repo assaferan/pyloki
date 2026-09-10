@@ -174,6 +174,17 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
   radius 1 in n dims, or simpler: spacing chosen so the sphere covering
   radius equals 1). Leave a hook for A_n* later. Do not optimise the
   lattice until Phase 3 shows the covering redundancy is the bottleneck.
+  **Amended 2026-09-10:** the redundancy is already measured, at Phase 2, and
+  it is large: 45x the volume lower bound at `poly_order=4` and past a 500k cap
+  at `poly_order=5`, against 512 children for `aggressive` on the same step. The
+  overhead factorises exactly as `4.935` (covering thickness of `Z^4`) x `9.2`
+  (retention dilation). A_4* buys 2.8x of the first factor; anisotropic spacing
+  in the metric's eigenbasis buys most of the second, since two of the four
+  parent semi-axes are already thinner than one child's covering radius. Note
+  ~1000 children at `poly_order=4` is the *volume bound* and so irreducible for
+  any complete covering — `aggressive` sits essentially at it. Phase 3 no longer
+  needs to establish whether redundancy is the bottleneck; it needs to decide
+  whether the metric strategy's detection gain is worth ~2x branching at best.
 - **What column 1 means under `metric`.** Either (a) store the ellipsoid
   axis extents in column 1 so downstream readers that expect a half-width
   keep working approximately, or (b) leave column 1 unused and guard every
@@ -189,7 +200,10 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    exactly with `transform_metric` and return the new axis extents for
    column 1. No inflation, no diagonal truncation.
 3. `core/taylor.py::poly_taylor_branch_batch` (new function
-   `poly_taylor_branch_metric_batch`, dispatched by strategy):
+   `poly_taylor_branch_metric_batch`, dispatched by strategy). **Amended
+   2026-09-10:** split into two functions instead of one, see step 6:
+   `metric_branch_tables` (plain Python, once per stage) and
+   `poly_taylor_branch_metric_apply` (`@njit`, once per batch):
    - Compute `g_s` for the new interval (stage-s metric) and its Cholesky
      factor `L_s`.
    - For each parent: whiten the parent ellipsoid with `L_s`
@@ -209,6 +223,40 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
 5. `validate`, `report`, `ascend`, `io/cands.py`: audit each consumer from
    Phase 0 step 2; make `metric` strategy either use axis extents or skip.
 6. `dynamic/dyn_poly_taylor.py`: dispatch only. No logic here.
+
+   **AMENDED 2026-09-10 — this step was blocked as originally written.**
+   `dyn_poly_taylor.py::branch_func` is `@njit(cache=True, fastmath=True)`, so
+   it cannot call a covering that needs `eigh`, Cholesky solves and a recursive
+   enumeration. As written, step 6 depended on the numba-isation that this plan
+   schedules for Phase 4 — an ordering error, since Phase 4 is gated on Phase 3,
+   which is gated on this step.
+
+   The fix does **not** require moving Phase 4 forward, because of D11: the
+   covering depends only on the *stage* (`t_obs_prev`, `t_obs_cur`, `nbins`,
+   `ducy`, `poly_order`, `m_max`) and never on the leaves — the metric is exactly
+   proportional to `f0**2`, so a leaf's `f0` enters only as a `1/f0` rescale. So
+   split the branch along that seam:
+
+   - `metric_branch_tables(...) -> (offsets_unit, extents_unit)` — plain Python,
+     all the linear algebra and the enumeration, **once per stage**.
+   - `poly_taylor_branch_metric_apply(leaves_batch, offsets_unit, extents_unit)`
+     — `@njit`, a broadcast add and a `1/f0` rescale, **once per batch**.
+
+   Verified: the njit half compiles in nopython mode, is callable from an `@njit`
+   caller and from inside a `prange`, and agrees with its `py_func` to ~1 ulp
+   (`fastmath` FMA contraction). See `tests/test_branch_metric.py::TestNjitDispatch`.
+
+   Remaining work for this step (**6b**), not yet done:
+   `coord_cur` and `coord_prev` are pure functions of `prune_level` via
+   `MiddleOutScheme`, so the whole per-stage schedule is known in Python. Compute
+   the tables once per level in `prune.py::PruneTaylorDPFuncts.execute_iter`
+   (which already has `self.prune_level` and the scheme) and thread them to
+   `branch_func` as plain arrays. Two routes, to choose when implementing:
+   (i) add a `branch_offsets` argument to the `branch` structref method — touches
+   the shared signature in `dyn_poly_taylor.py`, `dyn_poly_cheby.py` and
+   `dyn_circular_taylor.py`; or (ii) carry the table on the structref as a
+   mutable field. (i) is more churn but explicit; (ii) needs a structref setter.
+   Nothing about `aggressive` changes under either.
 
 ### Tests
 
@@ -261,6 +309,11 @@ short verdict: proceed / iterate lattice / abandon.
 ## Phase 4 — Only if Phase 3 is positive
 
 - Numba-ise `metric.py`; profile `poly_taylor_branch_metric_batch`.
+  **Amended 2026-09-10:** no longer a prerequisite for anything, and mostly
+  unnecessary. The per-batch half of the branch is already `@njit`
+  (`poly_taylor_branch_metric_apply`); what remains in Python — `eigh`, Cholesky,
+  Fincke-Pohst — runs once per stage, not per leaf, so it is not on the hot path.
+  Numba-ise it only if profiling shows per-stage setup actually matters.
 - Circular-orbit extension: `g` from the exact sinusoidal phase model once
   `T_s ≳ 0.2 P_orb`, matching where the code switches to exact circular
   propagation (`core/circular.py`, `dynamic/dyn_circular_taylor.py`).
