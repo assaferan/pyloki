@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 from scipy.special import gamma
 
+from pyloki.config import PulsarSearchConfig
 from pyloki.core import metric, taylor
 from pyloki.utils import psr_utils
 
@@ -389,8 +390,6 @@ class TestAggressiveUntouched:
         assert len(origins) == len(out)
 
     def test_metric_is_not_the_default_strategy(self) -> None:
-        from pyloki.config import PulsarSearchConfig
-
         fields = {f.name: f for f in PulsarSearchConfig.__attrs_attrs__}
         assert fields["tiling_strategy"].default == "aggressive"
         assert fields["m_max"].default == M_MAX
