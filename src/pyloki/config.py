@@ -414,7 +414,18 @@ class PulsarSearchConfig:
     )
     tiling_strategy: str = attrs.field(
         default="aggressive",
-        validator=attrs.validators.in_(["aggressive", "quadrature", "conservative"]),
+        validator=attrs.validators.in_(
+            ["aggressive", "quadrature", "conservative", "metric"],
+        ),
+    )
+    # --- tiling_strategy="metric" only; ignored by the other strategies ------------
+    m_max: float = attrs.field(
+        default=0.2,
+        validator=[attrs.validators.gt(0.0), attrs.validators.lt(1.0)],
+    )
+    metric_lattice: str = attrs.field(
+        default="cubic",
+        validator=attrs.validators.in_(["cubic"]),
     )
 
     def __attrs_post_init__(self) -> None:

@@ -366,3 +366,189 @@ def m_max_from_eta(
         volume=float(math.exp(log_m)),
         box_half_widths=half,
     )
+
+
+# --------------------------------------------------------------------------------
+# Phase 2: covering a parent region with metric-sized children.
+# --------------------------------------------------------------------------------
+
+
+def cubic_lattice_spacing(n_dim: int, m_max: float) -> float:
+    """Spacing of a hypercubic lattice whose covering radius is `sqrt(m_max)`.
+
+    In whitened coordinates a child's region is the ball of radius `r = sqrt(m_max)`.
+    A cubic lattice of spacing `a` in `n` dimensions has covering radius
+    `a * sqrt(n) / 2` (the worst case is a cell corner), so `a = 2 * r / sqrt(n)`
+    makes the balls centred on lattice points cover the whole space.
+
+    This is the deliberately unoptimised choice of `metric_PLAN.md`: A_n* would need
+    fewer points for the same covering radius, but the plan defers that until Phase 3
+    shows redundancy is the bottleneck.
+    """
+    if n_dim < 1:
+        msg = f"n_dim must be >= 1, got {n_dim}"
+        raise ValueError(msg)
+    if m_max <= 0:
+        msg = f"m_max must be > 0, got {m_max}"
+        raise ValueError(msg)
+    return 2.0 * math.sqrt(m_max) / math.sqrt(n_dim)
+
+
+def _retention_form(a_mat: np.ndarray, m_max: float) -> np.ndarray:
+    """Quadratic form `q` whose region `w^T q w <= 1` holds every needed lattice point.
+
+    In whitened child coordinates the parent region is the ellipsoid
+    `E = {w : w^T a_mat w <= m_max}` and each child covers a ball of radius
+    `r = sqrt(m_max)`. A lattice point can only be needed if it lies within `r` of some
+    point of `E`, i.e. inside the Minkowski sum `E + B(r)`, so any outer approximation
+    of that sum gives a set whose retention keeps coverage exact.
+
+    `E + B(r)` is not itself an ellipsoid. Two candidate outer forms:
+
+    - Dilating uniformly by `1 + sqrt(lambda_max(a_mat))` -- equivalently
+      `1 + r / a_min`, since `a_min = sqrt(m_max / lambda_max)`. Sound, and tight for
+      the *shortest* semi-axis, but it scales every longer axis by the same factor. With
+      observed axis ratios up to 335 (D8) that inflated the enumerated set 167x over the
+      volume bound.
+    - Dilating each semi-axis as `a_i -> a_i + r`. Tempting and much tighter, but
+      UNSOUND: comparing support functions needs
+      `|v| * sqrt(sum a_i^2 v_i^2) <= sum a_i v_i^2`, which is Cauchy-Schwarz the wrong
+      way round, and sampling `E + B(r)` puts points at 1.40 in that form.
+
+    Used here instead is the standard S-procedure external ellipsoid of a Minkowski sum:
+    for any `t` in `(0, 1)`,
+
+        E + B(r)  subset  {w : sum_i (w . q_i)^2 / c_i^2 <= 1},
+        c_i^2 = a_i^2 / t + r^2 / (1 - t),
+
+    with `q_i` the eigenvectors of `a_mat`. This is sound for every `t`, and for equal
+    semi-axes it reduces to `c = a + r` exactly, so nothing is given away in the
+    isotropic case. `t` is chosen to minimise the volume `prod c_i`.
+    """
+    lam, evec = np.linalg.eigh(a_mat)
+    if np.any(lam <= 0.0):
+        msg = "parent metric must be positive definite in whitened coordinates"
+        raise ValueError(msg)
+    a_sq = m_max / lam
+    # Minimise sum(log c_i^2) over t; smooth and unimodal, so a fine grid then a local
+    # refinement is ample and avoids a solver dependency.
+    grid = np.linspace(1e-4, 1.0 - 1e-4, 2001)
+    c_sq = a_sq[None, :] / grid[:, None] + m_max / (1.0 - grid)[:, None]
+    best = int(np.argmin(np.log(c_sq).sum(axis=1)))
+    lo = grid[max(best - 1, 0)]
+    hi = grid[min(best + 1, grid.size - 1)]
+    fine = np.linspace(lo, hi, 2001)
+    c_sq = a_sq[None, :] / fine[:, None] + m_max / (1.0 - fine)[:, None]
+    c_sq_best = c_sq[int(np.argmin(np.log(c_sq).sum(axis=1)))]
+    return (evec * (1.0 / c_sq_best)) @ evec.T
+
+
+def _enumerate_lattice_in_ellipsoid(
+    q_mat: np.ndarray,
+    bound: float,
+    *,
+    max_points: int | None = None,
+) -> np.ndarray:
+    """Integer vectors `z` with `z^T q_mat z <= bound`, by Fincke-Pohst enumeration.
+
+    Writing `q_mat = U^T U` with `U` upper triangular,
+    `z^T q_mat z = sum_i (sum_{j>=i} U[i,j] z_j)**2`, so the coordinates can be fixed
+    from the last to the first with an exact interval at each level and the partial sum
+    subtracted from the budget. Only points that can still satisfy the bound are
+    visited, which is what makes an elongated ellipsoid tractable -- enumerating its
+    axis-aligned bounding box instead is hopeless once the metric is ill-conditioned.
+
+    Raises
+    ------
+    ValueError
+        If more than `max_points` points satisfy the bound; the caller should widen
+        `m_max` or accept a coarser covering rather than silently truncate.
+    """
+    n_dim = q_mat.shape[0]
+    upper = np.linalg.cholesky(q_mat).T  # q_mat = upper^T @ upper
+    out: list[np.ndarray] = []
+    z = np.zeros(n_dim, dtype=np.int64)
+
+    def recurse(level: int, budget: float) -> None:
+        if budget < -1e-12:
+            return
+        if level < 0:
+            out.append(z.copy())
+            if max_points is not None and len(out) > max_points:
+                msg = (
+                    f"metric branching kept more than {max_points} lattice points; "
+                    f"the parent region is too large for the child spacing"
+                )
+                raise ValueError(msg)
+            return
+        # Partial sum from the already-fixed higher coordinates.
+        tail = float(np.dot(upper[level, level + 1 :], z[level + 1 :]))
+        diag = float(upper[level, level])
+        span = math.sqrt(max(budget, 0.0))
+        lo = math.ceil((-span - tail) / diag - 1e-12)
+        hi = math.floor((span - tail) / diag + 1e-12)
+        for value in range(lo, hi + 1):
+            z[level] = value
+            term = diag * value + tail
+            recurse(level - 1, budget - term * term)
+        z[level] = 0
+
+    recurse(n_dim - 1, bound)
+    if not out:
+        return np.zeros((1, n_dim), dtype=np.int64)
+    return np.asarray(out, dtype=np.int64)
+
+
+def lattice_children(
+    g_parent: np.ndarray,
+    g_child: np.ndarray,
+    m_max: float,
+    *,
+    max_children: int | None = None,
+) -> np.ndarray:
+    """Offsets of child centres covering a parent region, in Taylor coordinates.
+
+    Parameters
+    ----------
+    g_parent
+        Metric defining the parent's region, `{d : d^T g_parent d <= m_max}`, i.e. the
+        metric of the previous stage's interval.
+    g_child
+        Metric defining each child's region, i.e. the current stage's. Children are
+        spaced so their regions cover the parent's.
+    m_max
+        Mismatch budget, shared by parent and children.
+    max_children
+        Optional cap; exceeding it raises rather than silently under-covering.
+
+    Returns
+    -------
+    np.ndarray
+        `(n_children, n_params)` offsets relative to the parent centre, in the same
+        Taylor coordinates and axis order as the leaf array (C1). Always contains at
+        least one point.
+
+    Notes
+    -----
+    Coverage is guaranteed by construction, not by sampling: the lattice spacing gives
+    covering radius `sqrt(m_max)` everywhere, and `_retention_form` keeps every
+    lattice point within that radius of the parent region.
+    """
+    n_dim = g_child.shape[0]
+    chol = cholesky_factor(g_child)
+    # Whitened coordinates w = L^T d: a child's region is the ball of radius
+    # sqrt(m_max), the parent's is the ellipsoid w^T A w <= m_max.
+    a_mat = np.linalg.solve(chol, np.linalg.solve(chol, g_parent).T).T
+    a_mat = 0.5 * (a_mat + a_mat.T)
+
+    spacing = cubic_lattice_spacing(n_dim, m_max)
+    form = _retention_form(a_mat, m_max)
+
+    # Lattice points are w = spacing * z, so w^T form w <= 1 becomes
+    # z^T (spacing**2 * form) z <= 1.
+    z_int = _enumerate_lattice_in_ellipsoid(
+        form * spacing**2, 1.0, max_points=max_children,
+    )
+    kept = z_int.astype(np.float64) * spacing
+    # Back to Taylor coordinates: d = L^-T w.
+    return np.linalg.solve(chol.T, kept.T).T

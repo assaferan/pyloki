@@ -159,6 +159,109 @@ These are **observed from the code**, not chosen, and any metric code must match
   smaller leaves. Phase 3's recalibration is the place to decide whether the 2-3x that
   `"cross"` would claim is worth taking.
 
+## Choices made (Phase 2)
+
+- **D11 — Children are stored as offsets from the parent centre, computed once per
+  stage at `f0 = 1` and rescaled by `1 / f0` per leaf.** (Phase 2 decision "metric
+  storage".) `poly_phase_metric` is *exactly* proportional to `f0**2` — the phase
+  derivative is `-(f0/c)(t - t_ref)^k / k!` and the harmonic weighting depends only on
+  `(nbins, ducy)` — verified to machine precision (max relative deviation 2.3e-16, and
+  the offsets follow the resulting `1 / f0` law to 7e-14). So no metric needs storing in
+  the leaf array at all: the Fincke–Pohst enumeration, much the most expensive part,
+  runs **once per stage** rather than once per distinct `f0` in the batch.
+
+- **D12 — Column 1 (`dparam`) holds `ellipsoid_axis_extents(g_child, m_max)`, the
+  bounding box of the child's mismatch ellipsoid.** (Phase 2 decision "meaning of
+  column 1"; the plan's option (a), which Phase 0 already found cheaper than assumed
+  because `world_tree.py` does not interpret column 1.) It is the honest per-axis
+  half-width and keeps any consumer of that column reading something meaningful, but it
+  is deliberately **not** a covering box: an ellipsoid's bounding box does not tile.
+  Nothing in the metric path derives spacing from it.
+
+- **D13 — `poly_taylor_branch_metric_batch` takes `coord_prev` explicitly, and is not
+  `@njit`.** The box strategy never needs the parent's interval because a leaf's own
+  `dparam` column encodes its spacing; a metric does need it, since per-axis half-widths
+  cannot represent the parent ellipsoid's *orientation*. `coord_prev` is already
+  threaded to `branch_func` and currently unused, so it was available. The alternative
+  considered — squatting on the free leaf slot `[:, -2, 1]` — was rejected because
+  `core/chebyshev.py:60` already uses that slot for a velocity width in its own layout,
+  so writing a parent interval there would couple the two layouts silently.
+
+## Blocked in Phase 2 (needs a plan change)
+
+- **Phase 2 step 6 (dispatch) cannot be completed as scheduled.**
+  `dynamic/dyn_poly_taylor.py::branch_func` is `@njit(cache=True, fastmath=True)`, so it
+  cannot call a pure-NumPy branch. The covering needs `eigh`, Cholesky solves and a
+  recursive enumeration, none of which survive `nopython`. The plan schedules
+  numba-isation for **Phase 4**, so the ordering is wrong: either Phase 4's numba work
+  moves ahead of the dispatch wiring, or the dispatch goes through an
+  `objmode`/`@njit(forceobj)` shim. **Not worked around here** — the function and its
+  tests are complete and directly tested, but `tiling_strategy="metric"` is still inert
+  at the dispatch level. Flagged for the human.
+
+## Phase 2 findings
+
+- **The retention bound was 167x loose; fixed, and the fix is the interesting part.**
+  The first implementation (`_retention_radius`) dilated the parent ellipsoid
+  *uniformly* by `1 + sqrt(lambda_max(A))`. That equals `1 + r / a_min`, i.e. it is
+  tight for the **shortest** semi-axis and scales every longer one by the same factor —
+  the bounding-box mistake in spherical form, and with D8's axis ratios (up to 335 at
+  `poly_order=4`) it cost 167x the volume bound.
+
+  The obvious tightening — dilate each semi-axis `a_i -> a_i + r` — is **unsound**.
+  Containment of `E + B(r)` needs `|v| sqrt(sum a_i^2 v_i^2) <= sum a_i v_i^2`, which is
+  Cauchy–Schwarz the wrong way round; sampling `E + B(r)` puts points at **1.40** in
+  that form. `tests/test_branch_metric.py::test_per_axis_dilation_would_be_unsound`
+  pins that so the argument is not quietly re-derived wrongly.
+
+  What is used instead is the standard S-procedure external ellipsoid of a Minkowski
+  sum: `c_i**2 = a_i**2 / t + r**2 / (1 - t)`, sound for every `t in (0,1)`, exactly
+  `c = a + r` when the semi-axes are equal, with `t` chosen to minimise the volume.
+  Child counts fell **3.7x** (170235 -> 45909 at `poly_order=4`) with coverage and worst
+  mismatch **bit-identical** — the discarded points were provably never nearest.
+
+- **Child counts, and the whole overhead accounted for.** `m_max=0.2`, one segment
+  doubling 16.78 s -> 33.55 s:
+
+  | `poly_order` | volume bound | metric children | overhead | box strategy (`aggressive`) |
+  |---|---|---|---|---|
+  | 2 | 8.0 | 39 | 4.9 | 4 = `[4,1]` |
+  | 3 | 63.9 | 869 | 13.6 | 32 = `[8,4,1]` |
+  | 4 | 1021 | 45909 | 45.0 | 512 = `[16,8,4,1]` |
+  | 5 | — | >500000 (cap) | — | — |
+
+  The overhead factorises exactly: `1021 x 4.935 x 9.2 = 46300` vs measured **45909**,
+  where 4.935 is the **covering thickness of `Z^4`** (`V_n (sqrt n / 2)^n`, an intrinsic
+  property of the cubic lattice, independent of the region — and it shows up directly as
+  the measured mean coverings-per-point, 4.94) and 9.2 is the residual retention
+  dilation. Nothing is unexplained.
+
+- **CORRECTED: the box strategy branches ~512 per parent at `poly_order=4`, not
+  27–81.** An earlier session reported 27–81 and I carried that forward when first
+  reading the 170235 as a catastrophe. Measured directly on the identical parent→child
+  step, `poly_taylor_branch_batch` emits 4 / 32 / 512 at `poly_order` 2 / 3 / 4 — i.e.
+  essentially **at** the volume bound (8 / 64 / 1021), short of it only by a factor ~2
+  on the last axis, which `shift_bins < eta` suppresses. Pinned in
+  `TestAggressiveUntouched::test_box_branch_counts_unchanged`.
+
+  This reframes the redundancy question. **~1000 children per parent at
+  `poly_order=4` is intrinsic**, not a defect of the metric approach: no covering of any
+  kind can beat the volume ratio, so the metric strategy is *at best* ~2x the box
+  strategy's branching, and the box strategy is not leaving free headroom on the table.
+  The real gap is the 45x, and it is addressable rather than fundamental:
+
+  1. **Use a thin lattice.** `A_4*` has covering thickness 1.766 against the cubic
+     lattice's 4.935 — a 2.8x saving, and the plan already anticipated this for Phase 3.
+  2. **Anisotropic spacing in the metric's eigenbasis.** At `poly_order=4` the parent's
+     semi-axes in units of the covering radius are `[237.8, 6.43, 0.94, 0.71]`: **two of
+     four axes are thinner than a single child's covering radius**, so no refinement is
+     needed along them, yet an isotropic cubic lattice still spends ~5 points on each.
+     Per-axis spacing — what the box strategy does in Taylor axes — would recover most
+     of the 9.2 dilation factor. This is likely the larger win of the two.
+
+  The measurement is therefore available *now*, at Phase 2, rather than at the Phase 3
+  point where the plan intended to gate the lattice decision.
+
 ## Open questions (carried from Phase 0, need a human answer)
 
 - ~~**O5 — How should the harmonic weighting enter?**~~
@@ -250,4 +353,36 @@ Next session starts at: Phase 2. Phase 2 design decisions to make
   first are listed in metric_PLAN.md (metric storage, lattice, meaning of
   column 1); note Phase 0 found world_tree.py does not interpret column 1, so
   option (a) is cheaper than the plan assumed.
+
+## 2026-09-10 — Phase 2
+Done:
+  - config.py: tiling_strategy gains "metric"; m_max=0.2, metric_lattice="cubic".
+    Defaults unchanged, so the shipped path is untouched (test asserts this).
+  - core/metric.py: cubic_lattice_spacing, _retention_form,
+    _enumerate_lattice_in_ellipsoid (Fincke-Pohst), lattice_children.
+  - core/taylor.py: poly_taylor_branch_metric_batch, same contract as
+    poly_taylor_branch_batch. Not @njit (see the Phase 2 blocker).
+  - tests/test_branch_metric.py: 34 tests. Full suite 113 passed.
+Decisions fixed: D11 (offsets, one enumeration per stage via the exact f0^2
+  law), D12 (column 1 = child ellipsoid bounding box), D13 (coord_prev passed
+  explicitly, not the free leaf slot).
+Exit criterion: coverage green (0 uncovered at poly_order 2-4, worst mismatch
+  0.90-0.98 of m_max, guaranteed by construction not by sampling); redundancy
+  known and factorised exactly into lattice thickness x retention dilation;
+  aggressive path untouched.
+Two things the human needs to decide:
+  - Phase 2 step 6 is BLOCKED: branch_func is @njit and cannot dispatch to a
+    pure-NumPy branch. Phase 4's numba work has to move ahead of it, or the
+    dispatch needs an objmode shim. tiling_strategy="metric" is inert for now.
+  - Redundancy is a Phase 3 design question that is already answerable: the
+    metric covering costs 45x the volume bound and ~90x the box strategy at
+    poly_order=4, and poly_order=5 exceeds a 500k cap. A_4* buys 2.8x;
+    anisotropic spacing in the metric eigenbasis buys most of the rest (two of
+    four axes are thinner than one child's covering radius). Neither was done
+    here -- the plan puts the lattice choice in Phase 3.
+Corrected: the box strategy emits 4/32/512 children per parent at poly_order
+  2/3/4, not the 27-81 an earlier session reported. ~1000 at poly_order=4 is
+  intrinsic (it is the volume bound), so the metric approach cannot be cheaper
+  than ~2x the box strategy, and the box strategy is not leaving headroom.
+Open questions: O6 (unchanged, non-blocking).
 ```

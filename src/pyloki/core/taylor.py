@@ -5,6 +5,7 @@ import math
 import numpy as np
 from numba import njit
 
+from pyloki.core import metric
 from pyloki.core.common import get_leaves
 from pyloki.utils import np_utils, psr_utils, transforms
 from pyloki.utils.misc import C_VAL, FLOAT_EPSILON
@@ -163,6 +164,103 @@ def poly_taylor_branch_batch(
     leaves_branch_batch = np.zeros((n_branch, n_params + 2, 2), dtype=np.float64)
     leaves_branch_batch[:, :-2, 0] = leaf_params_branch_cart
     leaves_branch_batch[:, :-2, 1] = branched_dparams[batch_origins]
+    leaves_branch_batch[:, -2, 0] = d0_cur_batch[batch_origins]
+    leaves_branch_batch[:, -1, 0] = f0_batch[batch_origins]
+    leaves_branch_batch[:, -1, 1] = basis_flag_batch[batch_origins]
+    return leaves_branch_batch, batch_origins
+
+
+def poly_taylor_branch_metric_batch(
+    leaves_batch: np.ndarray,
+    coord_cur: tuple[float, float],
+    coord_prev: tuple[float, float],
+    nbins: int,
+    ducy: float,
+    poly_order: int,
+    m_max: float,
+    branch_max: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Branch a batch of leaves onto a metric-sized covering of each parent region.
+
+    Same contract as `poly_taylor_branch_batch` -- identical leaf layout in and out,
+    and the same `(leaves_branch_batch, batch_origins)` return -- but the children are
+    a lattice covering of the parent's mismatch ellipsoid rather than an axis-aligned
+    Cartesian product of per-axis steps.
+
+    Parameters
+    ----------
+    leaves_batch : np.ndarray
+        Leaf parameter sets. Shape: (n_leaves, poly_order + 2, 2).
+    coord_cur : tuple[float, float]
+        Coordinates for the accumulated segment in the current (child) stage.
+    coord_prev : tuple[float, float]
+        Coordinates for the previous (parent) stage. The box strategy does not need
+        this -- a leaf's `dparam` column already encodes its own spacing -- but a metric
+        does: per-axis half-widths cannot represent the parent ellipsoid's orientation,
+        so the parent's own metric has to be rebuilt from its interval.
+    nbins, ducy : int, float
+        Folded-profile resolution and duty cycle, setting the harmonic weighting.
+    poly_order : int
+        The order of the Taylor polynomial.
+    m_max : float
+        Mismatch budget, shared by parent and children.
+    branch_max : int
+        Cap on the number of children *per parent*. Note this differs from the box
+        strategy's use of `branch_max` as a per-axis padding width; a metric covering
+        is not separable per axis, so a total is the only meaningful cap.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        - leaves_branch_batch: Array of leaf centers.
+          Shape: (n_branch, poly_order + 2, 2).
+        - batch_origins: Array of original indices. Shape: (n_branch,).
+
+    Notes
+    -----
+    Not `@njit`: the covering needs `eigh`, Cholesky solves and a recursive
+    Fincke-Pohst enumeration. `dyn_poly_taylor.branch_func` *is* `@njit` and so cannot
+    dispatch here yet -- see `DECISIONS.md` D13.
+
+    The metric is exactly proportional to `f0**2` (verified to machine precision), so
+    the offsets scale as `1 / f0` and the enumeration -- much the most expensive part --
+    runs once per stage rather than once per distinct `f0` in the batch.
+    """
+    n_batch = leaves_batch.shape[0]
+    n_params = poly_order
+    _, t_obs_cur = coord_cur
+    _, t_obs_prev = coord_prev
+
+    param_cur_batch = leaves_batch[:, :-2, 0]
+    d0_cur_batch = leaves_batch[:, -2, 0]
+    f0_batch = leaves_batch[:, -1, 0]
+    basis_flag_batch = leaves_batch[:, -1, 1]
+
+    # Enumerate once at f0 = 1, then rescale per leaf by 1 / f0.
+    g_parent = metric.poly_phase_metric(
+        0.0, 0.0, t_obs_prev, poly_order, 1.0, nbins, ducy,
+    )
+    g_child = metric.poly_phase_metric(
+        0.0, 0.0, t_obs_cur, poly_order, 1.0, nbins, ducy,
+    )
+    offsets_unit = metric.lattice_children(
+        g_parent, g_child, m_max, max_children=branch_max,
+    )
+    extents_unit = metric.ellipsoid_axis_extents(g_child, m_max)
+    n_child = offsets_unit.shape[0]
+
+    scale = (1.0 / f0_batch)[:, np.newaxis, np.newaxis]
+    children = param_cur_batch[:, np.newaxis, :] + offsets_unit[np.newaxis] * scale
+    batch_origins = np.repeat(np.arange(n_batch), n_child)
+
+    n_branch = n_batch * n_child
+    leaves_branch_batch = np.zeros((n_branch, n_params + 2, 2), dtype=np.float64)
+    leaves_branch_batch[:, :-2, 0] = children.reshape(n_branch, n_params)
+    # The child's per-axis half-widths: the bounding box of its mismatch ellipsoid,
+    # so downstream consumers of the dparam column keep a meaningful width (C3).
+    leaves_branch_batch[:, :-2, 1] = (
+        extents_unit[np.newaxis, :] / f0_batch[batch_origins][:, np.newaxis]
+    )
     leaves_branch_batch[:, -2, 0] = d0_cur_batch[batch_origins]
     leaves_branch_batch[:, -1, 0] = f0_batch[batch_origins]
     leaves_branch_batch[:, -1, 1] = basis_flag_batch[batch_origins]
