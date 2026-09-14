@@ -761,6 +761,76 @@ still open.
 These supersede the provisional D33 numbers, which came from the non-optimised
 `determine_scheme` fallback and had `P_d` varying by 6x between runs.
 
+## Reading the paper (2026-09-14) — a correction and two findings
+
+The plan's ground rules say "Verify citations before relying on them." I did not, until
+now, and asserted that D36 "contradicts Kumar & Zackay (2026) §5.2.4" on the strength of
+the plan's one-line paraphrase. The source is in `paper/pruning1.tex`. Having read it:
+
+- **D37 — RETRACTION: D36 does not contradict §5.2.4. It sharpens one sentence of it
+  and confirms another.**
+
+  §5.2.2 (the tiling trilemma) describes the gaps as *per-tile* — `aggressive`'s inner
+  AABB misses its own sheared corners, which is exactly what Figure `grid_tiling`
+  panel (d) shows, and is true. It then says: *"These gaps are partially mitigated in
+  practice by **natural overlap between neighbouring templates**."* D36 measures that
+  collective cover and finds the mitigation is not partial but **exact**, for a
+  lower-triangular unit-diagonal `T`. That is a strengthening of the paper's own
+  caveat, not a contradiction.
+
+  §5.2.4 then anticipates this project's cost result outright:
+
+  > "An alternative approach ... is transporting a non-orthogonal lattice that **exactly
+  > tracks the coordinate shear** ... To preserve the `eta` bound, the sheared cell must
+  > be subdivided along its elongated axes. The resulting template count therefore
+  > approaches the same scaling as a conservative AABB cover. Consequently, **tracking
+  > exact geometric shear provides no practical computational advantage** over bounding
+  > box methods when a rigid `eta` constraint is enforced."
+
+  The measured 1070x is that prediction coming true. The paper also adopts *aggressive
+  Taylor as the operational default* and says its gaps "must then be controlled
+  empirically, for example by tightening `eta`" — the cheaper alternative.
+
+  The closing remark the plan is built on — *"A complete solution likely requires
+  replacing fixed coordinate spacings with a local metric-based mismatch criterion.
+  **Further work is required to quantify the sensitivity loss**"* — is a hedged
+  speculation and a call to measure, not a claim that a metric would be cheaper. The
+  plan's Purpose reads it as "the metric dissolves the dilemma"; §5.2.4 argues the
+  opposite.
+
+- **D38 — §3.4: the box grid is already metric-derived, which reframes the whole
+  comparison.** The paper states the problem this project set out to solve, in §3.4:
+
+  > "the valid parameter search volume is a highly elongated hyper-ellipsoid (a
+  > 'needle') rather than a hyper-rectangle. A simple rectangular grid ... is therefore
+  > highly redundant, as the grid axes do not align with the principal axes of the
+  > **parameter metric**."
+
+  And it already fixes it analytically: *"we retain the physically intuitive Taylor
+  coefficients for the search coordinates but define the grid density based on an
+  orthogonal basis analysis ... utilizes Chebyshev polynomials to **diagonalize the
+  parameter metric**"*. The output is exactly the `2**(k-1)` coarsening factor
+  (Appendix `app:optimal_gridding`).
+
+  So the shipped `aggressive` grid is **not naive** — it already carries a
+  metric-diagonalisation correction. D5 decided `"metric"` would not inherit that
+  coarsening, so our covering has been competing against a box that is metric-corrected
+  on the diagonal while ours pays full price. What a metric covering can still add over
+  that is only the **off-diagonal** correlation structure, which is a much smaller prize
+  than the plan assumed — and D8-corrected already measured that residual anisotropy at
+  1.6x-6.4x, not the 56x originally recorded.
+
+  §5.2.3 adds that Chebyshev alone buys ~10x fewer templates from isotropy, and that
+  "applying the coarsening factor brings the Taylor branching pattern down to a similar
+  scaling as the relevant Chebyshev profiles" — i.e. the coarsening already captures
+  most of the orthogonal-basis gain.
+
+**Bottom line.** The paper anticipated the cost result, already applies a diagonal
+metric correction, recommends the strategy our measurements favour, and asks for the one
+thing nobody has produced: a *quantified sensitivity loss*. That last item is the only
+part of the plan's premise still standing, and it is not what this branch has been
+building.
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
@@ -1322,4 +1392,27 @@ Caveats that could overturn it, in order: pruning is not modelled (a signal migr
 Open questions: O6, O7, (m_max, R) -- all now moot unless D36 is overturned.
 Next session starts at: checking D36 independently, and looking for the gap in the
   Chebyshev/circular transforms where the argument does not apply.
+
+## 2026-09-14 (n) — read the paper at last
+Done:
+  - Read `paper/pruning1.tex` §3.4 and §5.2.2-5.2.4 (numbering verified: 5.2.1 Reference
+    Frame Dilemma, 5.2.2 Moving Grid and Axis Misalignment, 5.2.3 Orthogonal Basis,
+    5.2.4 Branching Strategy) and Appendix `app:optimal_gridding`.
+  - D37: retracted the claim that D36 contradicts §5.2.4. It sharpens §5.2.2's
+    "partially mitigated by natural overlap" to "exactly mitigated", and §5.2.4 already
+    predicts that exact shear tracking gives no computational advantage.
+  - D38: §3.4 shows the shipped box grid is already metric-derived -- the `2**(k-1)`
+    coarsening IS the paper's analytic diagonalisation of the parameter metric. D5 had
+    us drop it, so our covering competes against a metric-corrected box while paying
+    full price. The residual prize is only the off-diagonal structure.
+Process failure worth naming: I asserted a contradiction with a section I had not
+  opened, from the plan's paraphrase, while the plan's own ground rules say to verify
+  citations. The paper had been in `paper/` the whole time. Fourth unforced error of the
+  session, same root cause as the others -- trusting a baseline instead of checking it.
+Open questions: whether anything in the plan's premise survives D37 and D38. The one
+  piece that does is the paper's own request: quantify the sensitivity loss of
+  aggressive tiling. That is a different (and much cheaper) measurement than building a
+  metric covering, and it is not what this branch has built.
+Next session starts at: deciding whether to pivot to the sensitivity-loss measurement,
+  or to stop.
 ```
