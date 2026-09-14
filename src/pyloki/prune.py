@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, ClassVar
 import numpy as np
 from numba import njit
 
-from pyloki.core import set_prune_load_func
+from pyloki.core import set_prune_load_func, taylor
 from pyloki.dynamic import (
     PruneCircTaylorComplexDPFuncts,
     PruneCircTaylorDPFuncts,
@@ -175,6 +175,8 @@ def pruning_iteration_batched(
     prune_funcs: DP_FUNCS_TYPE,
     threshold: float,
     load_func: Callable[[np.ndarray, np.ndarray], np.ndarray],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
     sugg_max: int = 2**18,
     batch_size: int = 1024,
 ) -> tuple[
@@ -200,6 +202,10 @@ def pruning_iteration_batched(
         The current pruning level.
     load_func : Callable[[np.ndarray, np.ndarray], np.ndarray]
         A function to load the desired fold from the input structure.
+    branch_offsets, branch_extents : np.ndarray
+        Per-stage covering tables for ``tiling_strategy="metric"``, built once per
+        level by ``Pruning._metric_branch_tables``. Empty for every other strategy,
+        which ignores them.
     world_tree_max : int, optional
         Maximum number of candidates to keep in the output WorldTree,
         by default 2**17
@@ -231,6 +237,8 @@ def pruning_iteration_batched(
             tree.leaves[i_batch_start:i_batch_end],
             coord_cur,
             coord_prev,
+            branch_offsets,
+            branch_extents,
         )
         n_leaves_batch = len(batch_leaves)
         n_leaves += n_leaves_batch
@@ -636,6 +644,10 @@ class Pruning:
         )
         coord_next = self.scheme.get_coord(self.prune_level)
         coord_add = self.scheme.get_segment_coord(self.prune_level)
+        branch_offsets, branch_extents = self._metric_branch_tables(
+            coord_cur,
+            coord_prev,
+        )
         world_tree, stats_dict, timers = pruning_iteration_batched(
             self.world_tree,
             fold_segment,
@@ -647,6 +659,8 @@ class Pruning:
             self.prune_funcs,
             threshold,
             self.load_func,
+            branch_offsets,
+            branch_extents,
             self.max_sugg,
             self.batch_size,
         )
@@ -764,6 +778,45 @@ class Pruning:
             lvl -= 1
         return steps_rev[::-1]
 
+    def _metric_branch_tables(
+        self,
+        coord_cur: tuple[float, float],
+        coord_prev: tuple[float, float],
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Covering tables for one pruning level (metric_PLAN.md Phase 2 step 6b).
+
+        The metric branch is split at the stage/batch seam (DECISIONS.md D14): the
+        expensive half -- ``eigh``, Cholesky solves and the Fincke-Pohst enumeration --
+        is numba-hostile but depends only on the stage (D11), so it runs here, in
+        Python, once per level, and reaches the ``@njit`` ``branch_func`` as two plain
+        arrays. Every other tiling strategy gets empty arrays and ignores them.
+
+        Levels repeat their ``(t_obs_prev, t_obs_cur)`` pair across pruning runs with
+        different reference segments, so the tables are memoised on that pair.
+        """
+        cfg = self.dyp.cfg
+        if cfg.tiling_strategy != "metric":
+            return self._empty_branch_tables
+        key = (coord_prev[1], coord_cur[1])
+        tables = self._branch_table_cache.get(key)
+        if tables is None:
+            with Timer(name="metric_branch_tables", logger=self.logger.debug):
+                tables = taylor.metric_branch_tables(
+                    coord_prev[1],
+                    coord_cur[1],
+                    cfg.nbins,
+                    cfg.metric_ducy,
+                    cfg.prune_poly_order,
+                    cfg.m_max,
+                    cfg.metric_branch_max,
+                )
+            self.logger.info(
+                f"Metric covering for t_obs {coord_prev[1]:.3f} -> {coord_cur[1]:.3f} "
+                f"s: {len(tables[0])} children per parent",
+            )
+            self._branch_table_cache[key] = tables
+        return tables
+
     def _setup_pruning(self, poly_basis: str, use_moving_grid: bool) -> None:
         if self.dyp.fold.ndim > 8:
             msg = "Pruning currently supports initial data till 5 param dimensions."
@@ -780,6 +833,31 @@ class Pruning:
         if prune_class is None:
             msg = f"Invalid pruning configuration: {key}"
             raise ValueError(msg)
+
+        is_circular, _, _ = key
+        if self.dyp.cfg.tiling_strategy == "metric" and (
+            is_circular or poly_basis != "taylor"
+        ):
+            # core/metric.py builds the mismatch tensor on the Taylor kinematic basis
+            # (DECISIONS.md C1/C2). The Chebyshev and circular paths have their own
+            # leaf layouts, so "metric" would be silently ignored there.
+            msg = (
+                f'tiling_strategy="metric" is only implemented for the Taylor basis, '
+                f"got poly_basis={poly_basis!r} with "
+                f"prune_poly_order={self.dyp.cfg.prune_poly_order} "
+                f"(prune_poly_order=5 selects the circular basis)"
+            )
+            raise ValueError(msg)
+
+        # Per-level metric covering tables, memoised on (t_obs_prev, t_obs_cur).
+        self._branch_table_cache: dict[
+            tuple[float, float],
+            tuple[np.ndarray, np.ndarray],
+        ] = {}
+        self._empty_branch_tables = (
+            np.empty((0, 0), dtype=np.float64),
+            np.empty(0, dtype=np.float64),
+        )
 
         self._prune_funcs = PicklableStructRefWrapper[DP_FUNCS_TYPE](
             prune_class,

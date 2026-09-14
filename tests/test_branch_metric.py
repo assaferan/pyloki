@@ -14,13 +14,18 @@
 
 from __future__ import annotations
 
+import logging
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from numba import njit, prange
 from scipy.special import gamma
 
-from pyloki.config import PulsarSearchConfig
+from pyloki.config import ParamLimits, PulsarSearchConfig
 from pyloki.core import metric, taylor
+from pyloki.dynamic import PrunePolyTaylorDPFuncts
+from pyloki.prune import Pruning
 from pyloki.utils import psr_utils
 
 RNG = np.random.default_rng(20260910)
@@ -138,7 +143,7 @@ class TestRetentionForm:
         chol = metric.cholesky_factor(g_child)
         a_mat = np.linalg.solve(chol, np.linalg.solve(chol, g_parent).T).T
         a_mat = 0.5 * (a_mat + a_mat.T)
-        form = metric._retention_form(a_mat, M_MAX)  # noqa: SLF001
+        form = metric._retention_form(a_mat, M_MAX)
 
         # Sample the boundary of E + B(r): a parent-boundary point plus a radius-r
         # kick. The boundary is where the containment is tight.
@@ -481,3 +486,169 @@ class TestAggressiveUntouched:
         assert fields["tiling_strategy"].default == "aggressive"
         assert fields["m_max"].default == M_MAX
         assert fields["metric_lattice"].default == "cubic"
+
+
+def _search_config(strategy: str, poly_order: int = 3) -> PulsarSearchConfig:
+    """Build a minimal config; only the fields the branch path reads matter."""
+    nsamps, tsamp = 2**14, 64e-6
+    tobs = nsamps * tsamp
+    limits = ParamLimits.from_upper(
+        (F0 - 1, F0 + 1), [6.0, 500.0], (-8.0, 8.0), tobs,
+    )
+    return PulsarSearchConfig(
+        nsamps=nsamps, tsamp=tsamp, nbins=NBINS, eta=1,
+        param_limits=limits.limits, bseg_brute=nsamps // 8, bseg_ffa=nsamps // 2,
+        prune_poly_order=poly_order, ducy_max=0.5, wtsp=1.2, use_fourier=False,
+        tiling_strategy=strategy, branch_max=16,
+        # prune_poly_order=5 is how config.py selects the circular-orbit search.
+        p_orb_min=tobs if poly_order == 5 else 0.0,
+    )
+
+
+def _dp_functs(cfg: PulsarSearchConfig) -> PrunePolyTaylorDPFuncts:
+    """`branch` reads only nbins/eta/poly_order/branch_max/tiling_strategy off self."""
+    n = cfg.prune_poly_order
+    return PrunePolyTaylorDPFuncts(
+        [np.array([0.0])] * (n - 1) + [np.linspace(F0 - 1, F0 + 1, 8)],
+        np.ones(n),
+        np.array([1] * (n - 1) + [8], dtype=np.int64),
+        T_PARENT,
+        cfg,
+    )
+
+
+class TestStrategyDispatch:
+    """Phase 2 step 6: the `@njit` `branch_func` must route on `tiling_strategy`."""
+
+    def test_metric_strategy_reaches_the_metric_covering(self) -> None:
+        cfg = _search_config("metric")
+        tables = taylor.metric_branch_tables(
+            T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+            cfg.metric_branch_max,
+        )
+        leaves = np.zeros((2, 5, 2))
+        leaves[:, -1, 0] = F0
+        out, origins = _dp_functs(cfg).branch(
+            leaves, (0.0, T_CHILD), (0.0, T_PARENT), *tables,
+        )
+        expected, _ = taylor.poly_taylor_branch_metric_apply(leaves, *tables)
+        np.testing.assert_array_equal(out, expected)
+        assert len(out) == 2 * len(tables[0])
+        assert len(origins) == len(out)
+
+    def test_box_strategy_ignores_the_tables(self) -> None:
+        """The shipped path must not read them, so junk tables must change nothing."""
+        cfg = _search_config("aggressive")
+        dpar = psr_utils.poly_taylor_step_d_vec(
+            3, T_PARENT, NBINS, 1.0, np.array([F0]), t_ref=0,
+        )
+        leaves = np.zeros((1, 5, 2))
+        leaves[0, :-2, 1] = dpar[0]
+        leaves[0, -1, 0] = F0
+        funcs = _dp_functs(cfg)
+        empty = (np.empty((0, 0)), np.empty(0))
+        junk = (RNG.normal(size=(7, 3)), RNG.normal(size=3))
+        out_a, org_a = funcs.branch(leaves, (0.0, T_CHILD), (0.0, T_PARENT), *empty)
+        out_b, org_b = funcs.branch(leaves, (0.0, T_CHILD), (0.0, T_PARENT), *junk)
+        np.testing.assert_array_equal(out_a, out_b)
+        np.testing.assert_array_equal(org_a, org_b)
+        # ...and still equals the untouched box branch.
+        out_ref, _ = taylor.poly_taylor_branch_batch(
+            leaves, (0.0, T_CHILD), NBINS, 1.0, 3, 16,
+        )
+        np.testing.assert_array_equal(out_a, out_ref)
+
+    def test_missing_tables_raise_rather_than_under_cover(self) -> None:
+        """An unset table would otherwise branch every parent into nothing."""
+        cfg = _search_config("metric")
+        leaves = np.zeros((2, 5, 2))
+        leaves[:, -1, 0] = F0
+        with pytest.raises(ValueError, match="per-stage branch tables"):
+            _dp_functs(cfg).branch(
+                leaves, (0.0, T_CHILD), (0.0, T_PARENT),
+                np.empty((0, 0)), np.empty(0),
+            )
+
+
+class TestPruneWiring:
+    """Phase 2 step 6b: the per-stage precompute hook in `prune.py`."""
+
+    def test_tables_are_empty_for_the_box_strategies(self) -> None:
+        prn = Pruning.__new__(Pruning)
+        prn._branch_table_cache = {}
+        prn._empty_branch_tables = (np.empty((0, 0)), np.empty(0))
+        prn._dyp = SimpleNamespace(cfg=_search_config("aggressive"))
+        offsets, extents = prn._metric_branch_tables((0.0, T_CHILD), (0.0, T_PARENT))
+        assert offsets.shape == (0, 0)
+        assert extents.shape == (0,)
+
+    def test_tables_are_built_once_per_stage(self) -> None:
+        """D11/D14: the enumeration is the expensive half, so it must be memoised."""
+        cfg = _search_config("metric")
+        prn = Pruning.__new__(Pruning)
+        prn._branch_table_cache = {}
+        prn._empty_branch_tables = (np.empty((0, 0)), np.empty(0))
+        prn._dyp = SimpleNamespace(cfg=cfg)
+        prn._logger = logging.getLogger("test_prune_wiring")
+
+        first = prn._metric_branch_tables((0.0, T_CHILD), (0.0, T_PARENT))
+        second = prn._metric_branch_tables((0.0, T_CHILD), (0.0, T_PARENT))
+        assert first[0] is second[0], "same stage must hit the cache"
+        assert len(prn._branch_table_cache) == 1
+
+        prn._metric_branch_tables((0.0, 2 * T_CHILD), (0.0, T_CHILD))
+        assert len(prn._branch_table_cache) == 2, "a new stage must recompute"
+
+        expected = taylor.metric_branch_tables(
+            T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+            cfg.metric_branch_max,
+        )
+        np.testing.assert_array_equal(first[0], expected[0])
+        np.testing.assert_array_equal(first[1], expected[1])
+
+    @pytest.mark.parametrize(
+        ("poly_basis", "poly_order"),
+        [("chebyshev", 3), ("taylor", 5)],  # poly_order=5 selects the circular basis
+    )
+    def test_metric_is_rejected_on_the_bases_that_cannot_honour_it(
+        self, poly_basis: str, poly_order: int,
+    ) -> None:
+        """Silently ignoring the strategy would be worse than refusing to run."""
+        cfg = _search_config("metric", poly_order)
+        prn = Pruning.__new__(Pruning)
+        prn._dyp = SimpleNamespace(
+            cfg=cfg, fold=np.zeros((2,) * 6), param_arr=[], dparams_actual=None,
+        )
+        with pytest.raises(ValueError, match="only implemented for the Taylor basis"):
+            prn._setup_pruning(poly_basis, use_moving_grid=True)
+
+
+class TestMetricConfigDefaults:
+    """The knobs step 6b needed, and the assumption baked into one of them."""
+
+    def test_metric_ducy_follows_ducy_max_unless_set(self) -> None:
+        assert _search_config("metric").metric_ducy == 0.5
+        cfg = PulsarSearchConfig(
+            nsamps=2**14, tsamp=64e-6, nbins=NBINS, eta=1,
+            param_limits=ParamLimits.from_upper(
+                (F0 - 1, F0 + 1), [6.0, 500.0], (-8.0, 8.0), 2**14 * 64e-6,
+            ).limits,
+            bseg_brute=2**11, bseg_ffa=2**13, prune_poly_order=3,
+            ducy_max=0.5, wtsp=1.2, use_fourier=False,
+            tiling_strategy="metric", branch_max=16, metric_ducy=0.05,
+        )
+        assert cfg.metric_ducy == 0.05
+
+    def test_metric_branch_max_is_not_the_box_branch_max(self) -> None:
+        """`branch_max` is a per-axis width; the metric cap is a total (D14 note)."""
+        cfg = _search_config("metric")
+        assert cfg.branch_max == 16
+        assert cfg.metric_branch_max >= 500_000
+        # 16 as a total would truncate even the poly_order=3 covering.
+        n_children = len(
+            taylor.metric_branch_tables(
+                T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+                cfg.metric_branch_max,
+            )[0],
+        )
+        assert n_children > cfg.branch_max

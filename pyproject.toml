@@ -107,7 +107,9 @@ ignore = [
 "examples/**/*.ipynb" = ["T201"]
 # S101: `assert` is how pytest tests assert. T201: several tests deliberately print
 # measured ratios that are meant to be read rather than asserted tightly.
-"tests/**/*.py" = ["S101", "T201"]
+# SLF001: the metric wiring hangs off private members of `Pruning` on purpose, and
+# a test that could not reach them would not be testing the wiring.
+"tests/**/*.py" = ["S101", "T201", "SLF001"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 20
