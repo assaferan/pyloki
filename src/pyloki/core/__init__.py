@@ -8,6 +8,7 @@ from .fold import brutefold, brutefold_single
 from .taylor import (
     generate_bp_poly_taylor,
     generate_bp_poly_taylor_approx,
+    generate_bp_poly_taylor_metric,
 )
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "generate_bp_poly_chebyshev_approx",
     "generate_bp_poly_taylor",
     "generate_bp_poly_taylor_approx",
+    "generate_bp_poly_taylor_metric",
     "set_ffa_load_func",
     "set_prune_load_func",
     "unify_fold",

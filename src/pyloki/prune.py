@@ -177,6 +177,7 @@ def pruning_iteration_batched(
     load_func: Callable[[np.ndarray, np.ndarray], np.ndarray],
     branch_offsets: np.ndarray,
     branch_extents: np.ndarray,
+    transform_extents: np.ndarray,
     sugg_max: int = 2**18,
     batch_size: int = 1024,
 ) -> tuple[
@@ -202,9 +203,9 @@ def pruning_iteration_batched(
         The current pruning level.
     load_func : Callable[[np.ndarray, np.ndarray], np.ndarray]
         A function to load the desired fold from the input structure.
-    branch_offsets, branch_extents : np.ndarray
+    branch_offsets, branch_extents, transform_extents : np.ndarray
         Per-stage covering tables for ``tiling_strategy="metric"``, built once per
-        level by ``Pruning._metric_branch_tables``. Empty for every other strategy,
+        level by ``Pruning._metric_stage_tables``. Empty for every other strategy,
         which ignores them.
     world_tree_max : int, optional
         Maximum number of candidates to keep in the output WorldTree,
@@ -309,6 +310,7 @@ def pruning_iteration_batched(
             filtered_leaves,
             coord_next,
             coord_cur,
+            transform_extents,
         )
         timers[6] += nb_time_now() - t_start
 
@@ -644,9 +646,10 @@ class Pruning:
         )
         coord_next = self.scheme.get_coord(self.prune_level)
         coord_add = self.scheme.get_segment_coord(self.prune_level)
-        branch_offsets, branch_extents = self._metric_branch_tables(
+        branch_offsets, branch_extents, transform_extents = self._metric_stage_tables(
             coord_cur,
             coord_prev,
+            coord_next,
         )
         world_tree, stats_dict, timers = pruning_iteration_batched(
             self.world_tree,
@@ -661,6 +664,7 @@ class Pruning:
             self.load_func,
             branch_offsets,
             branch_extents,
+            transform_extents,
             self.max_sugg,
             self.batch_size,
         )
@@ -778,30 +782,38 @@ class Pruning:
             lvl -= 1
         return steps_rev[::-1]
 
-    def _metric_branch_tables(
+    def _metric_stage_tables(
         self,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Covering tables for one pruning level (metric_PLAN.md Phase 2 step 6b).
+        coord_next: tuple[float, float],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Metric tables for one pruning level (metric_PLAN.md Phase 2, steps 2 and 6b).
 
-        The metric branch is split at the stage/batch seam (DECISIONS.md D14): the
-        expensive half -- ``eigh``, Cholesky solves and the Fincke-Pohst enumeration --
-        is numba-hostile but depends only on the stage (D11), so it runs here, in
-        Python, once per level, and reaches the ``@njit`` ``branch_func`` as two plain
-        arrays. Every other tiling strategy gets empty arrays and ignores them.
+        The metric path is split at the stage/batch seam (DECISIONS.md D14): the
+        expensive, numba-hostile work -- ``eigh``, Cholesky solves and the Fincke-Pohst
+        enumeration -- depends only on the stage (D11), so it runs here, in Python,
+        once per level, and reaches the ``@njit`` ``branch_func`` and ``transform_func``
+        as plain arrays. Every other tiling strategy gets empty arrays and ignores them.
 
-        Levels repeat their ``(t_obs_prev, t_obs_cur)`` pair across pruning runs with
-        different reference segments, so the tables are memoised on that pair.
+        Returns ``(branch_offsets, branch_extents, transform_extents)``. The first two
+        are the covering; the third is the *exact* re-centred axis extent of a child
+        (D18), which the transform cannot derive from leaf state because a leaf stores
+        only the ellipsoid's bounding box (D12).
+
+        Everything is keyed on the stage, so it is memoised on
+        ``(t_obs_prev, t_obs_cur, delta_t)`` -- levels repeat that triple across pruning
+        runs with different reference segments.
         """
         cfg = self.dyp.cfg
         if cfg.tiling_strategy != "metric":
-            return self._empty_branch_tables
-        key = (coord_prev[1], coord_cur[1])
-        tables = self._branch_table_cache.get(key)
+            return self._empty_stage_tables
+        delta_t = coord_next[0] - coord_cur[0]
+        key = (coord_prev[1], coord_cur[1], delta_t)
+        tables = self._stage_table_cache.get(key)
         if tables is None:
-            with Timer(name="metric_branch_tables", logger=self.logger.debug):
-                tables = taylor.metric_branch_tables(
+            with Timer(name="metric_stage_tables", logger=self.logger.debug):
+                offsets, extents = taylor.metric_branch_tables(
                     coord_prev[1],
                     coord_cur[1],
                     cfg.nbins,
@@ -810,11 +822,20 @@ class Pruning:
                     cfg.m_max,
                     cfg.metric_branch_max,
                 )
+                trans_extents = taylor.metric_transform_extents(
+                    coord_cur[1],
+                    delta_t,
+                    cfg.nbins,
+                    cfg.metric_ducy,
+                    cfg.prune_poly_order,
+                    cfg.m_max,
+                )
+            tables = (offsets, extents, trans_extents)
             self.logger.info(
                 f"Metric covering for t_obs {coord_prev[1]:.3f} -> {coord_cur[1]:.3f} "
-                f"s: {len(tables[0])} children per parent",
+                f"s: {len(offsets)} children per parent",
             )
-            self._branch_table_cache[key] = tables
+            self._stage_table_cache[key] = tables
         return tables
 
     def _setup_pruning(self, poly_basis: str, use_moving_grid: bool) -> None:
@@ -849,13 +870,14 @@ class Pruning:
             )
             raise ValueError(msg)
 
-        # Per-level metric covering tables, memoised on (t_obs_prev, t_obs_cur).
-        self._branch_table_cache: dict[
-            tuple[float, float],
-            tuple[np.ndarray, np.ndarray],
+        # Per-level metric tables, memoised on (t_obs_prev, t_obs_cur, delta_t).
+        self._stage_table_cache: dict[
+            tuple[float, float, float],
+            tuple[np.ndarray, np.ndarray, np.ndarray],
         ] = {}
-        self._empty_branch_tables = (
+        self._empty_stage_tables = (
             np.empty((0, 0), dtype=np.float64),
+            np.empty(0, dtype=np.float64),
             np.empty(0, dtype=np.float64),
         )
 

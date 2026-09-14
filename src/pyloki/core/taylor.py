@@ -267,6 +267,77 @@ def metric_branch_tables(
     return np.ascontiguousarray(offsets_unit), np.ascontiguousarray(extents_unit)
 
 
+def metric_transform_extents(
+    t_obs_cur: float,
+    delta_t: float,
+    nbins: int,
+    ducy: float,
+    poly_order: int,
+    m_max: float,
+) -> np.ndarray:
+    """Child axis extents after re-centring the epoch by `delta_t`, at `f0 = 1`.
+
+    A child's region is the ellipsoid `{d : d^T g d <= m_max}` in the stage-`s` metric
+    about the current epoch. Re-centring maps coefficients as `d' = T d`, so the same
+    physical region has metric `g' = T^-T g T^-1` (`metric.transform_metric`) and the
+    honest per-axis half-width at the new epoch is `ellipsoid_axis_extents(g', m_max)`.
+
+    This is the *exact* transform the plan's Phase 2 step 2 asks for, and it cannot be
+    done from leaf state alone: a leaf stores only the ellipsoid's bounding box (D12),
+    and a bounding box does not determine the ellipsoid it bounds. It can be done here
+    because `delta_t` and the stage metric are both properties of the *stage*, so --
+    exactly as for the covering tables (D11) -- one evaluation at `f0 = 1` serves every
+    leaf: `g` is proportional to `f0**2`, hence `inv(g)` to `f0**-2` and the extents to
+    `1 / f0`.
+
+    Notes
+    -----
+    Returns `poly_order` entries, for the branchable axes in leaf order (C1). `d_0` is
+    the constant-phase mode, which `poly_phase_metric` projects out, so it has no
+    defined half-width and keeps the zero that the metric branch gives it.
+    """
+    g_cur = metric.poly_phase_metric(
+        0.0, 0.0, t_obs_cur, poly_order, 1.0, nbins, ducy,
+    )
+    t_mat = metric.shift_matrix(delta_t, poly_order)
+    g_next = metric.transform_metric(g_cur, t_mat)
+    return np.ascontiguousarray(metric.ellipsoid_axis_extents(g_next, m_max))
+
+
+def generate_bp_poly_taylor_metric(
+    tseg_ffa: float,
+    nsegments: int,
+    ref_seg: int,
+    nbins: int,
+    ducy: float,
+    poly_order: int,
+    m_max: float,
+    branch_max: int,
+    *,
+    use_moving_grid: bool,
+) -> np.ndarray:
+    """Exact per-level branching factor `B(s)` under `tiling_strategy="metric"`.
+
+    `generate_bp_poly_taylor` cannot be reused: it models branching as a product of
+    independent per-axis counts, which is precisely the axis-aligned assumption the
+    metric covering replaces. It is also `@njit`, so it could not call the enumeration.
+
+    Under `"metric"` the answer is both simpler and exact rather than averaged: the
+    covering depends only on the stage (D11), so every parent at level `s` emits the
+    same number of children, with no `f0` dependence to average over.
+    """
+    scheme = MiddleOutScheme(nsegments, ref_seg, tseg_ffa, stride=1)
+    branching_pattern = np.empty(nsegments - 1, dtype=np.float64)
+    for prune_level in range(1, nsegments):
+        _, t_obs_cur = scheme.get_current_coord(prune_level, use_moving_grid)
+        _, t_obs_prev = scheme.get_previous_coord(prune_level, use_moving_grid)
+        offsets, _ = metric_branch_tables(
+            t_obs_prev, t_obs_cur, nbins, ducy, poly_order, m_max, branch_max,
+        )
+        branching_pattern[prune_level - 1] = float(len(offsets))
+    return branching_pattern
+
+
 @njit(cache=True, fastmath=True)
 def poly_taylor_branch_metric_apply(
     leaves_batch: np.ndarray,
@@ -466,15 +537,41 @@ def poly_taylor_transform_batch(
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
     tiling_strategy: str,
+    transform_extents: np.ndarray,
 ) -> np.ndarray:
-    """Re-center (in-place) the leaves to the next segment reference time."""
+    """Re-center (in-place) the leaves to the next segment reference time.
+
+    Under `tiling_strategy="metric"` the values shift exactly as they always have, but
+    column 1 does not come from the old column 1: it is the per-stage table built by
+    `metric_transform_extents` and rescaled by `1 / f0`. The box strategies propagate
+    their half-widths through `shift_taylor_full` and ignore `transform_extents`.
+    """
     delta_t = coord_next[0] - coord_cur[0]
     leaves_batch_trans = np.zeros_like(leaves_batch)
-    leaves_batch_trans[:, :-1] = transforms.shift_taylor_full(
-        leaves_batch[:, :-1],
-        delta_t,
-        tiling_strategy,
-    )
+    if tiling_strategy == "metric":
+        if transform_extents.shape[0] == 0:
+            msg = (
+                "tiling_strategy='metric' requires per-stage transform extents; "
+                "call taylor.metric_transform_extents and pass them to transform()"
+            )
+            raise ValueError(msg)
+        leaves_batch_trans[:, :-1, 0] = transforms.shift_taylor_params(
+            np.ascontiguousarray(leaves_batch[:, :-1, 0]),
+            delta_t,
+        )
+        n_params = transform_extents.shape[0]
+        for i in range(leaves_batch.shape[0]):
+            inv_f0 = 1.0 / leaves_batch[i, -1, 0]
+            for j in range(n_params):
+                leaves_batch_trans[i, j, 1] = transform_extents[j] * inv_f0
+        # Row [-2] is d_0, the constant-phase mode the metric projects out. It has no
+        # defined half-width, and keeps the zero the metric branch gave it.
+    else:
+        leaves_batch_trans[:, :-1] = transforms.shift_taylor_full(
+            leaves_batch[:, :-1],
+            delta_t,
+            tiling_strategy,
+        )
     leaves_batch_trans[:, -1] = leaves_batch[:, -1]
     return leaves_batch_trans
 
@@ -542,6 +639,9 @@ def generate_bp_poly_taylor_approx(
                 coord_next,
                 coord_cur,
                 tiling_strategy,
+                # No metric table: "metric" is refused before reaching the approximate
+                # branching pattern, which models branching per axis anyway.
+                np.empty(0, dtype=np.float64),
             )
         leaf = leaves_arr[0:1]  # shape: (1, total_size)
     # Check if any branches is truncated due to branch_max

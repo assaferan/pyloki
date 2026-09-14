@@ -127,8 +127,15 @@ class PrunePolyTaylorDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     def get_transform_matrix(
         self,
@@ -270,8 +277,15 @@ class PrunePolyTaylorComplexDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     def get_transform_matrix(
         self,
@@ -593,6 +607,7 @@ def transform_func(
     leaves_batch: np.ndarray,
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
+    transform_extents: np.ndarray,
 ) -> np.ndarray:
     if self.use_moving_grid:
         return taylor.poly_taylor_transform_batch(
@@ -600,6 +615,7 @@ def transform_func(
             coord_next,
             coord_cur,
             self.tiling_strategy,
+            transform_extents,
         )
     return leaves_batch
 
@@ -716,13 +732,17 @@ def report_func(
     coord_report: tuple[float, float],
     coord_end: tuple[float, float],
 ) -> np.ndarray:
-    if not self.use_moving_grid:
-        # Shift to the middle of the segment
+    if not self.use_moving_grid and self.tiling_strategy != "metric":
+        # Shift to the middle of the segment.
+        # NB (upstream, untouched): the result is discarded and `leaves_batch` is
+        # reported unshifted, so this call is already a no-op. "metric" skips it rather
+        # than raise for a per-stage table that would then be thrown away.
         taylor.poly_taylor_transform_batch(
             leaves_batch,
             coord_report,
             coord_end,
             self.tiling_strategy,
+            np.empty(0, dtype=np.float64),
         )
     return taylor.poly_taylor_report_batch(leaves_batch)
 
@@ -880,14 +900,22 @@ def ol_transform_func(
     leaves_batch: np.ndarray,
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
+    transform_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyTaylorDPFuncts,
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     return impl
 
@@ -1128,14 +1156,22 @@ def ol_transform_complex_func(
     leaves_batch: np.ndarray,
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
+    transform_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyTaylorComplexDPFuncts,
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     return impl
 

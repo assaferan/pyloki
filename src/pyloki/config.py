@@ -15,6 +15,7 @@ from pyloki.core import (
     generate_bp_poly_chebyshev_approx,
     generate_bp_poly_taylor,
     generate_bp_poly_taylor_approx,
+    generate_bp_poly_taylor_metric,
 )
 from pyloki.detection.scoring import generate_box_width_trials
 from pyloki.utils import maths, psr_utils, transforms
@@ -766,6 +767,13 @@ class PulsarSearchConfig:
             msg = f"Invalid kind: {kind}"
             raise ValueError(msg) from None
 
+        if self.tiling_strategy == "metric":
+            # The approximation tracks a worst-case per-axis branching factor, which
+            # has no meaning for a covering. Use generate_branching_pattern, which is
+            # exact under "metric" and no more expensive.
+            msg = 'tiling_strategy="metric" has no approximate branching pattern'
+            raise ValueError(msg)
+
         return generate_func(
             param_arr,
             dparams_act,
@@ -808,9 +816,30 @@ class PulsarSearchConfig:
         np.ndarray
             The branching pattern for the pruning search.
         """
+        nsegments_ffa = int(np.ceil(self.nsamps / self.bseg_ffa))
+        if self.tiling_strategy == "metric":
+            if kind not in {"poly_taylor_moving", "poly_taylor_fixed"}:
+                msg = (
+                    f'tiling_strategy="metric" is only implemented for the Taylor '
+                    f"basis, got kind={kind!r}"
+                )
+                raise ValueError(msg)
+            # Not a variant of the box calculation: `generate_bp_poly_taylor` models
+            # branching as a product of independent per-axis counts, which is the
+            # axis-aligned assumption the metric covering exists to replace.
+            return generate_bp_poly_taylor_metric(
+                self.tseg_ffa,
+                nsegments_ffa,
+                ref_seg,
+                self.nbins,
+                self.metric_ducy,
+                self.prune_poly_order,
+                self.m_max,
+                self.metric_branch_max,
+                use_moving_grid=kind == "poly_taylor_moving",
+            )
         if kind in {"poly_chebyshev_moving", "poly_chebyshev_fixed"}:
             use_cheby_coarsening = True
-        nsegments_ffa = int(np.ceil(self.nsamps / self.bseg_ffa))
         dparams = self.get_dparams(self.niters_ffa, use_cheby_coarsening)
         param_arr = self.get_param_arr(dparams)
         dparams_act = self.get_dparams_actual(self.niters_ffa, use_cheby_coarsening)
