@@ -816,6 +816,7 @@ class Pruning:
                 offsets, extents = taylor.metric_branch_tables(
                     coord_prev[1],
                     coord_cur[1],
+                    delta_t,
                     cfg.nbins,
                     cfg.metric_ducy,
                     cfg.prune_poly_order,
@@ -824,7 +825,6 @@ class Pruning:
                 )
                 trans_extents = taylor.metric_transform_extents(
                     coord_cur[1],
-                    delta_t,
                     cfg.nbins,
                     cfg.metric_ducy,
                     cfg.prune_poly_order,
