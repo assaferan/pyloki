@@ -241,3 +241,5 @@ pyrightconfig.json
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,linux,python,visualstudiocode
+# Phase 3: large intermediate threshold-scheme dumps (the .npz summaries are kept)
+docs/metric_gridding/schemes/*.h5
