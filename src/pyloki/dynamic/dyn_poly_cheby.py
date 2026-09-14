@@ -250,6 +250,7 @@ class PrunePolyChebyshevDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
         """Transform the leaf parameters to the new coordinate system.
 
@@ -267,7 +268,13 @@ class PrunePolyChebyshevDPFuncts(structref.StructRefProxy):
         np.ndarray
             The transformed leaf parameter set.
         """
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     def get_transform_matrix(
         self,
@@ -410,8 +417,15 @@ class PrunePolyChebyshevComplexDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     def get_transform_matrix(
         self,
@@ -725,7 +739,10 @@ def transform_func(
     leaves_batch: np.ndarray,
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
+    transform_extents: np.ndarray,
 ) -> np.ndarray:
+    # transform_extents is the metric strategy's per-stage table. Part of the
+    # shared transform() signature but unused here: see branch_func above.
     if self.use_moving_grid:
         return chebyshev.poly_chebyshev_transform_batch(
             leaves_batch,
@@ -1013,14 +1030,22 @@ def ol_transform_func(
     leaves_batch: np.ndarray,
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
+    transform_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyChebyshevDPFuncts,
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     return impl
 
@@ -1264,14 +1289,22 @@ def ol_transform_complex_func(
     leaves_batch: np.ndarray,
     coord_next: tuple[float, float],
     coord_cur: tuple[float, float],
+    transform_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyChebyshevComplexDPFuncts,
         leaves_batch: np.ndarray,
         coord_next: tuple[float, float],
         coord_cur: tuple[float, float],
+        transform_extents: np.ndarray,
     ) -> np.ndarray:
-        return transform_func(self, leaves_batch, coord_next, coord_cur)
+        return transform_func(
+            self,
+            leaves_batch,
+            coord_next,
+            coord_cur,
+            transform_extents,
+        )
 
     return impl
 

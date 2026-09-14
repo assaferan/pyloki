@@ -26,7 +26,8 @@ from pyloki.config import ParamLimits, PulsarSearchConfig
 from pyloki.core import metric, taylor
 from pyloki.dynamic import PrunePolyTaylorDPFuncts
 from pyloki.prune import Pruning
-from pyloki.utils import psr_utils
+from pyloki.utils import psr_utils, transforms
+from pyloki.utils.snail import MiddleOutScheme
 
 RNG = np.random.default_rng(20260910)
 F0 = 1.0 / 0.007  # 142.857 Hz, the spin period used throughout the plan
@@ -573,31 +574,40 @@ class TestStrategyDispatch:
 class TestPruneWiring:
     """Phase 2 step 6b: the per-stage precompute hook in `prune.py`."""
 
-    def test_tables_are_empty_for_the_box_strategies(self) -> None:
+    @staticmethod
+    def _pruning(cfg: PulsarSearchConfig) -> Pruning:
         prn = Pruning.__new__(Pruning)
-        prn._branch_table_cache = {}
-        prn._empty_branch_tables = (np.empty((0, 0)), np.empty(0))
-        prn._dyp = SimpleNamespace(cfg=_search_config("aggressive"))
-        offsets, extents = prn._metric_branch_tables((0.0, T_CHILD), (0.0, T_PARENT))
+        prn._stage_table_cache = {}
+        prn._empty_stage_tables = (np.empty((0, 0)), np.empty(0), np.empty(0))
+        prn._dyp = SimpleNamespace(cfg=cfg)
+        prn._logger = logging.getLogger("test_prune_wiring")
+        return prn
+
+    def test_tables_are_empty_for_the_box_strategies(self) -> None:
+        prn = self._pruning(_search_config("aggressive"))
+        offsets, extents, trans = prn._metric_stage_tables(
+            (0.0, T_CHILD), (0.0, T_PARENT), (1.0, 2 * T_CHILD),
+        )
         assert offsets.shape == (0, 0)
         assert extents.shape == (0,)
+        assert trans.shape == (0,)
 
     def test_tables_are_built_once_per_stage(self) -> None:
         """D11/D14: the enumeration is the expensive half, so it must be memoised."""
         cfg = _search_config("metric")
-        prn = Pruning.__new__(Pruning)
-        prn._branch_table_cache = {}
-        prn._empty_branch_tables = (np.empty((0, 0)), np.empty(0))
-        prn._dyp = SimpleNamespace(cfg=cfg)
-        prn._logger = logging.getLogger("test_prune_wiring")
+        prn = self._pruning(cfg)
+        cur, prev, nxt = (0.0, T_CHILD), (0.0, T_PARENT), (1.0, 2 * T_CHILD)
 
-        first = prn._metric_branch_tables((0.0, T_CHILD), (0.0, T_PARENT))
-        second = prn._metric_branch_tables((0.0, T_CHILD), (0.0, T_PARENT))
+        first = prn._metric_stage_tables(cur, prev, nxt)
+        second = prn._metric_stage_tables(cur, prev, nxt)
         assert first[0] is second[0], "same stage must hit the cache"
-        assert len(prn._branch_table_cache) == 1
+        assert len(prn._stage_table_cache) == 1
 
-        prn._metric_branch_tables((0.0, 2 * T_CHILD), (0.0, T_CHILD))
-        assert len(prn._branch_table_cache) == 2, "a new stage must recompute"
+        prn._metric_stage_tables((0.0, 2 * T_CHILD), cur, (2.0, 4 * T_CHILD))
+        assert len(prn._stage_table_cache) == 2, "a new stage must recompute"
+        # delta_t alone is enough to make it a different stage for the transform.
+        prn._metric_stage_tables(cur, prev, (5.0, 2 * T_CHILD))
+        assert len(prn._stage_table_cache) == 3, "delta_t must be part of the key"
 
         expected = taylor.metric_branch_tables(
             T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
@@ -605,6 +615,12 @@ class TestPruneWiring:
         )
         np.testing.assert_array_equal(first[0], expected[0])
         np.testing.assert_array_equal(first[1], expected[1])
+        np.testing.assert_array_equal(
+            first[2],
+            taylor.metric_transform_extents(
+                T_CHILD, 1.0, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+            ),
+        )
 
     @pytest.mark.parametrize(
         ("poly_basis", "poly_order"),
@@ -652,3 +668,161 @@ class TestMetricConfigDefaults:
             )[0],
         )
         assert n_children > cfg.branch_max
+
+
+class TestTransformExtents:
+    """Phase 2 step 2: the exact re-centred extents (DECISIONS.md D18)."""
+
+    @pytest.mark.parametrize("poly_order", [2, 3, 4])
+    def test_matches_the_support_function_of_the_mapped_ellipsoid(
+        self, poly_order: int,
+    ) -> None:
+        """The honest half-width is the ellipsoid's own extent, not a box's shear.
+
+        For axis `j` the exact half-width after `d -> T d` is
+        `max{ (T d)_j : d^T g d <= m_max } = sqrt(m_max * (T g^-1 T^T)_jj)`.
+        Checked here against a direct maximisation over sampled boundary points, which
+        must approach it from below.
+        """
+        delta_t = 7.3
+        extents = taylor.metric_transform_extents(
+            T_CHILD, delta_t, NBINS, DUCY, poly_order, M_MAX,
+        )
+        g = metric.poly_phase_metric(0.0, 0.0, T_CHILD, poly_order, 1.0, NBINS, DUCY)
+        t_mat = metric.shift_matrix(delta_t, poly_order)
+
+        chol = metric.cholesky_factor(g)
+        raw = RNG.normal(size=(200_000, poly_order))
+        unit = raw / np.linalg.norm(raw, axis=1, keepdims=True)
+        boundary = np.sqrt(M_MAX) * np.linalg.solve(chol.T, unit.T).T
+        sampled = np.abs(boundary @ t_mat.T).max(axis=0)
+
+        assert np.all(sampled <= extents * (1 + 1e-9)), "extents must bound the image"
+        np.testing.assert_allclose(sampled, extents, rtol=0.05)
+
+    def test_reduces_to_the_branch_extents_at_zero_shift(self) -> None:
+        """T(0) = I, so the transform must not move the child's bounding box."""
+        _, extents = taylor.metric_branch_tables(
+            T_PARENT, T_CHILD, NBINS, DUCY, 3, M_MAX, 500_000,
+        )
+        at_zero = taylor.metric_transform_extents(
+            T_CHILD, 0.0, NBINS, DUCY, 3, M_MAX,
+        )
+        np.testing.assert_allclose(at_zero, extents, rtol=1e-12)
+
+    def test_scales_as_one_over_f0(self) -> None:
+        """D11's f0**2 law, which is what lets this be a per-stage table."""
+        unit = taylor.metric_transform_extents(T_CHILD, 3.1, NBINS, DUCY, 4, M_MAX)
+        g = metric.poly_phase_metric(0.0, 0.0, T_CHILD, 4, F0, NBINS, DUCY)
+        at_f0 = metric.ellipsoid_axis_extents(
+            metric.transform_metric(g, metric.shift_matrix(3.1, 4)), M_MAX,
+        )
+        np.testing.assert_allclose(at_f0 * F0, unit, rtol=1e-10)
+
+
+class TestTransformDispatch:
+    """`poly_taylor_transform_batch` must route on strategy like `branch` does."""
+
+    @staticmethod
+    def _leaves(poly_order: int = 3) -> np.ndarray:
+        leaves = np.zeros((3, poly_order + 2, 2))
+        leaves[:, :-2, 0] = RNG.normal(scale=1e-3, size=(3, poly_order))
+        leaves[:, :-2, 1] = RNG.random((3, poly_order)) * 1e-4
+        leaves[:, -2, 0] = np.arange(3.0)
+        leaves[:, -1, 0] = F0
+        leaves[1, -1, 0] = 2.0 * F0
+        return leaves
+
+    def test_metric_takes_column_1_from_the_table_and_values_from_the_shift(
+        self,
+    ) -> None:
+        leaves = self._leaves()
+        coord_cur, coord_next = (0.0, T_CHILD), (4.5, T_CHILD)
+        extents = taylor.metric_transform_extents(
+            T_CHILD, 4.5, NBINS, DUCY, 3, M_MAX,
+        )
+        out = taylor.poly_taylor_transform_batch(
+            leaves, coord_next, coord_cur, "metric", extents,
+        )
+        # Values: the same shift the box strategies apply.
+        expected_vals = transforms.shift_taylor_params(
+            np.ascontiguousarray(leaves[:, :-1, 0]), 4.5,
+        )
+        np.testing.assert_allclose(out[:, :-1, 0], expected_vals, rtol=1e-12)
+        # Column 1: the per-stage table, rescaled per leaf, and nothing from the input.
+        for i in range(len(leaves)):
+            np.testing.assert_allclose(
+                out[i, :-2, 1], extents / leaves[i, -1, 0], rtol=1e-12,
+            )
+        assert np.all(out[:, -2, 1] == 0.0), "d_0 has no defined half-width"
+        np.testing.assert_array_equal(out[:, -1], leaves[:, -1])
+
+    def test_box_strategies_ignore_the_table(self) -> None:
+        leaves = self._leaves()
+        coord_cur, coord_next = (0.0, T_CHILD), (4.5, T_CHILD)
+        out_empty = taylor.poly_taylor_transform_batch(
+            leaves, coord_next, coord_cur, "aggressive", np.empty(0),
+        )
+        out_junk = taylor.poly_taylor_transform_batch(
+            leaves, coord_next, coord_cur, "aggressive", RNG.normal(size=3),
+        )
+        np.testing.assert_array_equal(out_empty, out_junk)
+
+    def test_missing_table_raises(self) -> None:
+        with pytest.raises(ValueError, match="per-stage transform extents"):
+            taylor.poly_taylor_transform_batch(
+                self._leaves(), (4.5, T_CHILD), (0.0, T_CHILD), "metric", np.empty(0),
+            )
+
+
+class TestMetricBranchingPattern:
+    """Phase 2 step 2, second half: B(s) for the threshold scheme."""
+
+    def test_matches_the_actual_per_level_child_counts(self) -> None:
+        cfg = _search_config("metric")
+        nsegments, ref_seg = 4, 1
+        pattern = taylor.generate_bp_poly_taylor_metric(
+            cfg.tseg_ffa, nsegments, ref_seg, NBINS, cfg.metric_ducy,
+            cfg.prune_poly_order, cfg.m_max, cfg.metric_branch_max,
+            use_moving_grid=True,
+        )
+        scheme = MiddleOutScheme(nsegments, ref_seg, cfg.tseg_ffa, stride=1)
+        expected = []
+        for lvl in range(1, nsegments):
+            _, t_cur = scheme.get_current_coord(lvl, moving_grid=True)
+            _, t_prev = scheme.get_previous_coord(lvl, moving_grid=True)
+            offsets, _ = taylor.metric_branch_tables(
+                t_prev, t_cur, NBINS, cfg.metric_ducy, cfg.prune_poly_order,
+                cfg.m_max, cfg.metric_branch_max,
+            )
+            expected.append(float(len(offsets)))
+        assert len(pattern) == nsegments - 1
+        np.testing.assert_array_equal(pattern, expected)
+        assert np.all(pattern >= 1)
+
+    def test_config_dispatches_to_it(self) -> None:
+        cfg = _search_config("metric")
+        pattern = cfg.generate_branching_pattern(
+            kind="poly_taylor_moving", ref_seg=1,
+        )
+        nsegments = int(np.ceil(cfg.nsamps / cfg.bseg_ffa))
+        assert len(pattern) == nsegments - 1
+        np.testing.assert_array_equal(
+            pattern,
+            taylor.generate_bp_poly_taylor_metric(
+                cfg.tseg_ffa, nsegments, 1, cfg.nbins, cfg.metric_ducy,
+                cfg.prune_poly_order, cfg.m_max, cfg.metric_branch_max,
+                use_moving_grid=True,
+            ),
+        )
+
+    def test_non_taylor_kinds_are_refused(self) -> None:
+        cfg = _search_config("metric")
+        with pytest.raises(ValueError, match="only implemented for the Taylor basis"):
+            cfg.generate_branching_pattern(kind="poly_chebyshev_moving", ref_seg=1)
+
+    def test_the_approximate_pattern_is_refused(self) -> None:
+        """A worst-case per-axis factor is meaningless for a covering."""
+        cfg = _search_config("metric")
+        with pytest.raises(ValueError, match="no approximate branching pattern"):
+            cfg.generate_branching_pattern_approx(kind="poly_taylor_moving", ref_seg=1)
