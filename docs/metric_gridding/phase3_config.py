@@ -22,11 +22,15 @@ ETA = 1.0
 DUCY_MAX = 0.2
 POLY_ORDER = 4
 
-# 67.1 s over 64 segments. Short of the plan's 18 min, but the same regime: this is
-# where prod B(s) showed the metric ahead by ~6 orders (see DECISIONS "Regime
-# dependence"), and it keeps an injection-recovery grid affordable.
-NSAMPS = 2**20
-BSEG_FFA = 2**14
+# 268.4 s over 64 segments. Chosen by measurement, not preference (D30):
+#   - the plan's 18 min / 128 segments needs a 3.8 TB FFA fold array -- not runnable
+#     on this machine; 537 s / 128 segments needs 5.0 GB and is a spot-check at best;
+#   - below ~268 s the FFA base grid is degenerate. At 67 s it is [1, 1, 1, 12]: only
+#     frequency is gridded, and every strategy recovers the same candidate, so nothing
+#     is discriminated. At 268 s it is [1, 1, 5, 467] and pruning refines all four axes.
+# FFA here costs 2.9 s and 0.1 GB, so an injection grid is affordable.
+NSAMPS = 2**22
+BSEG_FFA = 2**16
 
 
 def make_config(strategy: str, m_max: float = 0.2, defer: float = 1.0,
