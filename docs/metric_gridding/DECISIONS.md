@@ -257,33 +257,85 @@ These are **observed from the code**, not chosen, and any metric code must match
   The `metric_ducy` default is the **least conservative** choice available and is
   flagged as O7 below, not settled here.
 
+- **D18 — Step 2 takes the fourth option: the re-centred extents are a per-stage
+  table, threaded down the seam step 6b already built.** (Human's choice, 2026-09-14,
+  with (c) as the stated fallback; the fallback was not needed.)
+
+  The plan asks the transform to "transform `g` exactly with `transform_metric` and
+  return the new axis extents for column 1", and as written that is impossible: D12
+  stores only `ellipsoid_axis_extents` in column 1, and a bounding box does not
+  determine the ellipsoid it bounds. But it *is* possible one level up. `delta_t` and
+  the stage metric are both properties of the **stage**, so
+  `ellipsoid_axis_extents(transform_metric(g, T(delta_t)), m_max)` is a per-stage
+  constant, and — since `g` is proportional to `f0**2`, hence `inv(g)` to `f0**-2` —
+  it obeys the same exact `1 / f0` law as the covering offsets (verified: 2e-12).
+
+  So `taylor.metric_transform_extents` computes it once per level at `f0 = 1` next to
+  `metric_branch_tables`, `Pruning._metric_stage_tables` returns all three arrays, and
+  `transform_extents` joins the shared `transform` signature the way `branch_offsets`
+  joined `branch`. The result is the exact transform the plan wanted, with no `eigh`
+  inside `@njit`, no per-batch cost, and no new structref state. Option (a) was
+  rejected for putting per-stage linear algebra back on the per-batch path; option (b)
+  for being inexact when exactness turned out to be affordable.
+
+  Under `"metric"`, `poly_taylor_transform_batch` shifts the *values* exactly as the
+  box strategies do (`transforms.shift_taylor_params`) and takes column 1 entirely
+  from the table — the old column 1 is not an input. Row `[-2]` (`d_0`) keeps a zero
+  half-width: it is the constant-phase mode `poly_phase_metric` projects out, so it
+  has none.
+
+- **D19 — `B(s)` under `"metric"` is computed, not simulated.**
+  `generate_bp_poly_taylor` models branching as a product of independent per-axis
+  counts — exactly the axis-aligned assumption the covering replaces — and is `@njit`,
+  so it could not call the enumeration anyway. Under `"metric"` the answer is both
+  simpler and *exact rather than averaged*: the covering depends only on the stage
+  (D11), so every parent at level `s` emits the same number of children and there is
+  no `f0` spread to average over. `core/taylor.py::generate_bp_poly_taylor_metric`
+  walks the `MiddleOutScheme` and returns `len(metric_branch_tables(...)[0])` per
+  level; `config.generate_branching_pattern` dispatches to it.
+  `generate_branching_pattern_approx` **raises** under `"metric"` rather than return a
+  worst-case per-axis factor that has no meaning for a covering.
+
+## Verified end-to-end (2026-09-14)
+
+`tiling_strategy="metric"` now completes a real `prune_dyp_tree` run. On the
+`tests/test_prune.py` fixture at `poly_order=3`, `bseg_ffa = nsamps // 4` (4 segments,
+3 pruning levels), the branching pattern builds and the run finishes through ascend and
+report, with three distinct per-stage coverings:
+
+| level | `t_obs` prev -> cur (s) | children per parent |
+|---|---|---|
+| 1 | 0.131 -> 0.262 | 869 |
+| 2 | 0.262 -> 0.393 | 171 |
+| 3 | 0.393 -> 0.524 | 85 |
+
+The counts fall with level because the covering depends on the *ratio* of the
+accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
+`aggressive` completes the identical run, unchanged.
+
 ## Still to do in Phase 2
 
-- **Step 2 (`transforms.py`) was never implemented, and it — not step 6b — is now
-  what keeps `"metric"` from running end-to-end.** `shift_taylor_errors` and
-  `shift_taylor_full` still `raise ValueError(f"Invalid tiling strategy: metric")`.
-  Measured after step 6b landed, with `tiling_strategy="metric"`, `poly_order=3` on the
-  `tests/test_prune.py` fixture, a full `prune_dyp_tree` run now gets through **branch,
-  validate, resolve, shift_add and score** on metric children and dies at the
-  `transform` step, `prune.py:651 -> transforms.py:136`. `generate_branching_pattern`
-  fails the same way, so the threshold scheme cannot be built for `"metric"` either.
+- **Step 4** — the `resolve` diagnostic: children no longer sit on the rectangular base
+  grid `G0`, and the plan wants the metric mismatch between each child and the base-grid
+  point it resolves to, logged behind a debug flag, with a stop-and-discuss if the p95
+  exceeds the per-stage budget.
+- **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
+  that still matter under `"metric"` are `poly_taylor_report_batch`, `periodogram.
+  add_run` and `io/cands.py`, all of which turn column 1 into *reported* uncertainties.
+  Worth confirming that an ellipsoid bounding box is what those should print.
 
-  Step 2 is not mechanical, and the difficulty is worth stating before the session that
-  does it. The plan says to "transform the Cholesky factor (or `g`) exactly with
-  `transform_metric` and return the new axis extents for column 1. No inflation, no
-  diagonal truncation." But under D12 a leaf stores only `ellipsoid_axis_extents`, the
-  ellipsoid's **bounding box**, and a bounding box does not determine the ellipsoid — so
-  the exact transform cannot be done from leaf state alone. The options look like:
-  (a) rebuild `g` for the stage inside the transform, which needs `m_max` and the
-  duty cycle on the structref and the interval from `coord_next`/`coord_cur`;
-  (b) accept that column 1 is a diagnostic under `"metric"` (D12 already says nothing
-  derives spacing from it) and transform it by the `"conservative"` AABB rule, which
-  the plan's "no inflation" explicitly rules out; or (c) store the stage's `g` or its
-  Cholesky factor somewhere the transform can reach. This wants its own session and its
-  own decision entry.
+  Note what the trace now implies: inside the search loop column 1 is **write-only**
+  under `"metric"`. The metric branch reads the stage tables, not the parent's column 1;
+  `resolve` never touches column 1; `validate_func` is a no-op in the Taylor path;
+  `ascend` does not read it; `world_tree.py` does not interpret it. So D18's exactness
+  buys correct *reported error bars*, and cannot affect the grid or the coverage.
 
-- **Steps 4 and 5 are also still open**: the `resolve` diagnostic against the base grid
-  (step 4) and the `validate`/`report`/`ascend`/`io/cands.py` audit (step 5).
+- **An upstream oddity found while wiring this, deliberately not fixed.**
+  `report_func` (both `dyn_poly_taylor.py` and `dyn_circular_taylor.py`) calls
+  `poly_taylor_transform_batch` under `not use_moving_grid` and **discards the result**,
+  reporting `leaves_batch` unshifted — the call is already a no-op on `main`. `"metric"`
+  skips it rather than raise for a per-stage table that would be thrown away. Fixing the
+  discard is an upstream change, out of scope for this branch.
 
 ## Phase 2 findings
 
@@ -535,4 +587,27 @@ Status of "metric" end-to-end: **still inert, but for a different reason.** With
 Open questions: O6 (unchanged), O7 (new: which ducy sets the harmonic weighting; the
   default is the least conservative choice and should be settled with O6 in Phase 3).
 Next session starts at: Phase 2 step 2 (`transforms.py`), then steps 4 and 5.
+
+## 2026-09-14 (b) — Phase 2, step 2
+Done:
+  - Fourth option chosen by the human (D18), with (c) as an unused fallback:
+    `taylor.metric_transform_extents` computes the re-centred child extents once per
+    level at `f0 = 1`; `transform_extents` joins the shared `transform` signature
+    (3 `transform_func`s, 6 proxies, 6 overload stubs) and `_metric_branch_tables`
+    became `_metric_stage_tables`, returning all three arrays keyed on
+    `(t_obs_prev, t_obs_cur, delta_t)`.
+  - `poly_taylor_transform_batch` gained the `"metric"` branch: values via
+    `shift_taylor_params` as always, column 1 from the table, `d_0` left at zero.
+  - `core/taylor.py::generate_bp_poly_taylor_metric` + dispatch in
+    `config.generate_branching_pattern` (D19), so the threshold scheme can be built.
+    `generate_branching_pattern_approx` refuses `"metric"`.
+  - tests/test_branch_metric.py: +12 (`TestTransformExtents`, `TestTransformDispatch`,
+    `TestMetricBranchingPattern`). Full suite **138 passed**, ruff clean.
+Decisions fixed: D18 (per-stage transform extents), D19 (exact B(s), not simulated).
+Verified: `tiling_strategy="metric"` completes a real `prune_dyp_tree` run over three
+  pruning levels, branching pattern included — see "Verified end-to-end" above.
+  `aggressive` completes the identical run unchanged.
+Found, not fixed: `report_func` discards the result of its own transform call upstream.
+Open questions: O6, O7 (both unchanged, both for Phase 3).
+Next session starts at: Phase 2 steps 4 and 5, then Phase 3.
 ```

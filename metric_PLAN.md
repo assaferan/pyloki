@@ -200,19 +200,22 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    exactly with `transform_metric` and return the new axis extents for
    column 1. No inflation, no diagonal truncation.
 
-   **NOT DONE, and now the single thing keeping `"metric"` inert end-to-end**
-   (found 2026-09-14 while finishing step 6b). Both `shift_taylor_errors` and
-   `shift_taylor_full` still raise `Invalid tiling strategy: metric`, which stops a
-   real prune run at the `transform` step — everything before it (branch, validate,
-   resolve, shift_add, score) now works on metric children — and also breaks
-   `generate_branching_pattern`, hence the threshold scheme.
+   **DONE 2026-09-14**, but *not* in `shift_taylor_errors` (DECISIONS.md D18).
+   As written the step is not implementable — D12 stores only the ellipsoid's bounding
+   box in column 1, and a bounding box does not determine the ellipsoid — so the exact
+   transform was lifted one level up, to where it is not only possible but cheap:
+   `delta_t` and the stage metric are both per-stage, so
+   `taylor.metric_transform_extents` computes the re-centred extents once per level at
+   `f0 = 1` (same exact `1 / f0` law as the covering, D11) and `transform_extents`
+   joins the shared `transform` signature. `poly_taylor_transform_batch` gained the
+   `"metric"` branch: values via `shift_taylor_params` exactly as before, column 1 from
+   the table, `d_0` left at zero as the projected-out mode. `transforms.py` itself is
+   untouched, so the box strategies are bit-identical.
 
-   As written this step is not implementable: D12 stores only
-   `ellipsoid_axis_extents` in column 1, and a bounding box does not determine the
-   ellipsoid it bounds, so `g` cannot be transformed "exactly" from leaf state alone.
-   Either `g` (or its Cholesky factor) has to be reachable from the transform, or
-   column 1 has to be conceded as a diagnostic under `"metric"`. See
-   DECISIONS.md "Still to do in Phase 2" for the three options.
+   The other half of this step, not in the original text: `B(s)`.
+   `generate_bp_poly_taylor` simulates *box* branching and is `@njit`, so `"metric"`
+   gets `generate_bp_poly_taylor_metric`, which is exact rather than averaged (D19).
+   Without it the threshold scheme could not be built and nothing could run.
 3. `core/taylor.py::poly_taylor_branch_batch` (new function
    `poly_taylor_branch_metric_batch`, dispatched by strategy). **Amended
    2026-09-10:** split into two functions instead of one, see step 6:
@@ -282,7 +285,10 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
 - Shape/`batch_origins` contract identical to the existing branch function.
 
 Exit criterion: coverage test green; redundancy known; `aggressive` path
-untouched.
+untouched. **All three met.** As of 2026-09-14 steps 1, 2, 3 and 6 are done and
+`tiling_strategy="metric"` completes a real `prune_dyp_tree` run over three pruning
+levels, threshold scheme included; `aggressive` completes the identical run unchanged.
+Steps 4 (the `resolve` diagnostic) and 5 (the consumer audit) remain.
 
 ---
 
