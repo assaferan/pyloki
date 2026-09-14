@@ -174,6 +174,7 @@ def poly_taylor_branch_metric_batch(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    coord_next: tuple[float, float],
     nbins: int,
     ducy: float,
     poly_order: int,
@@ -198,6 +199,10 @@ def poly_taylor_branch_metric_batch(
         this -- a leaf's `dparam` column already encodes its own spacing -- but a metric
         does: per-axis half-widths cannot represent the parent ellipsoid's orientation,
         so the parent's own metric has to be rebuilt from its interval.
+    coord_next : tuple[float, float]
+        Coordinates the leaves will be re-centred on at the end of the stage. Only its
+        reference time is used, to place the child's averaging window relative to the
+        leaf's current epoch (D20).
     nbins, ducy : int, float
         Folded-profile resolution and duty cycle, setting the harmonic weighting.
     poly_order : int
@@ -226,17 +231,26 @@ def poly_taylor_branch_metric_batch(
     the offsets scale as `1 / f0` and the enumeration -- much the most expensive part --
     runs once per stage rather than once per distinct `f0` in the batch.
     """
-    _, t_obs_cur = coord_cur
-    _, t_obs_prev = coord_prev
+    ref_cur, t_half_cur = coord_cur
+    _, t_half_prev = coord_prev
+    ref_next, _ = coord_next
     offsets_unit, extents_unit = metric_branch_tables(
-        t_obs_prev, t_obs_cur, nbins, ducy, poly_order, m_max, branch_max,
+        t_half_prev,
+        t_half_cur,
+        ref_next - ref_cur,
+        nbins,
+        ducy,
+        poly_order,
+        m_max,
+        branch_max,
     )
     return poly_taylor_branch_metric_apply(leaves_batch, offsets_unit, extents_unit)
 
 
 def metric_branch_tables(
-    t_obs_prev: float,
-    t_obs_cur: float,
+    t_half_prev: float,
+    t_half_cur: float,
+    delta_t: float,
     nbins: int,
     ducy: float,
     poly_order: int,
@@ -247,18 +261,34 @@ def metric_branch_tables(
 
     Everything expensive lives here -- `eigh`, Cholesky solves and the Fincke-Pohst
     enumeration -- and none of it depends on the leaves. The tables are a function of
-    the *stage* alone (`t_obs_prev`, `t_obs_cur`, `nbins`, `ducy`, `poly_order`,
-    `m_max`), because the metric is exactly proportional to `f0**2` (D11), so a leaf's
-    own `f0` enters only as a `1 / f0` rescaling.
+    the *stage* alone, because the metric is exactly proportional to `f0**2` (D11), so
+    a leaf's own `f0` enters only as a `1 / f0` rescaling. That is what lets the
+    numba-hostile part run once per stage in Python while the per-batch work stays in
+    `poly_taylor_branch_metric_apply`, which is `@njit`.
 
-    That is what lets the numba-hostile part run once per stage in Python while the
-    per-batch work stays in `poly_taylor_branch_metric_apply`, which is `@njit`.
+    Parameters
+    ----------
+    t_half_prev, t_half_cur
+        **Half-widths** of the parent and child accumulated windows, i.e. `coord[1]`.
+    delta_t
+        `coord_next[0] - coord_cur[0]`: how far ahead of the leaf's expansion epoch the
+        child window is centred.
+
+    Notes
+    -----
+    The averaging windows, not the half-widths, are what `poly_phase_metric` needs, and
+    getting that wrong was a real bug (D20). Both leaves are expanded about the
+    *previous* centre. The parent's window is symmetric about it, `[-t_half_prev,
+    +t_half_prev]`; the child's window has grown and moved on, so it is centred
+    `delta_t` ahead: `[delta_t - t_half_cur, delta_t + t_half_cur]`. Passing
+    `[0, coord[1]]` -- the epoch at the window's edge, over half its true length --
+    misprices the extents by 4x to 64x.
     """
     g_parent = metric.poly_phase_metric(
-        0.0, 0.0, t_obs_prev, poly_order, 1.0, nbins, ducy,
+        0.0, -t_half_prev, t_half_prev, poly_order, 1.0, nbins, ducy,
     )
     g_child = metric.poly_phase_metric(
-        0.0, 0.0, t_obs_cur, poly_order, 1.0, nbins, ducy,
+        0.0, delta_t - t_half_cur, delta_t + t_half_cur, poly_order, 1.0, nbins, ducy,
     )
     offsets_unit = metric.lattice_children(
         g_parent, g_child, m_max, max_children=branch_max,
@@ -268,27 +298,30 @@ def metric_branch_tables(
 
 
 def metric_transform_extents(
-    t_obs_cur: float,
-    delta_t: float,
+    t_half_cur: float,
     nbins: int,
     ducy: float,
     poly_order: int,
     m_max: float,
 ) -> np.ndarray:
-    """Child axis extents after re-centring the epoch by `delta_t`, at `f0 = 1`.
+    """Child axis extents once re-centred on the new epoch, at `f0 = 1`.
 
-    A child's region is the ellipsoid `{d : d^T g d <= m_max}` in the stage-`s` metric
-    about the current epoch. Re-centring maps coefficients as `d' = T d`, so the same
-    physical region has metric `g' = T^-T g T^-1` (`metric.transform_metric`) and the
-    honest per-axis half-width at the new epoch is `ellipsoid_axis_extents(g', m_max)`.
+    A child's region is the ellipsoid `{d : d^T g d <= m_max}`. The transform moves the
+    expansion epoch to the centre of the newly accumulated window, where that window is
+    symmetric, so the honest per-axis half-width there is just
+    `ellipsoid_axis_extents(g, m_max)` for `g` built about the new epoch.
 
     This is the *exact* transform the plan's Phase 2 step 2 asks for, and it cannot be
     done from leaf state alone: a leaf stores only the ellipsoid's bounding box (D12),
     and a bounding box does not determine the ellipsoid it bounds. It can be done here
-    because `delta_t` and the stage metric are both properties of the *stage*, so --
-    exactly as for the covering tables (D11) -- one evaluation at `f0 = 1` serves every
-    leaf: `g` is proportional to `f0**2`, hence `inv(g)` to `f0**-2` and the extents to
-    `1 / f0`.
+    because the window is a property of the *stage*, so -- exactly as for the covering
+    tables (D11) -- one evaluation at `f0 = 1` serves every leaf: `g` is proportional
+    to `f0**2`, hence `inv(g)` to `f0**-2` and the extents to `1 / f0`.
+
+    Equivalently one could carry the pre-transform metric through
+    `metric.transform_metric(g, shift_matrix(delta_t, poly_order))`; Phase 1 test 2 is
+    the statement that the two agree, and `TestTransformExtents` checks it here too.
+    Rebuilding about the new epoch is cheaper and needs no `delta_t`.
 
     Notes
     -----
@@ -296,11 +329,9 @@ def metric_transform_extents(
     the constant-phase mode, which `poly_phase_metric` projects out, so it has no
     defined half-width and keeps the zero that the metric branch gives it.
     """
-    g_cur = metric.poly_phase_metric(
-        0.0, 0.0, t_obs_cur, poly_order, 1.0, nbins, ducy,
+    g_next = metric.poly_phase_metric(
+        0.0, -t_half_cur, t_half_cur, poly_order, 1.0, nbins, ducy,
     )
-    t_mat = metric.shift_matrix(delta_t, poly_order)
-    g_next = metric.transform_metric(g_cur, t_mat)
     return np.ascontiguousarray(metric.ellipsoid_axis_extents(g_next, m_max))
 
 
@@ -329,10 +360,18 @@ def generate_bp_poly_taylor_metric(
     scheme = MiddleOutScheme(nsegments, ref_seg, tseg_ffa, stride=1)
     branching_pattern = np.empty(nsegments - 1, dtype=np.float64)
     for prune_level in range(1, nsegments):
-        _, t_obs_cur = scheme.get_current_coord(prune_level, use_moving_grid)
-        _, t_obs_prev = scheme.get_previous_coord(prune_level, use_moving_grid)
+        ref_cur, t_half_cur = scheme.get_current_coord(prune_level, use_moving_grid)
+        _, t_half_prev = scheme.get_previous_coord(prune_level, use_moving_grid)
+        ref_next, _ = scheme.get_coord(prune_level)
         offsets, _ = metric_branch_tables(
-            t_obs_prev, t_obs_cur, nbins, ducy, poly_order, m_max, branch_max,
+            t_half_prev,
+            t_half_cur,
+            ref_next - ref_cur,
+            nbins,
+            ducy,
+            poly_order,
+            m_max,
+            branch_max,
         )
         branching_pattern[prune_level - 1] = float(len(offsets))
     return branching_pattern

@@ -37,14 +37,24 @@ M_MAX = 0.2
 # One EP stage: the accumulated segment doubles.
 T_PARENT = 16.78
 T_CHILD = 33.55
+# How far ahead of the leaf's epoch the child window is centred (D20). The leaf is
+# expanded about the previous centre, so the newly added segment moves the window on.
+DELTA_T = T_CHILD - T_PARENT
 
 
 def metrics_for(poly_order: int, f0: float = F0) -> tuple[np.ndarray, np.ndarray]:
-    """Parent- and child-stage metrics for one segment doubling."""
+    """Parent- and child-stage metrics for one segment doubling.
+
+    Both are about the leaf's epoch, which is the parent window's centre. The parent
+    window is therefore symmetric; the child window has grown and moved on, so it sits
+    `DELTA_T` ahead. `T_PARENT` and `T_CHILD` are half-widths, not endpoints (D20).
+    """
     g_parent = metric.poly_phase_metric(
-        0.0, 0.0, T_PARENT, poly_order, f0, NBINS, DUCY,
+        0.0, -T_PARENT, T_PARENT, poly_order, f0, NBINS, DUCY,
     )
-    g_child = metric.poly_phase_metric(0.0, 0.0, T_CHILD, poly_order, f0, NBINS, DUCY)
+    g_child = metric.poly_phase_metric(
+        0.0, DELTA_T - T_CHILD, DELTA_T + T_CHILD, poly_order, f0, NBINS, DUCY,
+    )
     return g_parent, g_child
 
 
@@ -329,8 +339,8 @@ class TestBranchContract:
         n_leaves = 5
         leaves = self._leaves(n_leaves, poly_order)
         out, origins = taylor.poly_taylor_branch_metric_batch(
-            leaves, (0.0, T_CHILD), (0.0, T_PARENT), NBINS, DUCY, poly_order,
-            M_MAX, 500_000,
+            leaves, (0.0, T_CHILD), (0.0, T_PARENT), (DELTA_T, T_CHILD), NBINS, DUCY,
+            poly_order, M_MAX, 500_000,
         )
         assert out.ndim == 3
         assert out.shape[1:] == (poly_order + 2, 2)
@@ -346,8 +356,8 @@ class TestBranchContract:
     def test_passthrough_columns(self, poly_order: int) -> None:
         leaves = self._leaves(4, poly_order)
         out, origins = taylor.poly_taylor_branch_metric_batch(
-            leaves, (0.0, T_CHILD), (0.0, T_PARENT), NBINS, DUCY, poly_order,
-            M_MAX, 500_000,
+            leaves, (0.0, T_CHILD), (0.0, T_PARENT), (DELTA_T, T_CHILD), NBINS, DUCY,
+            poly_order, M_MAX, 500_000,
         )
         np.testing.assert_allclose(out[:, -2, 0], leaves[origins, -2, 0])
         np.testing.assert_allclose(out[:, -1, 0], leaves[origins, -1, 0])
@@ -363,8 +373,8 @@ class TestBranchContract:
         leaves = self._leaves(3, poly_order)
         leaves[:, -1, 0] = np.array([F0, 2.0 * F0, 0.5 * F0])
         out, origins = taylor.poly_taylor_branch_metric_batch(
-            leaves, (0.0, T_CHILD), (0.0, T_PARENT), NBINS, DUCY, poly_order,
-            M_MAX, 500_000,
+            leaves, (0.0, T_CHILD), (0.0, T_PARENT), (DELTA_T, T_CHILD), NBINS, DUCY,
+            poly_order, M_MAX, 500_000,
         )
         for i in range(len(leaves)):
             f0 = leaves[i, -1, 0]
@@ -383,8 +393,8 @@ class TestBranchContract:
         poly_order = 3
         leaves = self._leaves(2, poly_order)
         out, _ = taylor.poly_taylor_branch_metric_batch(
-            leaves, (0.0, T_CHILD), (0.0, T_PARENT), NBINS, DUCY, poly_order,
-            M_MAX, 500_000,
+            leaves, (0.0, T_CHILD), (0.0, T_PARENT), (DELTA_T, T_CHILD), NBINS, DUCY,
+            poly_order, M_MAX, 500_000,
         )
         _, g_child = metrics_for(poly_order)
         expected = metric.ellipsoid_axis_extents(g_child, M_MAX)
@@ -395,7 +405,8 @@ class TestBranchContract:
         leaves = self._leaves(2, 3)
         with pytest.raises(ValueError, match="lattice points"):
             taylor.poly_taylor_branch_metric_batch(
-                leaves, (0.0, T_CHILD), (0.0, T_PARENT), NBINS, DUCY, 3, M_MAX, 5,
+                leaves, (0.0, T_CHILD), (0.0, T_PARENT), (DELTA_T, T_CHILD),
+                NBINS, DUCY, 3, M_MAX, 5,
             )
 
 
@@ -413,7 +424,7 @@ class TestNjitDispatch:
         self, poly_order: int,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         offsets, extents = taylor.metric_branch_tables(
-            T_PARENT, T_CHILD, NBINS, DUCY, poly_order, M_MAX, 500_000,
+            T_PARENT, T_CHILD, DELTA_T, NBINS, DUCY, poly_order, M_MAX, 500_000,
         )
         leaves = np.zeros((4, poly_order + 2, 2))
         leaves[:, :-2, 0] = RNG.normal(scale=1e-3, size=(4, poly_order))
@@ -450,10 +461,10 @@ class TestNjitDispatch:
     def test_tables_depend_only_on_the_stage(self) -> None:
         """D11: no leaf state enters the tables, so one call per stage suffices."""
         first = taylor.metric_branch_tables(
-            T_PARENT, T_CHILD, NBINS, DUCY, 3, M_MAX, 500_000,
+            T_PARENT, T_CHILD, DELTA_T, NBINS, DUCY, 3, M_MAX, 500_000,
         )
         second = taylor.metric_branch_tables(
-            T_PARENT, T_CHILD, NBINS, DUCY, 3, M_MAX, 500_000,
+            T_PARENT, T_CHILD, DELTA_T, NBINS, DUCY, 3, M_MAX, 500_000,
         )
         np.testing.assert_array_equal(first[0], second[0])
         np.testing.assert_array_equal(first[1], second[1])
@@ -524,7 +535,7 @@ class TestStrategyDispatch:
     def test_metric_strategy_reaches_the_metric_covering(self) -> None:
         cfg = _search_config("metric")
         tables = taylor.metric_branch_tables(
-            T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+            T_PARENT, T_CHILD, DELTA_T, NBINS, cfg.metric_ducy, 3, cfg.m_max,
             cfg.metric_branch_max,
         )
         leaves = np.zeros((2, 5, 2))
@@ -610,7 +621,7 @@ class TestPruneWiring:
         assert len(prn._stage_table_cache) == 3, "delta_t must be part of the key"
 
         expected = taylor.metric_branch_tables(
-            T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+            T_PARENT, T_CHILD, 1.0, NBINS, cfg.metric_ducy, 3, cfg.m_max,
             cfg.metric_branch_max,
         )
         np.testing.assert_array_equal(first[0], expected[0])
@@ -618,7 +629,7 @@ class TestPruneWiring:
         np.testing.assert_array_equal(
             first[2],
             taylor.metric_transform_extents(
-                T_CHILD, 1.0, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+                T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
             ),
         )
 
@@ -663,7 +674,7 @@ class TestMetricConfigDefaults:
         # 16 as a total would truncate even the poly_order=3 covering.
         n_children = len(
             taylor.metric_branch_tables(
-                T_PARENT, T_CHILD, NBINS, cfg.metric_ducy, 3, cfg.m_max,
+                T_PARENT, T_CHILD, DELTA_T, NBINS, cfg.metric_ducy, 3, cfg.m_max,
                 cfg.metric_branch_max,
             )[0],
         )
@@ -671,53 +682,93 @@ class TestMetricConfigDefaults:
 
 
 class TestTransformExtents:
-    """Phase 2 step 2: the exact re-centred extents (DECISIONS.md D18)."""
+    """Phase 2 step 2: the exact re-centred extents (D18), on the right window (D20)."""
 
     @pytest.mark.parametrize("poly_order", [2, 3, 4])
-    def test_matches_the_support_function_of_the_mapped_ellipsoid(
+    def test_agrees_with_transporting_the_metric(self, poly_order: int) -> None:
+        """The two routes to the same ellipsoid must coincide.
+
+        Before the transform the child's metric is built about the *old* epoch over the
+        window `[dt - T, dt + T]`; after it, about the new epoch over `[-T, +T]`. Those
+        are the same absolute window seen from two epochs, so
+        `transform_metric(g_old, T(dt))` must equal `g_new` -- Phase 1 test 2, in the
+        exact configuration the pruning loop uses. `metric_transform_extents` takes the
+        cheap route (rebuild about the new epoch) and this pins that it is the same.
+        """
+        dt = DELTA_T
+        g_old = metric.poly_phase_metric(
+            0.0, dt - T_CHILD, dt + T_CHILD, poly_order, 1.0, NBINS, DUCY,
+        )
+        g_new = metric.transform_metric(
+            g_old, metric.shift_matrix(dt, poly_order),
+        )
+        np.testing.assert_allclose(
+            taylor.metric_transform_extents(
+                T_CHILD, NBINS, DUCY, poly_order, M_MAX,
+            ),
+            metric.ellipsoid_axis_extents(g_new, M_MAX),
+            rtol=1e-9,
+        )
+
+    @pytest.mark.parametrize("poly_order", [2, 3, 4])
+    def test_matches_the_support_function_of_the_ellipsoid(
         self, poly_order: int,
     ) -> None:
-        """The honest half-width is the ellipsoid's own extent, not a box's shear.
+        """The honest half-width is the ellipsoid's own extent along each axis.
 
-        For axis `j` the exact half-width after `d -> T d` is
-        `max{ (T d)_j : d^T g d <= m_max } = sqrt(m_max * (T g^-1 T^T)_jj)`.
-        Checked here against a direct maximisation over sampled boundary points, which
-        must approach it from below.
+        For axis `j` that is `max{ d_j : d^T g d <= m_max } = sqrt(m_max * (g^-1)_jj)`.
+        Checked against a direct maximisation over sampled boundary points, which must
+        approach it from below.
         """
-        delta_t = 7.3
         extents = taylor.metric_transform_extents(
-            T_CHILD, delta_t, NBINS, DUCY, poly_order, M_MAX,
+            T_CHILD, NBINS, DUCY, poly_order, M_MAX,
         )
-        g = metric.poly_phase_metric(0.0, 0.0, T_CHILD, poly_order, 1.0, NBINS, DUCY)
-        t_mat = metric.shift_matrix(delta_t, poly_order)
-
+        g = metric.poly_phase_metric(
+            0.0, -T_CHILD, T_CHILD, poly_order, 1.0, NBINS, DUCY,
+        )
         chol = metric.cholesky_factor(g)
         raw = RNG.normal(size=(200_000, poly_order))
         unit = raw / np.linalg.norm(raw, axis=1, keepdims=True)
         boundary = np.sqrt(M_MAX) * np.linalg.solve(chol.T, unit.T).T
-        sampled = np.abs(boundary @ t_mat.T).max(axis=0)
+        sampled = np.abs(boundary).max(axis=0)
 
-        assert np.all(sampled <= extents * (1 + 1e-9)), "extents must bound the image"
+        assert np.all(sampled <= extents * (1 + 1e-9)), "extents must bound the region"
         np.testing.assert_allclose(sampled, extents, rtol=0.05)
 
-    def test_reduces_to_the_branch_extents_at_zero_shift(self) -> None:
-        """T(0) = I, so the transform must not move the child's bounding box."""
-        _, extents = taylor.metric_branch_tables(
-            T_PARENT, T_CHILD, NBINS, DUCY, 3, M_MAX, 500_000,
+    def test_uses_the_symmetric_window_not_the_half_width_as_an_endpoint(self) -> None:
+        """The D20 regression guard.
+
+        `coord[1]` is a half-width, so the window is `[-T, +T]`. Passing `[0, T]` puts
+        the epoch at the window's edge over half its length, and misprices the extents
+        by a large factor -- 4x to 64x, growing with `poly_order`. Pinned so the
+        convention cannot quietly revert.
+        """
+        poly_order = 3
+        got = taylor.metric_transform_extents(
+            T_CHILD, NBINS, DUCY, poly_order, M_MAX,
         )
-        at_zero = taylor.metric_transform_extents(
-            T_CHILD, 0.0, NBINS, DUCY, 3, M_MAX,
+        symmetric = metric.ellipsoid_axis_extents(
+            metric.poly_phase_metric(
+                0.0, -T_CHILD, T_CHILD, poly_order, 1.0, NBINS, DUCY,
+            ),
+            M_MAX,
         )
-        np.testing.assert_allclose(at_zero, extents, rtol=1e-12)
+        one_sided = metric.ellipsoid_axis_extents(
+            metric.poly_phase_metric(
+                0.0, 0.0, T_CHILD, poly_order, 1.0, NBINS, DUCY,
+            ),
+            M_MAX,
+        )
+        np.testing.assert_allclose(got, symmetric, rtol=1e-12)
+        assert np.all(one_sided / symmetric > 3.0), "the bug was not benign"
 
     def test_scales_as_one_over_f0(self) -> None:
         """D11's f0**2 law, which is what lets this be a per-stage table."""
-        unit = taylor.metric_transform_extents(T_CHILD, 3.1, NBINS, DUCY, 4, M_MAX)
-        g = metric.poly_phase_metric(0.0, 0.0, T_CHILD, 4, F0, NBINS, DUCY)
-        at_f0 = metric.ellipsoid_axis_extents(
-            metric.transform_metric(g, metric.shift_matrix(3.1, 4)), M_MAX,
+        unit = taylor.metric_transform_extents(T_CHILD, NBINS, DUCY, 4, M_MAX)
+        g = metric.poly_phase_metric(0.0, -T_CHILD, T_CHILD, 4, F0, NBINS, DUCY)
+        np.testing.assert_allclose(
+            metric.ellipsoid_axis_extents(g, M_MAX) * F0, unit, rtol=1e-10,
         )
-        np.testing.assert_allclose(at_f0 * F0, unit, rtol=1e-10)
 
 
 class TestTransformDispatch:
@@ -739,7 +790,7 @@ class TestTransformDispatch:
         leaves = self._leaves()
         coord_cur, coord_next = (0.0, T_CHILD), (4.5, T_CHILD)
         extents = taylor.metric_transform_extents(
-            T_CHILD, 4.5, NBINS, DUCY, 3, M_MAX,
+            T_CHILD, NBINS, DUCY, 3, M_MAX,
         )
         out = taylor.poly_taylor_transform_batch(
             leaves, coord_next, coord_cur, "metric", extents,
@@ -789,11 +840,12 @@ class TestMetricBranchingPattern:
         scheme = MiddleOutScheme(nsegments, ref_seg, cfg.tseg_ffa, stride=1)
         expected = []
         for lvl in range(1, nsegments):
-            _, t_cur = scheme.get_current_coord(lvl, moving_grid=True)
+            ref_cur, t_cur = scheme.get_current_coord(lvl, moving_grid=True)
             _, t_prev = scheme.get_previous_coord(lvl, moving_grid=True)
+            ref_next, _ = scheme.get_coord(lvl)
             offsets, _ = taylor.metric_branch_tables(
-                t_prev, t_cur, NBINS, cfg.metric_ducy, cfg.prune_poly_order,
-                cfg.m_max, cfg.metric_branch_max,
+                t_prev, t_cur, ref_next - ref_cur, NBINS, cfg.metric_ducy,
+                cfg.prune_poly_order, cfg.m_max, cfg.metric_branch_max,
             )
             expected.append(float(len(offsets)))
         assert len(pattern) == nsegments - 1
