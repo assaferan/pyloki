@@ -610,6 +610,46 @@ which is generous to neither side at `m = 0.5`. And deferral at the winning `R` 
 few branch events, so the pruning-diversity question from the earlier section is still
 open.
 
+- **D27 — Step 5 audit: `"metric"` publishes axis extents, and nothing needs to skip.**
+  Phase 0 traced ten consumers of column 1. Re-checked against what the metric path now
+  writes:
+
+  | consumer | under `"metric"` | action |
+  |---|---|---|
+  | `common.get_leaves` / `poly_taylor_seed` | writes the FFA cell; now **read back** by `metric_seed_region` (D23) | none — the D24 halving makes it consistent |
+  | `poly_taylor_branch_batch` | not on the metric path | none |
+  | `poly_taylor_branch_metric_apply` | writes the region's full span (D24) | none |
+  | `poly_taylor_transform_batch` | writes the transported region's span (D18) | none |
+  | `poly_taylor_report_batch` | gauge-transforms it into the published uncertainty | works; see caveats |
+  | `periodogram.add_run` | writes it out as the `d<name>` columns | works |
+  | `io/cands.py` | persists it to HDF5 | works |
+  | `validate` | no-op in the Taylor path | none |
+  | `ascend`, `world_tree.py` | never read column 1 | none |
+  | `circular`, `chebyshev` | `"metric"` is refused on those bases (D16) | none |
+
+  So the plan's "use axis extents or skip" resolves to **use axis extents** everywhere,
+  which is what D12/D18/D24 already do. Verified end to end, not just read: a real
+  `prune_dyp_tree` run under each strategy publishes comparable numbers for the same
+  candidate — jerk span 15.99 (box) vs 16.15 (metric), accel 8.39 vs 8.76, frequency
+  0.0741 Hz vs 0.2223 Hz. The frequency span is 3x wider under `"metric"` because on
+  that config it never refines (one child per level, correctly), so it keeps the seed
+  cell where the box split 3x.
+
+  **Two caveats, neither a metric regression.**
+
+  1. `poly_taylor_report_batch` combines column 1 **in quadrature**, i.e. it treats a
+     full cell span as a 1-sigma uncertainty and assumes the axes are independent. They
+     are not — an ellipsoid's bounding box is correlated by construction, and a sheared
+     box is too. This is pre-existing behaviour that the box strategies get as well, so
+     it is out of scope here, but the published `d<name>` should not be read as a
+     Gaussian sigma by either strategy.
+  2. The published span is the ellipsoid's **bounding box**, i.e. the honest marginal
+     extent along each axis. It is deliberately not a covering box (D12): it does not
+     tile, and downstream code must not treat `dfreq` as a cell width it can step by.
+
+  `d_0` and the basis-flag row carry `0` in column 1 under both strategies — neither is
+  a searched axis, so that is correct rather than a gap.
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
@@ -1031,4 +1071,24 @@ Why the small config misleads: there `aggressive` under-reports its region by 1.
 Open questions: O6, O7, and (m_max, R) jointly — all four are scale factors on the same
   criterion and Phase 3 should settle them together.
 Next session starts at: step 5, then Phase 3 with the target-regime config.
+
+## 2026-09-14 (h) — Phase 2, step 5
+Done:
+  - Audited all ten Phase 0 consumers of column 1 against what the metric path writes
+    (D27). Resolution: "use axis extents" everywhere; nothing needs to skip, and no
+    code change was required — D12/D18/D24 had already put the right thing in column 1.
+  - Verified end to end rather than by reading: a real `prune_dyp_tree` run under each
+    strategy publishes comparable spans for the same candidate (jerk 15.99 vs 16.15,
+    accel 8.39 vs 8.76, freq 0.0741 vs 0.2223 Hz).
+  - 4 tests pinning the publishing path, including that the published number is a full
+    span (D24) at the point a user reads it, and that `validate` really is a no-op.
+  - Full suite **167 passed**, ruff clean.
+Flagged, not fixed (pre-existing, applies to the box strategies too):
+  - `poly_taylor_report_batch` combines column 1 in quadrature, treating a full span as
+    a 1-sigma uncertainty and assuming axis independence. Neither holds.
+  - The published span is a bounding box, not a covering box; it does not tile.
+Phase 2 is now complete: steps 1-6 all done.
+Open questions: O6, O7, and (m_max, R) jointly.
+Next session starts at: Phase 3, on a target-regime config (67 s+, poly_order 4), with
+  the four scale factors settled together.
 ```
