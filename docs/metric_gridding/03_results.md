@@ -68,3 +68,71 @@ the same thing for every strategy. Three noise realisations per point,
 
 Wall-clock per injection: `aggressive` 2-4 s, `conservative` ~11 s, `metric` 100-260 s.
 
+### The buffer, not the covering
+
+`max_sugg` is **not a neutral knob** for the metric strategy. Its branching is spiky —
+a single parent emits **17 549** children — so at `max_sugg = 2**14 = 16 384` the buffer
+cannot hold even one parent's offspring, `trim_threshold` fires mid-burst, and the true
+track is discarded. Re-run at `S/N = 15` with the buffer as the only change:
+
+| `max_sugg` | recovered | median mismatch | median score | seconds (3 reps) |
+|---|---|---|---|---|
+| 2^14 | 0/3 | 8.3e5 | 3.79 | 130 |
+| **2^17** | **3/3** | **0.00025** | **14.06** | 1694 |
+
+So the `0/3` in the table above is an artefact of a shared buffer, not a detection
+deficit — the second time in this phase that a shared resource setting made the metric
+look broken (D31 was the first, with a shared threshold ramp). **Given room to run, the
+metric matches `aggressive` at `S/N = 15` (3/3 each) and localises the signal better:
+median mismatch 2.5e-4 against `aggressive`'s 1.5e-3, at an equal score (14.06 vs
+14.02).**
+
+The price is the whole story:
+
+| | `aggressive` | `metric` |
+|---|---|---|
+| recovered at S/N 15 | 3/3 | 3/3 |
+| candidate buffer needed | 2^14 | **2^17** (8x) |
+| wall-clock per injection | ~1.2 s | **~565 s** (~450x) |
+| log2 complexity at equal `P_d` (step 2) | 8.16 | **18.22** (~1070x) |
+
+The three independent cost measures agree to within a factor of a few, which is
+reassuring: step 2's predicted ~1070x shows up as ~450x wall-clock and 8x memory.
+
+## Verdict
+
+**Inconclusive on the central question, and negative on cost.**
+
+The metric strategy works. It covers correctly, it recovers what `aggressive` recovers,
+and it localises better. It costs about three orders of magnitude more to do so.
+
+But this config cannot answer the question the project exists to ask. The premise is
+that `aggressive` loses signals in the corners its diagonal error propagation does not
+track — and here `aggressive` **under-reports its own region by only 1.02x to 1.33x**
+(measured, see DECISIONS "Regime dependence"). There is essentially no gap to fix, so
+the metric's guarantee buys nothing and only its cost is visible. A fair test needs a
+regime where `aggressive` actually drops signals, and the plan named one: the 18-minute
+circular-orbit search. That config needs 3.8 TB here and `"metric"` does not support the
+circular basis.
+
+So the recommendation is **not** "abandon". It is that the decisive experiment has not
+been run, and cannot be run on this machine as the code stands. The two things that
+would change that, in order:
+
+1. **A regime where `aggressive` visibly fails.** Either a larger machine for the
+   plan's config, or find a Taylor-basis config on this machine where `aggressive`'s
+   under-report is large. The under-report grew with baseline and order in the small
+   scan (1.001x at 17 s to 1.33x at 67 s), so a longer or higher-order Taylor run is
+   worth scanning for before reaching for more hardware.
+2. **The circular-orbit extension** (Phase 4), without which the plan's own config is
+   unreachable at any scale.
+
+Cheaper things that would sharpen, but not settle, the picture: more noise realisations
+(3 is too few — `conservative` goes 1/3, 0/3, 3/3 across S/N 12, 15, 20, which is
+noise), per-strategy buffers rather than a shared one, and settling `(m_max, R)` jointly
+with O6 and O7 instead of using the cost-optimal point.
+
+## Not done
+
+Step 4 (`P_d[q]` versus anchor segment) and step 5 (wall-clock and per-stage candidate
+counts at equal recalibrated `P_d`). Step 5 is partly covered by the table above.

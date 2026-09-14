@@ -1269,4 +1269,30 @@ Result worth stating: at equal detection probability the metric costs 1070x
 Open questions: O6, O7, (m_max, R) jointly.
 Next session starts at: Phase 3 step 3 — injection-recovery with these schemes, which
   is the decisive experiment.
+
+## 2026-09-14 (l) — Phase 3 step 3
+Done:
+  - Upstream PR #10 opened (fixes #8 and #9, based on #7).
+  - Injection-recovery grid: 3 strategies x 6 S/N x 3 realisations, with the
+    recalibrated schemes. Results and verdict in `03_results.md`.
+  - **D35 — `max_sugg` is not a neutral knob for the metric strategy.** Its branching
+    is spiky (17 549 children from one parent), so a shared `max_sugg = 2**14` cannot
+    hold even one parent's offspring and the true track is trimmed mid-burst. At S/N 15
+    the metric scored 0/3; with `2**17` and nothing else changed it scores **3/3**, at a
+    median mismatch of 2.5e-4 against `aggressive`'s 1.5e-3 and an equal score.
+    The second time a shared resource setting has made the metric look broken -- D31 was
+    the first. Any future comparison must give each strategy the resources it needs and
+    count that as part of its cost, not silently starve one of them.
+Verdict (Taylor analogue): the metric works, matches `aggressive`'s detection and
+  localises better, and costs ~3 orders of magnitude more -- 8x buffer, ~450x
+  wall-clock, ~1070x complexity at equal P_d. Three independent measures agreeing to a
+  factor of a few.
+  But the config cannot answer the central question: `aggressive` under-reports its
+  region by only 1.02-1.33x here, so there is no coverage gap to fix and only the
+  metric's cost is visible. NOT a reason to abandon -- a reason to say the decisive
+  experiment has not been run. See `03_results.md` for what would change that.
+Open questions: O6, O7, (m_max, R) jointly, and now: which affordable regime, if any,
+  makes `aggressive` visibly fail.
+Next session starts at: scanning for a Taylor config where `aggressive` under-reports
+  badly; failing that, Phase 4's circular extension or a bigger machine.
 ```
