@@ -511,6 +511,10 @@ class Pruning:
         # Initialize the world tree with the first segment
         coord_init = self.scheme.get_coord(0)
         self._world_tree = self.prune_funcs.seed(fold_segment, coord_init)
+        if self.dyp.cfg.tiling_strategy == "metric":
+            # D23: the seed's region is the FFA cell it came from, not a mismatch
+            # ellipsoid. Everything downstream is a refinement of this.
+            self._region_form = taylor.metric_seed_region(self._world_tree.leaves)
         # Per-level backtracks for all survivors (integration path reconstruction)
         self._backtrack_hist: list[np.ndarray] = []
         self._best_intermediate_arr = np.zeros(
@@ -864,47 +868,41 @@ class Pruning:
         once per level, and reaches the ``@njit`` ``branch_func`` and ``transform_func``
         as plain arrays. Every other tiling strategy gets empty arrays and ignores them.
 
-        Returns ``(branch_offsets, branch_extents, transform_extents)``. The first two
-        are the covering; the third is the *exact* re-centred axis extent of a child
-        (D18), which the transform cannot derive from leaf state because a leaf stores
-        only the ellipsoid's bounding box (D12).
+        Also carries the running **region** across levels (D23). The parent's region is
+        state, not something derivable from the baseline: it starts as the seed's FFA
+        cell, stays put on any level whose guard fires, and becomes the stage's
+        mismatch ellipsoid on any level that actually refines. Inferring it from the
+        baseline instead is what D22 measured the cost of.
 
-        Everything is keyed on the stage, so it is memoised on
-        ``(t_obs_prev, t_obs_cur, delta_t)`` -- levels repeat that triple across pruning
-        runs with different reference segments.
+        Returns ``(branch_offsets, branch_dparams, transform_dparams)``. The last two
+        are per-axis **full spans**, matching what column 1 means (D24).
         """
         cfg = self.dyp.cfg
         if cfg.tiling_strategy != "metric":
             return self._empty_stage_tables
         delta_t = coord_next[0] - coord_cur[0]
-        key = (coord_prev[1], coord_cur[1], delta_t)
-        tables = self._stage_table_cache.get(key)
-        if tables is None:
-            with Timer(name="metric_stage_tables", logger=self.logger.debug):
-                offsets, extents = taylor.metric_branch_tables(
-                    coord_prev[1],
-                    coord_cur[1],
-                    delta_t,
-                    cfg.nbins,
-                    cfg.metric_ducy,
-                    cfg.prune_poly_order,
-                    cfg.m_max,
-                    cfg.metric_branch_max,
-                )
-                trans_extents = taylor.metric_transform_extents(
-                    coord_cur[1],
-                    cfg.nbins,
-                    cfg.metric_ducy,
-                    cfg.prune_poly_order,
-                    cfg.m_max,
-                )
-            tables = (offsets, extents, trans_extents)
-            self.logger.info(
-                f"Metric covering for t_obs {coord_prev[1]:.3f} -> {coord_cur[1]:.3f} "
-                f"s: {len(offsets)} children per parent",
+        with Timer(name="metric_stage_tables", logger=self.logger.debug):
+            offsets, dparams, region = taylor.metric_branch_tables(
+                self._region_form,
+                coord_cur[1],
+                delta_t,
+                cfg.nbins,
+                cfg.metric_ducy,
+                cfg.prune_poly_order,
+                cfg.m_max,
+                cfg.metric_branch_max,
             )
-            self._stage_table_cache[key] = tables
-        return tables
+            self._region_form, trans_dparams = taylor.metric_transform_region(
+                region,
+                delta_t,
+                cfg.prune_poly_order,
+            )
+        refined = "refined" if len(offsets) > 1 else "no refinement possible yet"
+        self.logger.info(
+            f"Metric covering for t_obs {coord_prev[1]:.3f} -> {coord_cur[1]:.3f} "
+            f"s: {len(offsets)} children per parent ({refined})",
+        )
+        return offsets, dparams, trans_dparams
 
     def _setup_pruning(self, poly_basis: str, use_moving_grid: bool) -> None:
         if self.dyp.fold.ndim > 8:
@@ -938,11 +936,8 @@ class Pruning:
             )
             raise ValueError(msg)
 
-        # Per-level metric tables, memoised on (t_obs_prev, t_obs_cur, delta_t).
-        self._stage_table_cache: dict[
-            tuple[float, float, float],
-            tuple[np.ndarray, np.ndarray, np.ndarray],
-        ] = {}
+        # The running metric region (D23) is per-run state; initialize() seeds it.
+        self._region_form = np.zeros((0, 0), dtype=np.float64)
         self._empty_stage_tables = (
             np.empty((0, 0), dtype=np.float64),
             np.empty(0, dtype=np.float64),
