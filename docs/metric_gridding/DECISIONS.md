@@ -673,7 +673,11 @@ would favour whichever grid happens to be finer in frequency.
 
 ## Phase 3 step 2 — threshold recalibration (2026-09-14)
 
-- **D32 — BLOCKER: the Viterbi threshold optimiser is broken on this base.**
+- **D32 — ~~BLOCKER~~ RESOLVED 2026-09-14: the Viterbi threshold optimiser was broken
+  on this base.** Two independent upstream bugs, both now fixed, tested and filed:
+  **issue #8** (zero-filled state records) and **issue #9** (`trials_scheme` returning
+  `-inf`). Branch `fix-viterbi-zero-states`, cut from PR #7 since the crash it fixes
+  masks both. Details of the original diagnosis below.
   `DynamicThresholdScheme.run()` completes without error but leaves **every state empty
   from stage 2 onward**, so `backtrack_best` raises "No non-empty final states to plot"
   and no scheme can be extracted. Stage 0 has 36 non-empty states, stage 1 has ~155,
@@ -716,6 +720,46 @@ would favour whichever grid happens to be finer in frequency.
   schemes are not optimised, and the ranking of `aggressive` vs `metric` on cost is
   well inside neither. Treat the table as an order-of-magnitude sighting shot, not a
   result. The real comparison needs D32 fixed, several seeds, and step 3.
+
+- **D34 — The second bug, found only after fixing the first.**
+  `schemes.trials_scheme` is `norm.isf(1 / cumprod(B))`. A branching pattern that starts
+  with `B(s) = 1` has a cumulative trial count of 1, so the leading entries are
+  `norm.isf(1) = -inf`. `DynamicThresholdScheme` centres its threshold beam on that
+  path, so the beam selects nothing and every state is empty from stage 0 — the same
+  end-user symptom as #8, a completely different cause, and it survives the #8 fix.
+
+  This is exactly the case the metric strategy produces and the box strategies do not:
+  `aggressive` starts at `B = 4`, while the metric starts with four unbranched stages
+  (D26's guard doing its job). Fixed by flooring the path at zero — no branching means
+  no trials pressure, so no threshold is required — which leaves already-branching
+  patterns numerically unchanged.
+
+## Phase 3 step 2 — COMPLETE (2026-09-14)
+
+Viterbi-optimised scheme per strategy, `P_d` target 0.1, on the 268 s config:
+
+| strategy | `prod B(s)` | `P_d` achieved | log2 complexity | log2 cost | thresholds |
+|---|---|---|---|---|---|
+| `aggressive` | 1.51e12 | 0.1031 | **8.16** | 11.44 | 2.30 – 7.70 |
+| `metric` | 1.35e19 | 0.1031 | **18.22** | 21.50 | 1.40 – 8.40 |
+| `conservative` | 5.29e32 | 0.1031 | **49.99** | 53.27 | 1.70 – 9.10 |
+
+**All three now hit the same detection probability**, so for the first time the
+comparison is at equal `P_d` rather than equal worst-case mismatch — which is what the
+plan asked for and what makes the complexity column meaningful.
+
+At `P_d = 0.103` the metric costs `2^10.1` = **1070x** `aggressive` and `2^31.8` =
+**3.7e9 x less** than `conservative`. On a log scale it again sits about a quarter to a
+third of the way from the cheap-and-gappy strategy to the safe-and-unusable one — the
+same position three independent measurements have now found.
+
+Note this is the metric at its *cost-optimal* operating point, `(m_max, R) =
+(0.00208, 16)`, chosen to match `conservative`'s worst-case mismatch. Other operating
+points move that row and nothing else; settling `(m_max, R)` jointly with O6 and O7 is
+still open.
+
+These supersede the provisional D33 numbers, which came from the non-optimised
+`determine_scheme` fallback and had `P_d` varying by 6x between runs.
 
 ## Still to do in Phase 2
 
@@ -1200,4 +1244,29 @@ Findings:
 Open questions: O6, O7, (m_max, R) jointly.
 Next session starts at: Phase 3 step 2 proper -- `DynamicThresholdScheme` per strategy
   at P_d = 0.1 on the 268 s config -- then step 3 on a real injection grid.
+
+## 2026-09-14 (k) — fixing D32 upstream, and finishing step 2
+Done:
+  - Worked the fix on its own branch in its own worktree, off PR #7 (whose SIGABRT masks
+    both bugs), with an isolated venv: `worktrees/fix-viterbi`,
+    branch `fix-viterbi-zero-states`.
+  - **Upstream issue #8** — `run_stage_legacy`/`run_stage_improved` wrote zero-filled
+    records. Root cause is a numba miscompilation: given a jitted callee returning a
+    one-element structured array, `dst[i] = make()[0]` writes zeros, `r = a[0];
+    dst[i] = r` writes zeros, field-by-field loses bool fields, and only
+    `dst[i:i+1] = make()` round-trips. Minimal repro in the issue.
+  - **Upstream issue #9** — `trials_scheme` returns `-inf` when the pattern starts
+    unbranched, emptying the beam. Found only after #8 was fixed (D34).
+  - `tests/test_thresholding.py`: 11 tests. Verified they fail on the parent commit and
+    pass after, for each fix separately, by reverting just the src file.
+  - Both cherry-picked into `metric-gridding`; suite **178 passed**.
+  - Phase 3 step 2 complete: all three strategies now reach P_d = 0.1031. See the table
+    above.
+Result worth stating: at equal detection probability the metric costs 1070x
+  `aggressive` and 3.7e9 x less than `conservative` — the same "quarter to a third of
+  the way across on a log scale" position the branching comparison found, now measured
+  on the axis the plan actually cares about.
+Open questions: O6, O7, (m_max, R) jointly.
+Next session starts at: Phase 3 step 3 — injection-recovery with these schemes, which
+  is the decisive experiment.
 ```
