@@ -494,6 +494,69 @@ accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
   wrong in everything `report` and `io/cands.py` print, and it now feeds the region
   recursion, where a factor of 2 is not cosmetic.
 
+- **D25 — A child's region is parent ∩ ellipsoid, not the ellipsoid.** Carrying
+  `g_child / m_max` alone let the region *grow* on every axis the stage did not
+  actually refine; the ellipsoid then shrinks only slowly, so the containment guard
+  never fired again and the branch re-tiled at every level.
+  `metric.region_intersection` returns the minimum-volume member of `t*A + (1-t)*B`,
+  which is a sound outer bound for every `t` and can only beat whichever input is
+  smaller. Worth **4.3e33 -> 1.1e26** on `prod B(s)`. Per-axis the bound can still
+  exceed the narrower input — unavoidable for an ellipsoidal approximation of a lens,
+  and harmless, since the covering consumes the form and not its bounding box.
+
+## Branching-factor comparison (2026-09-14) — the Figure 7 analogue
+
+Config: `T_obs = 16.8 s`, 32 segments, `poly_order = 3`, `eta = 1`, `nbins = 64`,
+`ducy_max = 0.2`, `m_max = 0.2`. Config-only, no FFA run needed.
+
+| strategy | `prod B(s)` | first refining level |
+|---|---|---|
+| aggressive / quadrature / conservative | **27** | 2 |
+| aggressive, un-coarsened (D5 like-for-like) | 27 | 2 |
+| metric, as implemented | **1.1e26** | 8 |
+
+**The metric strategy is not competitive as designed, by 24 orders of magnitude, and
+the cause is not the criterion.** Three measurements pin it:
+
+1. **The box is already inside the metric budget.** Its leaf carries mismatch
+   **0.002-0.024** against `m_max = 0.2` at every level — 1% to 12% of budget. So the
+   metric criterion demands *less* total refinement than the box already performs. The
+   entire excess is covering waste.
+2. **The overhead is paid per level and compounds.** From the first refining level the
+   volume ratio between the parent region and the child ellipsoid is only **1.5-1.9**,
+   yet the covering emits **9-33 children**. Covering an ellipsoid with ellipsoids of
+   nearly its own size costs the lattice thickness (4.9 at `n = 3`) whatever the volume
+   gain is. Over ~24 levels that is `~10^26`. The box never pays it: it splits per axis
+   in integer factors, and `shift_bins < eta` defers until a whole factor accrues.
+3. **The floor for any covering scheme** is `V_total * thickness^(branch events)`. To
+   be competitive it must branch **rarely** — which is in direct tension with pruning,
+   since pruning needs branching early to have anything to prune against.
+
+**Deferral rescues it.** Branch only when the parent region overhangs a child ellipsoid
+by at least a factor `R` in the worst direction (`1 / sqrt(lambda_min(a_mat))`, the
+natural counterpart of `shift_bins < eta`):
+
+| defer `R` | `prod B(s)` | branch events |
+|---|---|---|
+| 1.0 (containment only — current) | 1.1e26 | 24 |
+| 1.5 | 1.0e21 | 19 |
+| 2.0 | 4.4e4 | 4 |
+| **3.0** | **21** | **1** |
+| 4.0+ | 1 | 0 (never refines) |
+
+At `R = 3` the metric strategy costs **21 against the box's 27** — competitive, and
+slightly cheaper. Note how sharp the cliff is: `R = 2` is 2000x worse and `R = 4` stops
+refining altogether, so `R` is not a knob that can be set carelessly.
+
+**The catch Phase 3 has to settle.** `prod B(s) = 21` at `R = 3` comes from a *single*
+branch event: the tree stays one leaf wide until that level, then fans out 21x. The box
+instead branches 3x at level 2 and 3x at level 6. Cost parity therefore says nothing
+about detection parity — pruning works by having diversity to threshold against, and a
+single late fan-out may well detect worse. That is an injection-recovery question, and
+it is the real Phase 3 experiment.
+
+Deferral is **not implemented**; the table above is a simulation over the same schedule.
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
@@ -505,9 +568,12 @@ accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
   Note that column 1 is no longer write-only under `"metric"`: D23 reads a seed's cell
   back out of it, so it is load-bearing at the start of every run.
 
-- **Re-measure the cost.** D23 retires the recorded child counts. Phase 3 needs
-  branching factors from a schedule long enough that the guard releases, and the
-  comparison against `aggressive` has to be redone on the same schedule.
+- **Implement deferral, then re-measure.** The comparison above says the metric
+  strategy needs a deferral rule to be viable at all, and that `R` near 3 is the
+  operating point on this config. It should become a config knob
+  (`metric_defer_factor`), with the guard generalised from strict containment
+  (`lambda_min >= 1`) to `lambda_min >= 1 / R**2`. Then re-measure `prod B(s)` on the
+  Phase 3 schedule, and check how `R` interacts with `m_max` and O7.
 
 - **An upstream oddity found while wiring step 2, deliberately not fixed.**
   `report_func` (both `dyn_poly_taylor.py` and `dyn_circular_taylor.py`) calls
@@ -870,4 +936,27 @@ Consequence worth flagging: on the smoke config the metric strategy now emits ON
 Open questions: O6, O7. The step 4 design question is closed by D23.
 Next session starts at: step 5 (the consumer audit, now with D24 to check), then
   re-measuring cost on a schedule long enough to refine, then Phase 3.
+
+## 2026-09-14 (f) — branching-factor comparison
+Done:
+  - Pushed the branch (8 commits) to origin/metric-gridding.
+  - Figure 7 analogue measured, config-only: metric `prod B(s) = 1.1e26` against the
+    box strategies' **27** on a 32-segment, 16.8 s, poly_order=3 schedule.
+  - D25 found and fixed on the way: the child region must be parent ∩ ellipsoid, not
+    the ellipsoid. Worth 4.3e33 -> 1.1e26. `metric.region_intersection` + 4 tests.
+  - Full suite **153 passed**, ruff clean.
+Diagnosis (all measured, see the section above):
+  - The box leaf already carries only 1-12% of `m_max`, so the criterion is not the
+    problem — the metric demands *less* refinement than the box performs.
+  - The covering pays the lattice thickness at every level for a volume gain of only
+    1.5-1.9x, and that compounds over ~24 levels.
+  - Simulated deferral at R=3 gives `prod B(s) = 21` vs the box's 27 — competitive.
+    The cliff is sharp: R=2 is 2000x worse, R=4 never refines.
+Verdict: viable, but only with deferral, and the R=3 operating point buys cost parity
+  with a *single* late branch event. Whether that detects as well as the box's early
+  branching is an injection-recovery question, and it is now the central Phase 3
+  experiment rather than a side one.
+Open questions: O6, O7, and the deferral factor R (new).
+Next session starts at: implement `metric_defer_factor`, re-measure on the Phase 3
+  schedule, then step 5.
 ```

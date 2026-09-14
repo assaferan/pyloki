@@ -1052,3 +1052,59 @@ class TestResolveMismatch:
         # Frequency is the exception: there the ellipsoid is comparable to the band,
         # which is why the damage shows up as jerk/accel scatter, not a frequency sweep.
         assert 0.1 < ratio[-1] < 10.0, f"d_1 should be comparable, got {ratio[-1]}"
+
+
+class TestRegionIntersection:
+    """D25: a child's region is parent AND ellipsoid, never just the ellipsoid."""
+
+    @staticmethod
+    def _pair(poly_order: int) -> tuple[np.ndarray, np.ndarray]:
+        a_form = parent_region(poly_order)
+        _, g_child = metrics_for(poly_order, 1.0)
+        return a_form, metric.region_from_metric(g_child, M_MAX)
+
+    @pytest.mark.parametrize("poly_order", [2, 3, 4])
+    def test_is_a_sound_outer_bound(self, poly_order: int) -> None:
+        """Every point in both regions must land inside the returned one."""
+        a_form, b_form = self._pair(poly_order)
+        out = metric.region_intersection(a_form, b_form)
+
+        # Sample inside A, then keep those also in B -- a box around A misses the
+        # intersection almost surely once poly_order > 2.
+        pts = sample_parent_region(a_form, 1.0, 200_000)
+        in_b = np.einsum("ni,ij,nj->n", pts, b_form, pts) <= 1.0
+        assert in_b.sum() > 100, "test is vacuous; sampling missed the intersection"
+        q = np.einsum("ni,ij,nj->n", pts[in_b], out, pts[in_b])
+        assert q.max() <= 1.0 + 1e-9, f"not an outer bound: max {q.max()}"
+
+    @pytest.mark.parametrize("poly_order", [2, 3, 4])
+    def test_never_grows_the_volume(self, poly_order: int) -> None:
+        """The point of D25: the region must not expand as it is carried forward.
+
+        Volume is the right invariant, not the per-axis extent: `t = 0` and `t = 1` are
+        both in the family, so maximising `det` can only beat whichever input is
+        smaller. An *ellipsoidal* outer bound of a lens can still be wider than the
+        narrower input on an individual axis -- unavoidable, and harmless, since the
+        covering consumes the form and not its bounding box.
+
+        Taking the child ellipsoid alone grew the region on every unrefined axis, and
+        because the ellipsoid then shrinks only slowly the guard never fired again: the
+        branch re-tiled at every level, compounding to `prod B(s) = 4.3e33` against the
+        box strategy's 27.
+        """
+        a_form, b_form = self._pair(poly_order)
+        out = metric.region_intersection(a_form, b_form)
+        # det of the form is inverse to volume, so it must not fall below either input.
+        sign, logdet = np.linalg.slogdet(out)
+        assert sign > 0
+        for other in (a_form, b_form):
+            s_o, ld_o = np.linalg.slogdet(other)
+            assert sign * logdet >= s_o * ld_o - 1e-9
+
+    def test_reduces_to_the_smaller_region_when_nested(self) -> None:
+        """If one region contains the other, the intersection is the inner one."""
+        inner = metric.region_form_from_box(np.array([1.0, 2.0, 3.0]))
+        outer = metric.region_form_from_box(np.array([10.0, 20.0, 30.0]))
+        np.testing.assert_allclose(
+            metric.region_intersection(inner, outer), inner, rtol=1e-9,
+        )
