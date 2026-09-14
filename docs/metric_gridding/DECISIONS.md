@@ -671,6 +671,52 @@ Harness: `docs/metric_gridding/injection_recovery.py`. Recovery is judged by mis
 the truth in the full-baseline metric, not by parameter distance — a tolerance in Hz
 would favour whichever grid happens to be finer in frequency.
 
+## Phase 3 step 2 — threshold recalibration (2026-09-14)
+
+- **D32 — BLOCKER: the Viterbi threshold optimiser is broken on this base.**
+  `DynamicThresholdScheme.run()` completes without error but leaves **every state empty
+  from stage 2 onward**, so `backtrack_best` raises "No non-empty final states to plot"
+  and no scheme can be extracted. Stage 0 has 36 non-empty states, stage 1 has ~155,
+  stage 2 has 0.
+
+  Not our doing, and not the config:
+  - it reproduces on the **example notebook's own branching pattern**
+    (`examples/optimal_thresholds.ipynb`, 127 stages, max `B = 8`), with the notebook's
+    own settings, so it is nothing to do with the metric strategy;
+  - it happens in **both** `legacy` and `improved` modes;
+  - it is not the PR #7 cherry-pick (D28): `boxcar_snr_2d_serial` is **bit-identical**
+    to `boxcar_snr_2d` on the same input, verified directly;
+  - the beam is not starving it — stage 2 offers 42 candidate thresholds.
+
+  So the failure is in the state propagation between stages 1 and 2. Diagnosing it is
+  work in `detection/`, unrelated to metric gridding, and probably belongs upstream as a
+  sibling to PR #7.
+
+- **D33 — Fallback: per-strategy schemes from `determine_scheme`, not optimised.**
+  `thresholding.determine_scheme(probs, bp, ...)` with `probs = 1 / B(s)` ("expect one
+  survivor per branch") works, and is per-strategy, which is the property D31 says is
+  indispensable. It is **not** P_d-optimal, so every number below is provisional.
+
+  | strategy | `prod B(s)` | `P_d` | log2 complexity | **log2 cost = complexity / P_d** |
+  |---|---|---|---|---|
+  | `aggressive` | 1.51e12 | 0.040 | 7.28 | **11.93** |
+  | `conservative` | 5.29e32 | 1.3e-6 | 8.81 | **28.36** |
+  | `metric` | 1.35e19 | 0.141 | 14.10 | **16.92** |
+
+  First evidence on the axis that actually matters. The metric reaches **3.5x the
+  detection probability of `aggressive`** (0.141 vs 0.040) because it branches at only
+  5 of 63 stages and can therefore afford much lower thresholds (1.59-4.02, against
+  `aggressive`'s 2.11-6.83). It pays for that in complexity, and on the combined
+  figure of merit it lands at **2^5 = 32x worse than `aggressive`** and **2^11 =
+  87 000x better than `conservative`** — the same "between the horns, nearer the cheap
+  one" position the branching comparison found.
+
+  **Caveats.** `P_d` is noisy: the scheme's RNG is unseeded and `ntrials = 1024`, and
+  repeat runs gave 0.040-0.25 for the same strategy. These are single draws, the
+  schemes are not optimised, and the ranking of `aggressive` vs `metric` on cost is
+  well inside neither. Treat the table as an order-of-magnitude sighting shot, not a
+  result. The real comparison needs D32 fixed, several seeds, and step 3.
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
