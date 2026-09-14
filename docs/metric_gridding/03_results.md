@@ -136,3 +136,64 @@ with O6 and O7 instead of using the cost-optimal point.
 
 Step 4 (`P_d[q]` versus anchor segment) and step 5 (wall-clock and per-stage candidate
 counts at equal recalibrated `P_d`). Step 5 is partly covered by the table above.
+
+## The benefit side — and it appears to be zero
+
+Every measurement above is a **cost**. This is the missing half: how much does
+`aggressive` actually lose to the coverage gaps the project exists to close?
+
+**Measured answer: nothing, geometrically.**
+
+`shift_taylor_errors` builds `T` lower-triangular with **unit diagonal** (C4). So row `i`
+of `T @ ((idx - n) * spacing)` depends on `n_i` only through `-n_i * spacing_i`, and
+choosing `n_0, n_1, ...` in order brings every row's residual within `spacing_i / 2` by
+rounding. An axis-aligned box of half-width `spacing / 2`, placed at the **sheared**
+lattice of leaf centres, therefore tiles the space exactly — for any shear.
+
+And `aggressive` records exactly `spacing * |diag(T)| == spacing`. Its widths are
+unchanged because they *should* be: the lattice shears underneath them but each axis
+keeps its period.
+
+Uncovered fraction of a sheared cell, `poly_order = 4`, real Phase 3 spacings:
+
+| `delta_t` | `aggressive` | `quadrature` | `conservative` |
+|---|---|---|---|
+| 0.5 | 0.0000 | 0.0000 | 0.0000 |
+| 2.0 | 0.0000 | 0.0000 | 0.0000 |
+| 10.0 | 0.0000 | 0.0000 | 0.0000 |
+| 100.0 | 0.0000 | 0.0000 | 0.0000 |
+
+Verified two independent ways: forward substitution, and brute force over an explicit
+±400 lattice in 2D. They agree to the fourth decimal.
+
+**This took three attempts and the first two were wrong**, both in the same direction —
+searching a fixed block of neighbouring lattice points instead of solving for the
+covering one. Because `T` is triangular, the covering index can be arbitrarily far from
+the nearest one on the lower-order axes, so a too-small window reports spurious holes
+(the second attempt claimed `aggressive` leaves 100% uncovered). Recorded because the
+error is easy to repeat.
+
+### What this means
+
+If it holds, the premise of the project does not: `aggressive` is not gappy, it is
+exactly sufficient, and `quadrature` and `conservative` record wider boxes for **no
+coverage benefit at all** — `quadrature` costs 1.10e17 against `aggressive`'s 1.51e12,
+and `conservative` 1.48e32, all covering identically.
+
+The metric strategy is then paying ~1070x at equal `P_d` to guarantee something
+`aggressive` already guarantees for free. That is consistent with step 3, where
+`aggressive` matched or beat it.
+
+### Caveats, in order of how much they could overturn this
+
+1. **Pruning is not modelled.** This is pure geometry, and assumes every lattice point
+   exists. In a real run only survivors continue, so a signal migrating into a leaf that
+   was thresholded away is still lost. That is a threshold-scheme interaction, not a
+   tiling one — and a better tiling does not obviously fix it, since metric leaves get
+   pruned too.
+2. **Taylor basis only.** C4's unit-diagonal triangular `T` is the Taylor kinematic
+   transform. `core/chebyshev.py` and the circular path transform differently, and the
+   argument above does not carry over. If the paper's gap is real, this is where to
+   look for it.
+3. It contradicts the stated motivation of Kumar & Zackay (2026) §5.2.4 as this plan
+   reads it, so it deserves an independent check before anyone acts on it.
