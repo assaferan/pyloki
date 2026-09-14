@@ -114,6 +114,25 @@ These are **observed from the code**, not chosen, and any metric code must match
   gaps along the short ones, which is exactly the `conservative`-vs-`aggressive`
   dilemma, and why the gap cost measured in the notes grows with `poly_order`.
 
+  > **PARTLY SUPERSEDED by D20 (2026-09-14).** The table above is on a *one-sided*
+  > window, `t_ref = 0` over `[0, T]`, with the epoch at the window's edge. The search
+  > actually expands about the **centre** of a symmetric window. Re-measured there, at
+  > the same `max|tau|`, the divergence is far milder:
+  >
+  > | poly_order | `axis_tight` (inscribed) | `volume`-matched |
+  > |---|---|---|
+  > | 2 | `[1.00, 0.52]` | `[1.57, 0.81]` |
+  > | 3 | `[1.00, 0.51, 0.65]` | `[2.43, 1.23, 1.59]` |
+  > | 4 | `[1.00, 0.50, 0.89, 0.33]` | `[3.72, 1.87, 3.32, 1.23]` |
+  > | 5 | `[0.88, 0.44, 1.00, 0.39, 0.25]` | `[5.62, 2.82, 6.41, 2.53, 1.63]` |
+  >
+  > The **qualitative** claim survives — the ellipsoid is still ill-conditioned, still
+  > worsening with `poly_order`, and a box still cannot be both tight and gap-free. But
+  > the headline "**56x** on one axis at `poly_order=5`" was an artefact of the window,
+  > not a property of the metric: the honest figure is **6.4x**. The quantitative case
+  > for this project is real but roughly an order of magnitude weaker than recorded.
+  > Phase 3 must quote the symmetric numbers.
+
 - **D9 — Harmonic weighting is NOT optional (bears on O4).** A fundamental-only metric
   badly under-predicts the real S/N loss, because folding with wrong parameters
   multiplies harmonic `n` by `kappa_n = <exp(2*pi*i*n*dPhi)>`, so the penalty grows as
@@ -296,6 +315,59 @@ These are **observed from the code**, not chosen, and any metric code must match
   `generate_branching_pattern_approx` **raises** under `"metric"` rather than return a
   worst-case per-axis factor that has no meaning for a covering.
 
+- **D20 — CORRECTION: `coord[1]` is a half-width, not an interval endpoint.**
+  (Found 2026-09-14 while scoping step 4, which needs "the base-segment metric".)
+
+  `metric_branch_tables` called `poly_phase_metric(0.0, 0.0, coord[1], ...)`, and
+  `metric_transform_extents` inherited it. That is wrong twice over.
+  `MiddleOutScheme.get_coord` returns `(ref, scale)` with `ref` the **centre** of the
+  accumulated window and `scale = ref - min` its **half-width**; the box code's name
+  for it, `t_obs_minus_t_ref`, means *max |tau|*, which is exactly what a sup-norm step
+  size needs. The metric caller reused that quantity as an *averaging window*, so it
+  put the epoch at the window's **edge** and averaged over **half** its true length.
+
+  The correct windows, relative to the leaf's epoch (the previous centre, since
+  `coord_cur = (prev_ref, cur_scale)` under a moving grid):
+
+  | quantity | window |
+  |---|---|
+  | parent | `[-t_half_prev, +t_half_prev]` (the epoch *is* its centre) |
+  | child, while scoring | `[delta_t - t_half_cur, delta_t + t_half_cur]` |
+  | child, after the transform | `[-t_half_cur, +t_half_cur]` about the new epoch |
+
+  with `delta_t = coord_next[0] - coord_cur[0]` — already in `_metric_stage_tables`'s
+  cache key, so nothing structural changed. `metric_transform_extents` got *simpler*:
+  rebuilding `g` about the new epoch over its symmetric window is the transported
+  metric, so the `shift_matrix` / `transform_metric` round trip is gone. Phase 1 test 2
+  is the statement that the two agree, and `TestTransformExtents` now pins it in the
+  exact configuration the loop uses.
+
+  **Why the tests could not catch it.** Phase 1 is innocent: `poly_phase_metric` takes
+  `t_ref` and `[t_start, t_end]` independently and `test_metric.py` exercises it with
+  the epoch centred. Phase 1 test 5 could not catch it either, because
+  `m_max_from_eta` *calibrates* `m_max` against the box, so any global scale error in
+  `g` is absorbed by construction. Only the callers were wrong.
+
+  **What it changes, and what it does not.**
+  - Extents move by **4x to 64x**, growing with `poly_order`. So the absolute meaning
+    of `m_max`, the reported column-1 widths, and D8's ratios all shift (see D8).
+  - Child counts barely move — 869 -> 871, 171 -> 171, 85 -> 93 on the smoke config —
+    and the **Phase 2 findings table is essentially unchanged** (39 / 871 / 46691
+    against volume bounds 8.0 / 63.9 / 1021, i.e. overheads 4.9 / 13.6 / 45.7 versus
+    the recorded 4.9 / 13.6 / 45.0). The covering depends on the parent-to-child
+    *ratio*, which the window error largely cancels out of. The redundancy analysis,
+    its factorisation into lattice thickness x retention dilation, and the conclusion
+    that ~1000 children at `poly_order=4` is the intrinsic volume bound all stand.
+  - `TestTransformExtents::test_uses_the_symmetric_window_not_the_half_width_as_an_endpoint`
+    pins the convention so it cannot quietly revert.
+
+- **D21 — `m_max_from_eta` sized its box from `t_end - t_start`.**
+  That is `max|tau|` only when the epoch sits at an endpoint; for the centred window
+  the search uses it is 2x too long. Now `max(t_end - t_ref, t_ref - t_start)`, which
+  is what `poly_taylor_step_f`'s `(tobs - t_ref)` means. No recorded number changes —
+  every existing call has the epoch at an endpoint — but the bridge is now correct for
+  the configuration Phase 3 will actually quote.
+
 ## Verified end-to-end (2026-09-14)
 
 `tiling_strategy="metric"` now completes a real `prune_dyp_tree` run. On the
@@ -305,9 +377,9 @@ report, with three distinct per-stage coverings:
 
 | level | `t_obs` prev -> cur (s) | children per parent |
 |---|---|---|
-| 1 | 0.131 -> 0.262 | 869 |
+| 1 | 0.131 -> 0.262 | 871 |
 | 2 | 0.262 -> 0.393 | 171 |
-| 3 | 0.393 -> 0.524 | 85 |
+| 3 | 0.393 -> 0.524 | 93 |
 
 The counts fall with level because the covering depends on the *ratio* of the
 accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
@@ -610,4 +682,30 @@ Verified: `tiling_strategy="metric"` completes a real `prune_dyp_tree` run over 
 Found, not fixed: `report_func` discards the result of its own transform call upstream.
 Open questions: O6, O7 (both unchanged, both for Phase 3).
 Next session starts at: Phase 2 steps 4 and 5, then Phase 3.
+
+## 2026-09-14 (c) — Phase 2, window-convention correction (D20/D21)
+Done:
+  - Found while scoping step 4: `metric_branch_tables` (and `metric_transform_extents`,
+    which copied it) passed `coord[1]` to `poly_phase_metric` as an interval endpoint.
+    `coord[1]` is a **half-width** and the epoch is the window's **centre**, so the
+    metric was averaged over half the right length with the epoch at the edge.
+  - Corrected all three windows (parent symmetric, child offset by `delta_t`, post-
+    transform symmetric about the new epoch); `metric_transform_extents` no longer
+    needs `delta_t` or the shift matrix at all.
+  - `m_max_from_eta` box span -> `max(t_end - t_ref, t_ref - t_start)` (D21).
+  - Full suite **141 passed**, ruff clean; `"metric"` and `aggressive` both still
+    complete the 3-level end-to-end run.
+Decisions fixed: D20 (the correction), D21 (the bridge's box span).
+Re-measured:
+  - Phase 2 redundancy table essentially unchanged (overheads 4.9 / 13.6 / 45.7 vs the
+    recorded 4.9 / 13.6 / 45.0) — the covering depends on the parent/child ratio, which
+    the error largely cancels out of.
+  - D8 is the casualty: the recorded "56x on one axis at poly_order=5" was an artefact
+    of the one-sided window. On the symmetric window it is **6.4x**. The qualitative
+    argument for this project stands; the quantitative case is ~10x weaker than
+    recorded. Phase 3 must quote the corrected numbers.
+Not done: step 4, which is what I was scoping when this turned up.
+Open questions: O6, O7 (unchanged).
+Next session starts at: Phase 2 step 4 (the resolve diagnostic), on a metric that now
+  means what it says.
 ```

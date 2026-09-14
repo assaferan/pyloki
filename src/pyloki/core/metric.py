@@ -336,9 +336,14 @@ def m_max_from_eta(
     g = poly_phase_metric(t_ref, t_start, t_end, poly_order, f0, nbins, ducy)
     # poly_taylor_step_d_vec wants the span it is sizing for, and returns full step
     # sizes in leaf axis order; a leaf's column 1 is the HALF-width (C3).
+    # The span is max|t - t_ref| over the window, which is what `(tobs - t_ref)` means
+    # inside poly_taylor_step_f. That equals `t_end - t_start` only when the epoch sits
+    # at an endpoint; for a window centred on the epoch -- the configuration the search
+    # actually uses (D20) -- it is the half-width, not the full length.
+    span = max(t_end - t_ref, t_ref - t_start)
     steps = psr_utils.poly_taylor_step_d_vec(
         poly_order,
-        t_end - t_start,
+        span,
         nbins,
         eta,
         np.array([f0], dtype=np.float64),
