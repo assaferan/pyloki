@@ -199,6 +199,20 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    this strategy the function must transform the Cholesky factor (or `g`)
    exactly with `transform_metric` and return the new axis extents for
    column 1. No inflation, no diagonal truncation.
+
+   **NOT DONE, and now the single thing keeping `"metric"` inert end-to-end**
+   (found 2026-09-14 while finishing step 6b). Both `shift_taylor_errors` and
+   `shift_taylor_full` still raise `Invalid tiling strategy: metric`, which stops a
+   real prune run at the `transform` step — everything before it (branch, validate,
+   resolve, shift_add, score) now works on metric children — and also breaks
+   `generate_branching_pattern`, hence the threshold scheme.
+
+   As written this step is not implementable: D12 stores only
+   `ellipsoid_axis_extents` in column 1, and a bounding box does not determine the
+   ellipsoid it bounds, so `g` cannot be transformed "exactly" from leaf state alone.
+   Either `g` (or its Cholesky factor) has to be reachable from the transform, or
+   column 1 has to be conceded as a diagnostic under `"metric"`. See
+   DECISIONS.md "Still to do in Phase 2" for the three options.
 3. `core/taylor.py::poly_taylor_branch_batch` (new function
    `poly_taylor_branch_metric_batch`, dispatched by strategy). **Amended
    2026-09-10:** split into two functions instead of one, see step 6:
@@ -246,17 +260,15 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    caller and from inside a `prange`, and agrees with its `py_func` to ~1 ulp
    (`fastmath` FMA contraction). See `tests/test_branch_metric.py::TestNjitDispatch`.
 
-   Remaining work for this step (**6b**), not yet done:
-   `coord_cur` and `coord_prev` are pure functions of `prune_level` via
-   `MiddleOutScheme`, so the whole per-stage schedule is known in Python. Compute
-   the tables once per level in `prune.py::PruneTaylorDPFuncts.execute_iter`
-   (which already has `self.prune_level` and the scheme) and thread them to
-   `branch_func` as plain arrays. Two routes, to choose when implementing:
-   (i) add a `branch_offsets` argument to the `branch` structref method — touches
-   the shared signature in `dyn_poly_taylor.py`, `dyn_poly_cheby.py` and
-   `dyn_circular_taylor.py`; or (ii) carry the table on the structref as a
-   mutable field. (i) is more churn but explicit; (ii) needs a structref setter.
-   Nothing about `aggressive` changes under either.
+   **Step 6b DONE 2026-09-14, route (i)** (human's choice; DECISIONS.md D15).
+   `Pruning._metric_branch_tables` builds the tables once per level and memoises them
+   on `(t_obs_prev, t_obs_cur)`; `branch_offsets` / `branch_extents` were added to the
+   shared `branch` signature and threaded through `pruning_iteration_batched`. The
+   Chebyshev and circular bases accept and ignore them, and `_setup_pruning` now
+   refuses `"metric"` on those bases outright (D16) rather than ignoring it silently.
+   Two config knobs came with it (D17): `metric_branch_max` (the box `branch_max` is a
+   per-axis width and cannot serve as a total) and `metric_ducy`.
+   `aggressive` is unchanged, and a test asserts junk tables cannot perturb it.
 
 ### Tests
 
