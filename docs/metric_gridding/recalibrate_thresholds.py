@@ -16,7 +16,8 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 from phase3_config import make_config, nsegments  # noqa: E402
 
-from pyloki.detection import thresholding  # noqa: E402
+from pyloki.detection import schemes, thresholding  # noqa: E402
+from pyloki.detection.thresholding import DynamicThresholdScheme  # noqa: E402
 
 REF_DUCY = 0.1
 TARGET_SNR = 10.0
@@ -34,18 +35,47 @@ STRATEGIES = {
 }
 
 
-def run() -> dict[str, dict[str, float]]:
-    """Per-strategy threshold scheme, one strategy per process.
+def run_viterbi(outdir: str = "docs/metric_gridding/schemes") -> dict[str, dict]:
+    """The real thing: Viterbi-optimised scheme per strategy at P_d = 0.1.
 
-    Uses `determine_scheme` with `probs = 1 / B(s)` -- "expect one survivor per branch"
-    -- and NOT the Viterbi optimiser, which is broken on this base: it empties every
-    state at stage 2, including on the example notebook's own branching pattern, in both
-    modes. See D32. These schemes are per-strategy and comparable, but they are not
-    P_d-optimal, so anything derived from them is provisional.
+    Unblocked by the fix for upstream issue #8 -- before it, `run()` wrote zero-filled
+    state records and `backtrack_best` could not find a path (D32).
 
-    Run one strategy per process: constructing several configs in one interpreter kills
-    it silently.
+    Run one strategy per process: building several configs in one interpreter kills it.
     """
+    import tempfile
+
+    import numpy as np
+
+    ref = nsegments() // 2
+    out = {}
+    for name, kw in STRATEGIES.items():
+        cfg = make_config(name, **kw)
+        bp = cfg.generate_branching_pattern(kind="poly_taylor_moving", ref_seg=ref)
+        dyn = DynamicThresholdScheme(
+            bp, ref_ducy=REF_DUCY, nbins=cfg.nbins, ntrials=1024, nprobs=30,
+            prob_min=0.05, snr_final=TARGET_SNR, nthresholds=100,
+            ducy_max=0.3, wtsp=cfg.wtsp, beam_width=2.5, mode="improved",
+        )
+        dyn.run(thres_neigh=11)
+        with tempfile.TemporaryDirectory() as td:
+            analyser = schemes.DynamicThresholdSchemeAnalyser.from_file(
+                dyn.save(outdir=td),
+            )
+        best = analyser.backtrack_best(min_probs=[P_D])
+        si = best[0] if isinstance(best, (tuple, list)) else best
+        out[name] = {
+            "prod_b": float(np.prod(bp)),
+            "thresholds": si.thresholds,
+            "p_d": float(si.get_info("success_h1_cumul")[-1]),
+            "log2_complexity": float(np.log2(si.get_info("complexity_cumul")[-1])),
+            "log2_cost": float(np.log2(si.get_info("cost")[-1])),
+        }
+    return out
+
+
+def run() -> dict[str, dict[str, float]]:
+    """Non-optimised fallback, kept for comparison with the pre-fix numbers (D33)."""
     import numpy as np
 
     ref = nsegments() // 2
@@ -65,14 +95,3 @@ def run() -> dict[str, dict[str, float]]:
             "thresholds": st.thresholds,
         }
     return out
-
-
-if __name__ == "__main__":
-    import numpy as np
-
-    for name, r in run().items():
-        print(f"{name:>13}: prodB={r['prod_b']:.3g} P_d={r['p_d']:.4g} "
-              f"log2(complexity)={r['log2_complexity']:.2f} "
-              f"log2(cost)={r['log2_cost']:.2f} "
-              f"thr=[{np.nanmin(r['thresholds']):.2f},"
-              f"{np.nanmax(r['thresholds']):.2f}]")
