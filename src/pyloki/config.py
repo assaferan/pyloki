@@ -427,8 +427,22 @@ class PulsarSearchConfig:
         default="cubic",
         validator=attrs.validators.in_(["cubic"]),
     )
+    metric_branch_max: int = attrs.field(
+        default=500_000,
+        validator=[
+            attrs.validators.instance_of(int | np.integer),
+            attrs.validators.gt(0),
+        ],
+    )
+    # 0.0 means "follow ducy_max"; see _metric_ducy_default.
+    metric_ducy: float = attrs.field(
+        default=0.0,
+        validator=[attrs.validators.ge(0.0), attrs.validators.lt(1.0)],
+    )
 
     def __attrs_post_init__(self) -> None:
+        if self.metric_ducy == 0.0:
+            object.__setattr__(self, "metric_ducy", self._metric_ducy_default())
         if self.bseg_brute == 0:
             object.__setattr__(self, "bseg_brute", self._bseg_brute_default())
         if self.bseg_ffa == 0:
@@ -836,3 +850,16 @@ class PulsarSearchConfig:
 
     def _bseg_ffa_default(self) -> int:
         return self.nsamps
+
+    def _metric_ducy_default(self) -> float:
+        """Duty cycle setting the harmonic weighting of the mismatch metric.
+
+        Defaults to ``ducy_max``, the widest pulse the boxcar bank scores. That is the
+        *least* conservative choice available: the harmonic weight rises steeply as the
+        pulse narrows (DECISIONS.md D10), so a signal narrower than ``ducy_max`` has its
+        S/N loss under-predicted and gets a coarser grid than it deserves. Overriding
+        this with the narrowest duty cycle of interest is the safe direction, at the
+        cost of many more children per parent. Left as a knob rather than decided here
+        -- see open question O7.
+        """
+        return self.ducy_max

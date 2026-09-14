@@ -108,6 +108,8 @@ class PrunePolyChebyshevDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Branch the current parameter set into the finer grid of parameters (leaves).
 
@@ -125,7 +127,14 @@ class PrunePolyChebyshevDPFuncts(structref.StructRefProxy):
         np.ndarray
             The branched parameter set.
         """
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     def validate(
         self,
@@ -343,8 +352,17 @@ class PrunePolyChebyshevComplexDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     def validate(
         self,
@@ -589,7 +607,13 @@ def branch_func(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
+    # branch_offsets / branch_extents are the metric-strategy covering tables.
+    # They are part of the shared branch() signature but unused here: the metric
+    # is defined on the Taylor kinematic basis, and config.py only ever pairs
+    # tiling_strategy="metric" with poly_basis="taylor".
     # Pass coord_cur for moving grid, coord_cur_fixed for fixed grid
     # Pass coord_prev for moving grid, coord_prev_fixed for fixed grid
     return chebyshev.poly_chebyshev_branch_batch(
@@ -877,14 +901,25 @@ def ol_branch_func(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyChebyshevDPFuncts,
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     return impl
 
@@ -1108,14 +1143,25 @@ def ol_branch_complex_func(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyChebyshevComplexDPFuncts,
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     return impl
 

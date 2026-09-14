@@ -214,18 +214,76 @@ These are **observed from the code**, not chosen, and any metric code must match
   anything, and is mostly unnecessary — what stays in Python is per-stage, not per-leaf,
   so it is off the hot path.
 
-## Still to do in Phase 2 (step 6b)
+## Choices made (Phase 2, step 6b)
 
-- **The per-stage precompute hook is not wired up, so `tiling_strategy="metric"` is
-  still inert end-to-end.** `coord_cur` and `coord_prev` are pure functions of
-  `prune_level` via `MiddleOutScheme`, so the whole schedule is known in Python: compute
-  the tables once per level in `prune.py::execute_iter` (which already holds
-  `self.prune_level` and the scheme) and thread them to `branch_func` as plain arrays.
-  Two routes, to pick when implementing: (i) add a `branch_offsets` argument to the
-  `branch` structref method, which touches the shared signature in `dyn_poly_taylor.py`,
-  `dyn_poly_cheby.py` and `dyn_circular_taylor.py`; or (ii) carry the table as a mutable
-  structref field, which needs a setter. (i) is more churn but explicit. Neither changes
-  anything for `aggressive`.
+- **D15 — Step 6b takes route (i): the covering tables are explicit arguments to
+  `branch`.** (Human's choice, 2026-09-14, from the two routes this section used to
+  list.) `pruning_iteration_batched` now passes `branch_offsets, branch_extents` to
+  `prune_funcs.branch(...)`, and the two arrays were added to the shared signature:
+  three `branch_func`s, six proxy `.branch()` methods and six `@overload_method` stubs
+  across `dyn_poly_taylor.py`, `dyn_poly_cheby.py` and `dyn_circular_taylor.py`. The
+  Chebyshev and circular halves accept and ignore them (`ARG001/ARG002` are already
+  per-file-ignored there); a comment at each says why.
+
+  Explicit dataflow was preferred over the mutable-structref alternative because the
+  table is *stage* state passing through a per-batch call: as a structref field it
+  could silently go stale, and nothing in the type system would say so. The cost is
+  that two other bases carry a Taylor-only concept in their signature.
+
+  `dyn_poly_taylor.branch_func` is the only one that reads them, under
+  `if self.tiling_strategy == "metric"`. It **raises** on an empty table rather than
+  branching, because `poly_taylor_branch_metric_apply` with zero children would
+  otherwise return an empty leaf array and end the run silently.
+
+- **D16 — `"metric"` is refused on the Chebyshev and circular bases.**
+  `Pruning._setup_pruning` raises when `tiling_strategy="metric"` is paired with
+  `poly_basis="chebyshev"` or with `prune_poly_order=5` (which is how `config.py`
+  selects the circular search). `core/metric.py` builds the mismatch tensor on the
+  Taylor kinematic basis (C1/C2) and those two paths have their own leaf layouts, so
+  the strategy would otherwise be accepted and then quietly ignored. Refusing is the
+  honest behaviour and it is what makes the "unused here" comments in their
+  `branch_func`s true rather than aspirational.
+
+- **D17 — Two config knobs that step 6b forced into the open.**
+
+  - `metric_branch_max = 500_000`. The metric cap **cannot** reuse `branch_max`: that
+    is a per-axis padding width defaulting to **16**, while the metric cap is a total
+    (already noted in `poly_taylor_branch_metric_batch`'s docstring), and 16 as a total
+    would raise on even the `poly_order=3` covering of 869 children. A separate field
+    is the only correct reading.
+  - `metric_ducy = 0.0` meaning "follow `ducy_max`", resolved in `__attrs_post_init__`
+    the same way `bseg_brute`/`bseg_ffa` already resolve their `0` defaults.
+
+  The `metric_ducy` default is the **least conservative** choice available and is
+  flagged as O7 below, not settled here.
+
+## Still to do in Phase 2
+
+- **Step 2 (`transforms.py`) was never implemented, and it — not step 6b — is now
+  what keeps `"metric"` from running end-to-end.** `shift_taylor_errors` and
+  `shift_taylor_full` still `raise ValueError(f"Invalid tiling strategy: metric")`.
+  Measured after step 6b landed, with `tiling_strategy="metric"`, `poly_order=3` on the
+  `tests/test_prune.py` fixture, a full `prune_dyp_tree` run now gets through **branch,
+  validate, resolve, shift_add and score** on metric children and dies at the
+  `transform` step, `prune.py:651 -> transforms.py:136`. `generate_branching_pattern`
+  fails the same way, so the threshold scheme cannot be built for `"metric"` either.
+
+  Step 2 is not mechanical, and the difficulty is worth stating before the session that
+  does it. The plan says to "transform the Cholesky factor (or `g`) exactly with
+  `transform_metric` and return the new axis extents for column 1. No inflation, no
+  diagonal truncation." But under D12 a leaf stores only `ellipsoid_axis_extents`, the
+  ellipsoid's **bounding box**, and a bounding box does not determine the ellipsoid — so
+  the exact transform cannot be done from leaf state alone. The options look like:
+  (a) rebuild `g` for the stage inside the transform, which needs `m_max` and the
+  duty cycle on the structref and the interval from `coord_next`/`coord_cur`;
+  (b) accept that column 1 is a diagnostic under `"metric"` (D12 already says nothing
+  derives spacing from it) and transform it by the `"conservative"` AABB rule, which
+  the plan's "no inflation" explicitly rules out; or (c) store the stage's `g` or its
+  Cholesky factor somewhere the transform can reach. This wants its own session and its
+  own decision entry.
+
+- **Steps 4 and 5 are also still open**: the `resolve` diagnostic against the base grid
+  (step 4) and the `validate`/`report`/`ascend`/`io/cands.py` audit (step 5).
 
 ## Phase 2 findings
 
@@ -303,6 +361,20 @@ These are **observed from the code**, not chosen, and any metric code must match
   cannot be validated in isolation because boxcar loss is non-monotonic in smearing.
   Phase 3 should settle this against real injection-recovery rather than a model. Not
   blocking Phase 2: it is one keyword.
+
+- **O7 — Which duty cycle should set the harmonic weighting? (new, from D17.)**
+  `cfg.metric_ducy` defaults to `ducy_max`, the **widest** pulse the boxcar bank scores,
+  and that is the least conservative reading available. The harmonic weight rises
+  steeply as the pulse narrows (D10: 1.59 at `ducy=0.5`, 102 at `ducy=0.05`), so a
+  signal narrower than `ducy_max` has its S/N loss under-predicted and is given a
+  coarser grid than it deserves — precisely the failure this project exists to remove.
+  The safe reading is the *narrowest* duty cycle the search is sensitive to, which is
+  set by the smallest boxcar width (~`1/nbins`) and would cost a large factor in
+  children per parent.
+
+  Defaulted to `ducy_max` rather than decided, because the honest answer needs the same
+  injection-recovery measurement as O6 and the two interact (both are just scale factors
+  on `g`). Phase 3 should settle them together. Cheap to change: one config field.
 
 - ~~**O1 — Phase 3 blocker.**~~ **RESOLVED (2026-09-09): upstream PR #3 merged**
   (`2b4b80c`), so the fix arrived by fast-forward rather than needing a branch merge.
@@ -422,4 +494,45 @@ Corrected: the box strategy emits 4/32/512 children per parent at poly_order
   intrinsic (it is the volume bound), so the metric approach cannot be cheaper
   than ~2x the box strategy, and the box strategy is not leaving headroom.
 Open questions: O6 (unchanged, non-blocking).
+
+## 2026-09-14 — Phase 2, step 6b
+Done:
+  - Route (i) chosen by the human (D15): `branch_offsets` / `branch_extents` added to
+    the shared `branch` signature -- 3 `branch_func`s, 6 proxy methods, 6 overload
+    stubs across the three `dynamic/` modules, plus the call in
+    `prune.py::pruning_iteration_batched`. Chebyshev and circular accept and ignore
+    them, with a comment saying why.
+  - `dyn_poly_taylor.branch_func` dispatches on `self.tiling_strategy == "metric"` to
+    `taylor.poly_taylor_branch_metric_apply`, and raises on an empty table rather than
+    branching every parent into nothing.
+  - `prune.py::Pruning._metric_branch_tables`: the per-stage precompute hook. Builds
+    the tables once per level in Python and memoises them on
+    `(t_obs_prev, t_obs_cur)`; returns empty arrays for every other strategy.
+  - `_setup_pruning` now refuses `"metric"` on the Chebyshev and circular bases (D16).
+  - config.py: `metric_branch_max` (500k) and `metric_ducy` (0 = follow `ducy_max`),
+    both required by the hook -- see D17 for why `branch_max` could not be reused.
+  - tests/test_branch_metric.py: +9 tests (`TestStrategyDispatch`, `TestPruneWiring`,
+    `TestMetricConfigDefaults`). Full suite **126 passed**, `src` and the metric tests
+    ruff-clean (`SLF001` added to the tests per-file-ignores: the wiring hangs off
+    private members of `Pruning` on purpose).
+Decisions fixed: D15 (route (i)), D16 (refuse metric off the Taylor basis),
+  D17 (the two new config knobs).
+Measured:
+  - Per-stage table cost is negligible: ~1 ms at `poly_order=3` (869 children) and
+    ~18 ms at `poly_order=4` (46051), so the memoisation is insurance, not a
+    necessity. Child counts depend only on the *ratio* `t_cur / t_prev`, not on the
+    absolute interval -- 869 at both 0.262->0.524 s and 16.78->33.55 s -- as the
+    `f0**2` proportionality of D11 predicts.
+Status of "metric" end-to-end: **still inert, but for a different reason.** With
+  step 6b in place a real `prune_dyp_tree` run at `poly_order=3` now branches,
+  validates, resolves, shift_adds and scores metric children successfully, and dies at
+  `transform` -- because **Phase 2 step 2 (`transforms.py`) was never implemented**.
+  `shift_taylor_errors` and `shift_taylor_full` still raise on `"metric"`, which also
+  breaks `generate_branching_pattern` and so the threshold scheme. Step 2 is not
+  mechanical: D12 stores only the ellipsoid's bounding box in column 1, and a bounding
+  box does not determine the ellipsoid, so the plan's "transform `g` exactly" cannot be
+  done from leaf state alone. Options written up under "Still to do in Phase 2".
+Open questions: O6 (unchanged), O7 (new: which ducy sets the harmonic weighting; the
+  default is the least conservative choice and should be settled with O6 in Phase 3).
+Next session starts at: Phase 2 step 2 (`transforms.py`), then steps 4 and 5.
 ```

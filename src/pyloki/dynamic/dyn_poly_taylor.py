@@ -69,8 +69,17 @@ class PrunePolyTaylorDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     def validate(
         self,
@@ -203,8 +212,17 @@ class PrunePolyTaylorComplexDPFuncts(structref.StructRefProxy):
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     def validate(
         self,
@@ -449,7 +467,26 @@ def branch_func(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
+    if self.tiling_strategy == "metric":
+        # Dispatch only (metric_PLAN.md Phase 2 step 6). The covering depends on the
+        # stage alone, never on the leaves (D11), so the numba-hostile half --
+        # taylor.metric_branch_tables -- runs once per level in prune.py and arrives
+        # here as plain arrays; all that is left per batch is a broadcast add and a
+        # 1 / f0 rescale (D14).
+        if branch_offsets.shape[0] == 0:
+            msg = (
+                "tiling_strategy='metric' requires per-stage branch tables; "
+                "call taylor.metric_branch_tables and pass them to branch()"
+            )
+            raise ValueError(msg)
+        return taylor.poly_taylor_branch_metric_apply(
+            leaves_batch,
+            branch_offsets,
+            branch_extents,
+        )
     # Pass coord_cur for moving grid, coord_cur_fixed for fixed grid
     return taylor.poly_taylor_branch_batch(
         leaves_batch,
@@ -728,14 +765,25 @@ def ol_branch_func(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyTaylorDPFuncts,
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     return impl
 
@@ -959,14 +1007,25 @@ def ol_branch_complex_func(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
     coord_prev: tuple[float, float],
+    branch_offsets: np.ndarray,
+    branch_extents: np.ndarray,
 ) -> types.FunctionType:
     def impl(
         self: PrunePolyTaylorComplexDPFuncts,
         leaves_batch: np.ndarray,
         coord_cur: tuple[float, float],
         coord_prev: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
-        return branch_func(self, leaves_batch, coord_cur, coord_prev)
+        return branch_func(
+            self,
+            leaves_batch,
+            coord_cur,
+            coord_prev,
+            branch_offsets,
+            branch_extents,
+        )
 
     return impl
 
