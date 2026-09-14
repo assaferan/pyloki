@@ -244,17 +244,26 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    `m_max = 0.2` over three levels. The diagnostic is sound — the same code on
    `aggressive` children returns p50 = 7e-10.
 
-   Neither of the plan's two anticipated options is the answer, because the cause is
-   not `G0` being too coarse. `metric_branch_tables` infers the parent's region from
-   the accumulated baseline alone and never consults the region the parent actually
+   Neither of the plan's two anticipated options was the answer, because the cause was
+   not `G0` being too coarse. `metric_branch_tables` inferred the parent's region from
+   the accumulated baseline alone and never consulted the region the parent actually
    occupies; on short baselines that `m_max` ellipsoid exceeds the **whole search
-   space** by 9.2e7x in jerk and 4.1e6x in accel, so children land outside
-   `param_limits` and `resolve` can only clamp them. The metric is fine; the scope is
-   wrong. Four candidate fixes are in DECISIONS.md under "Still to do in Phase 2";
-   picking one is a design decision for the human.
+   space** by 9.2e7x in jerk and 4.1e6x in accel, so children landed outside
+   `param_limits` and `resolve` could only clamp them.
 
-   This also reframes the Phase 2 cost findings: the recorded child counts are the
-   cost of covering a region the parent never had.
+   **FIXED the same day (D23), by carrying the region explicitly** — the human chose
+   the principled option of the four offered. A region is a form `{d : d^T A d <= 1}`,
+   seeded from the leaf's FFA cell, kept as run state, and advanced per level; plus a
+   guard, `region_fits_in_one_child`, that emits a single child when the stage cannot
+   resolve anything finer — the exact counterpart of the box strategy's
+   `shift_bins < eta`. The gate now passes at the control's own floor: p95
+   **7.0e-10 / 7.0e-10 / 2.8e-9**, matching `aggressive` exactly.
+
+   The cost findings are retired, not merely reframed: the recorded 869 / 171 / 93
+   children per parent measured a region the parent never had. On the smoke config the
+   honest branching factor is **1 at every level** (a 1-second observation cannot
+   refine an FFA cell at `m_max = 0.2`); on a 64-segment schedule refinement starts at
+   level 9 and runs 9 / 33 / 33 / 29 / 27 / 27. Phase 3 must re-measure.
 5. `validate`, `report`, `ascend`, `io/cands.py`: audit each consumer from
    Phase 0 step 2; make `metric` strategy either use axis extents or skip.
 6. `dynamic/dyn_poly_taylor.py`: dispatch only. No logic here.
@@ -307,11 +316,12 @@ untouched. Steps 1, 2, 3, 4 and 6 are done and `tiling_strategy="metric"` comple
 real `prune_dyp_tree` run over three pruning levels, threshold scheme included;
 `aggressive` completes the identical run unchanged. Step 5 (the consumer audit) remains.
 
-**But the exit criterion should not be read as met.** Step 4 (D22) showed the coverage
-test is self-consistent rather than correct: it asks whether children cover the
-stage-(s-1) `m_max` ellipsoid, which is the same over-large region the branch wrongly
-assumes the parent occupies. Phase 3 must not start until that scope bug is fixed, since
-both the detection claim and the cost claim depend on it.
+Step 4 (D22) found that the coverage test was self-consistent rather than correct — it
+asked whether children cover the same over-large region the branch assumed. D23 fixed
+that by carrying the region explicitly, and the coverage test now checks the region the
+branch was actually given. What remains before Phase 3 is **re-measuring the cost**: the
+recorded child counts and the 45x redundancy are retired, and `B(s)` has to be taken
+again on a schedule long enough for the guard to release.
 
 ---
 

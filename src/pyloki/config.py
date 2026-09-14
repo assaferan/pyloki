@@ -828,7 +828,19 @@ class PulsarSearchConfig:
             # Not a variant of the box calculation: `generate_bp_poly_taylor` models
             # branching as a product of independent per-axis counts, which is the
             # axis-aligned assumption the metric covering exists to replace.
+            # D5: "metric" does not inherit the 2**k Chebyshev coarsening.
+            seed_dparams = self.get_dparams_actual(
+                self.niters_ffa, use_cheby_coarsening=False,
+            )
             return generate_bp_poly_taylor_metric(
+                self.metric_seed_region(
+                    seed_dparams,
+                    self.get_param_arr(
+                        self.get_dparams(
+                            self.niters_ffa, use_cheby_coarsening=False,
+                        ),
+                    ),
+                ),
                 self.tseg_ffa,
                 nsegments_ffa,
                 ref_seg,
@@ -880,6 +892,35 @@ class PulsarSearchConfig:
 
     def _bseg_ffa_default(self) -> int:
         return self.nsamps
+
+    def metric_seed_region(
+        self,
+        dparams_act: np.ndarray,
+        param_arr: list[np.ndarray],
+    ) -> np.ndarray:
+        """Region form of a seed leaf at `f0 = 1`, for `tiling_strategy="metric"`.
+
+        Mirrors what `poly_taylor_seed` writes into column 1: the FFA step on every
+        axis above velocity, and `df * C / f0` on the velocity axis. (`poly_taylor_seed`
+        only works when `prune_poly_order == nparams`, so the two arrays line up.)
+
+        Column 1 is a full span (D24), hence the halving. Scaling by `f0_max` on the
+        `f0`-independent axes makes the result **contain** every leaf's cell once
+        rescaled by `1 / f0`; see `taylor.metric_seed_region` for why one region has to
+        serve the whole batch.
+        """
+        dparams_act = np.asarray(dparams_act, dtype=np.float64)
+        if len(dparams_act) != self.prune_poly_order:
+            msg = (
+                f"metric seeding needs one FFA step per branchable axis, got "
+                f"{len(dparams_act)} for prune_poly_order={self.prune_poly_order}"
+            )
+            raise ValueError(msg)
+        f0_max = float(np.max(param_arr[-1]))
+        half = np.empty(self.prune_poly_order, dtype=np.float64)
+        half[:-1] = 0.5 * dparams_act[:-1] * f0_max
+        half[-1] = 0.5 * dparams_act[-1] * C_VAL
+        return np.diag(1.0 / half**2)
 
     def _metric_ducy_default(self) -> float:
         """Duty cycle setting the harmonic weighting of the mismatch metric.

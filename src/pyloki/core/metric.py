@@ -506,51 +506,94 @@ def _enumerate_lattice_in_ellipsoid(
     return np.asarray(out, dtype=np.int64)
 
 
-def lattice_children(
-    g_parent: np.ndarray,
+def region_form_from_box(half_widths: np.ndarray) -> np.ndarray:
+    """Region form `A` of an axis-aligned box, as the ellipsoid inscribing it.
+
+    A region is carried as `A` with `{d : d^T A d <= 1}` (D23), so a box of per-axis
+    half-widths `h` becomes `diag(1 / h**2)`. That is the *inscribed* ellipsoid, not the
+    circumscribed one: it is contained in the box, so covering it never claims coverage
+    the box does not have. The corners are given up, which is the same conservatism the
+    box strategies already accept in reverse.
+    """
+    half = np.asarray(half_widths, dtype=np.float64)
+    if np.any(half <= 0.0):
+        msg = f"box half-widths must be positive, got {half}"
+        raise ValueError(msg)
+    return np.diag(1.0 / half**2)
+
+
+def region_axis_extents(a_form: np.ndarray) -> np.ndarray:
+    """Bounding-box half-widths of `{d : d^T A d <= 1}`: `sqrt(diag(inv(A)))`."""
+    return np.sqrt(np.diag(np.linalg.inv(a_form)))
+
+
+def region_from_metric(g: np.ndarray, m_max: float) -> np.ndarray:
+    """Express the `m_max` mismatch ellipsoid as a region form: `g / m_max`."""
+    if m_max <= 0.0:
+        msg = f"m_max must be positive, got {m_max}"
+        raise ValueError(msg)
+    return g / m_max
+
+
+def _whitened_parent_form(
+    a_parent: np.ndarray, g_child: np.ndarray, m_max: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Parent region in the child's whitened coordinates, plus the Cholesky factor.
+
+    Returns `a_mat` scaled so the parent region is `{w : w^T a_mat w <= m_max}` and a
+    child covers the ball of radius `sqrt(m_max)` -- the convention `_retention_form`
+    expects. With `a_parent = g_parent / m_max` this reproduces `L^-1 g_parent L^-T`
+    exactly, so the older two-metric form is the special case it looks like.
+    """
+    chol = cholesky_factor(g_child)
+    w_mat = np.linalg.solve(chol, np.linalg.solve(chol, a_parent).T).T
+    return m_max * 0.5 * (w_mat + w_mat.T), chol
+
+
+def region_fits_in_one_child(
+    a_parent: np.ndarray, g_child: np.ndarray, m_max: float,
+) -> bool:
+    """Report whether the parent region already fits in one child's ellipsoid.
+
+    The guard the metric branch was missing (D22/D23), and the exact counterpart of the
+    box strategy's `shift_bins < eta` test: when the stage cannot resolve anything finer
+    than the parent already is, branching must emit **one** child, not tile a region the
+    parent does not occupy.
+
+    In the child's whitened coordinates the parent is `{w : w^T a_mat w <= m_max}` and
+    the child is the ball `|w|**2 <= m_max`, so containment is exactly
+    `a_mat >= I`, i.e. `lambda_min(a_mat) >= 1`.
+    """
+    a_mat, _ = _whitened_parent_form(a_parent, g_child, m_max)
+    return bool(np.linalg.eigvalsh(a_mat)[0] >= 1.0 - 1e-12)
+
+
+def lattice_children_for_region(
+    a_parent: np.ndarray,
     g_child: np.ndarray,
     m_max: float,
     *,
     max_children: int | None = None,
 ) -> np.ndarray:
-    """Offsets of child centres covering a parent region, in Taylor coordinates.
+    """Offsets of child centres covering an explicit parent region.
 
     Parameters
     ----------
-    g_parent
-        Metric defining the parent's region, `{d : d^T g_parent d <= m_max}`, i.e. the
-        metric of the previous stage's interval.
+    a_parent
+        Parent region as a form: `{d : d^T a_parent d <= 1}`. Carrying the region
+        explicitly, rather than inferring it from the previous stage's metric, is what
+        D23 fixes -- see D22 for what inferring it cost.
     g_child
-        Metric defining each child's region, i.e. the current stage's. Children are
-        spaced so their regions cover the parent's.
+        Metric of the current stage; each child covers `{d : d^T g_child d <= m_max}`.
     m_max
-        Mismatch budget, shared by parent and children.
+        Mismatch budget.
     max_children
         Optional cap; exceeding it raises rather than silently under-covering.
-
-    Returns
-    -------
-    np.ndarray
-        `(n_children, n_params)` offsets relative to the parent centre, in the same
-        Taylor coordinates and axis order as the leaf array (C1). Always contains at
-        least one point.
-
-    Notes
-    -----
-    Coverage is guaranteed by construction, not by sampling: the lattice spacing gives
-    covering radius `sqrt(m_max)` everywhere, and `_retention_form` keeps every
-    lattice point within that radius of the parent region.
     """
     n_dim = g_child.shape[0]
-    chol = cholesky_factor(g_child)
-    # Whitened coordinates w = L^T d: a child's region is the ball of radius
-    # sqrt(m_max), the parent's is the ellipsoid w^T A w <= m_max.
-    a_mat = np.linalg.solve(chol, np.linalg.solve(chol, g_parent).T).T
-    a_mat = 0.5 * (a_mat + a_mat.T)
-
+    a_mat, chol = _whitened_parent_form(a_parent, g_child, m_max)
     spacing = cubic_lattice_spacing(n_dim, m_max)
     form = _retention_form(a_mat, m_max)
-
     # Lattice points are w = spacing * z, so w^T form w <= 1 becomes
     # z^T (spacing**2 * form) z <= 1.
     z_int = _enumerate_lattice_in_ellipsoid(
@@ -559,3 +602,26 @@ def lattice_children(
     kept = z_int.astype(np.float64) * spacing
     # Back to Taylor coordinates: d = L^-T w.
     return np.linalg.solve(chol.T, kept.T).T
+
+
+def lattice_children(
+    g_parent: np.ndarray,
+    g_child: np.ndarray,
+    m_max: float,
+    *,
+    max_children: int | None = None,
+) -> np.ndarray:
+    """Offsets of child centres covering the parent's `m_max` mismatch ellipsoid.
+
+    Thin wrapper over `lattice_children_for_region` for the case where the parent region
+    happens to be a mismatch ellipsoid of `g_parent`. Coverage is guaranteed by
+    construction, not by sampling: the lattice spacing gives covering radius
+    `sqrt(m_max)` everywhere, and `_retention_form` keeps every lattice point within
+    that radius of the parent region.
+    """
+    return lattice_children_for_region(
+        region_from_metric(g_parent, m_max),
+        g_child,
+        m_max,
+        max_children=max_children,
+    )

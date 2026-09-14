@@ -173,7 +173,7 @@ def poly_taylor_branch_batch(
 def poly_taylor_branch_metric_batch(
     leaves_batch: np.ndarray,
     coord_cur: tuple[float, float],
-    coord_prev: tuple[float, float],
+    coord_prev: tuple[float, float],  # noqa: ARG001
     coord_next: tuple[float, float],
     nbins: int,
     ducy: float,
@@ -195,10 +195,11 @@ def poly_taylor_branch_metric_batch(
     coord_cur : tuple[float, float]
         Coordinates for the accumulated segment in the current (child) stage.
     coord_prev : tuple[float, float]
-        Coordinates for the previous (parent) stage. The box strategy does not need
-        this -- a leaf's `dparam` column already encodes its own spacing -- but a metric
-        does: per-axis half-widths cannot represent the parent ellipsoid's orientation,
-        so the parent's own metric has to be rebuilt from its interval.
+        Unused since D23; kept so the signature still mirrors the box branch. The parent
+        region now comes from the leaves themselves via `metric_seed_region`, which is
+        why this convenience wrapper is only correct for a batch of *seed* leaves. The
+        search drives the stage/batch split directly and carries the region across
+        levels; see `Pruning._metric_stage_tables`.
     coord_next : tuple[float, float]
         Coordinates the leaves will be re-centred on at the end of the stage. Only its
         reference time is used, to place the child's averaging window relative to the
@@ -232,10 +233,9 @@ def poly_taylor_branch_metric_batch(
     runs once per stage rather than once per distinct `f0` in the batch.
     """
     ref_cur, t_half_cur = coord_cur
-    _, t_half_prev = coord_prev
     ref_next, _ = coord_next
-    offsets_unit, extents_unit = metric_branch_tables(
-        t_half_prev,
+    offsets_unit, dparam_unit, _ = metric_branch_tables(
+        metric_seed_region(leaves_batch),
         t_half_cur,
         ref_next - ref_cur,
         nbins,
@@ -244,11 +244,11 @@ def poly_taylor_branch_metric_batch(
         m_max,
         branch_max,
     )
-    return poly_taylor_branch_metric_apply(leaves_batch, offsets_unit, extents_unit)
+    return poly_taylor_branch_metric_apply(leaves_batch, offsets_unit, dparam_unit)
 
 
 def metric_branch_tables(
-    t_half_prev: float,
+    region_parent_unit: np.ndarray,
     t_half_cur: float,
     delta_t: float,
     nbins: int,
@@ -256,8 +256,8 @@ def metric_branch_tables(
     poly_order: int,
     m_max: float,
     branch_max: int,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Per-stage covering tables: child offsets at `f0 = 1`, and child axis extents.
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per-stage covering tables, given the parent's region explicitly.
 
     Everything expensive lives here -- `eigh`, Cholesky solves and the Fincke-Pohst
     enumeration -- and none of it depends on the leaves. The tables are a function of
@@ -268,74 +268,95 @@ def metric_branch_tables(
 
     Parameters
     ----------
-    t_half_prev, t_half_cur
-        **Half-widths** of the parent and child accumulated windows, i.e. `coord[1]`.
+    region_parent_unit
+        The parent's **actual** region at `f0 = 1`, as a form: `{d : d^T A d <= 1}`.
+        Passing this rather than inferring it from the previous stage's metric is the
+        D23 fix; D22 is what inferring it cost.
+    t_half_cur
+        Half-width of the child's accumulated window, i.e. `coord_cur[1]`.
     delta_t
         `coord_next[0] - coord_cur[0]`: how far ahead of the leaf's expansion epoch the
-        child window is centred.
+        child window is centred (D20).
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        Child offsets at `f0 = 1`; the new region's per-axis full span (leaf
+        column 1, D24); and the new region form, to be carried to the next stage.
 
     Notes
     -----
-    The averaging windows, not the half-widths, are what `poly_phase_metric` needs, and
-    getting that wrong was a real bug (D20). Both leaves are expanded about the
-    *previous* centre. The parent's window is symmetric about it, `[-t_half_prev,
-    +t_half_prev]`; the child's window has grown and moved on, so it is centred
-    `delta_t` ahead: `[delta_t - t_half_cur, delta_t + t_half_cur]`. Passing
-    `[0, coord[1]]` -- the epoch at the window's edge, over half its true length --
-    misprices the extents by 4x to 64x.
+    When the stage cannot resolve anything finer than the parent already is, this emits
+    a **single** child and the region is unchanged -- the exact counterpart of the box
+    strategy's `shift_bins < eta` guard, and the thing whose absence let the covering
+    tile regions the parent never occupied (D22).
     """
-    g_parent = metric.poly_phase_metric(
-        0.0, -t_half_prev, t_half_prev, poly_order, 1.0, nbins, ducy,
-    )
     g_child = metric.poly_phase_metric(
         0.0, delta_t - t_half_cur, delta_t + t_half_cur, poly_order, 1.0, nbins, ducy,
     )
-    offsets_unit = metric.lattice_children(
-        g_parent, g_child, m_max, max_children=branch_max,
+    if metric.region_fits_in_one_child(region_parent_unit, g_child, m_max):
+        offsets_unit = np.zeros((1, poly_order), dtype=np.float64)
+        region_new = region_parent_unit
+    else:
+        offsets_unit = metric.lattice_children_for_region(
+            region_parent_unit, g_child, m_max, max_children=branch_max,
+        )
+        region_new = metric.region_from_metric(g_child, m_max)
+    # Column 1 is a FULL cell span, not a half-width: `branch_param_padded` reads it
+    # as `param_cur -/+ dparam / 2`. (C3 said half-width and was wrong; D24.)
+    dparam_unit = 2.0 * metric.region_axis_extents(region_new)
+    return (
+        np.ascontiguousarray(offsets_unit),
+        np.ascontiguousarray(dparam_unit),
+        np.ascontiguousarray(region_new),
     )
-    extents_unit = metric.ellipsoid_axis_extents(g_child, m_max)
-    return np.ascontiguousarray(offsets_unit), np.ascontiguousarray(extents_unit)
 
 
-def metric_transform_extents(
-    t_half_cur: float,
-    nbins: int,
-    ducy: float,
+def metric_transform_region(
+    region_unit: np.ndarray,
+    delta_t: float,
     poly_order: int,
-    m_max: float,
-) -> np.ndarray:
-    """Child axis extents once re-centred on the new epoch, at `f0 = 1`.
+) -> tuple[np.ndarray, np.ndarray]:
+    """Carry a region form to the epoch the leaves are re-centred on.
 
-    A child's region is the ellipsoid `{d : d^T g d <= m_max}`. The transform moves the
-    expansion epoch to the centre of the newly accumulated window, where that window is
-    symmetric, so the honest per-axis half-width there is just
-    `ellipsoid_axis_extents(g, m_max)` for `g` built about the new epoch.
-
-    This is the *exact* transform the plan's Phase 2 step 2 asks for, and it cannot be
-    done from leaf state alone: a leaf stores only the ellipsoid's bounding box (D12),
-    and a bounding box does not determine the ellipsoid it bounds. It can be done here
-    because the window is a property of the *stage*, so -- exactly as for the covering
-    tables (D11) -- one evaluation at `f0 = 1` serves every leaf: `g` is proportional
-    to `f0**2`, hence `inv(g)` to `f0**-2` and the extents to `1 / f0`.
-
-    Equivalently one could carry the pre-transform metric through
-    `metric.transform_metric(g, shift_matrix(delta_t, poly_order))`; Phase 1 test 2 is
-    the statement that the two agree, and `TestTransformExtents` checks it here too.
-    Rebuilding about the new epoch is cheaper and needs no `delta_t`.
-
-    Notes
-    -----
-    Returns `poly_order` entries, for the branchable axes in leaf order (C1). `d_0` is
-    the constant-phase mode, which `poly_phase_metric` projects out, so it has no
-    defined half-width and keeps the zero that the metric branch gives it.
+    A region `{d : d^T A d <= 1}` under `d' = T d` becomes `{d' : d'^T A' d' <= 1}` with
+    `A' = T^-T A T^-1` -- the same map as `transform_metric`, since a region form and a
+    metric transform identically. Returns the new form and its per-axis full span, the
+    latter being what leaf column 1 carries after the transform (D18, D24).
     """
-    g_next = metric.poly_phase_metric(
-        0.0, -t_half_cur, t_half_cur, poly_order, 1.0, nbins, ducy,
+    t_mat = metric.shift_matrix(delta_t, poly_order)
+    region_next = metric.transform_metric(region_unit, t_mat)
+    return (
+        np.ascontiguousarray(region_next),
+        np.ascontiguousarray(2.0 * metric.region_axis_extents(region_next)),
     )
-    return np.ascontiguousarray(metric.ellipsoid_axis_extents(g_next, m_max))
+
+
+def metric_seed_region(leaves_batch: np.ndarray) -> np.ndarray:
+    """Region form of the seed leaves, at `f0 = 1`, valid for every leaf in the batch.
+
+    The seed's region is the FFA cell it came from -- carried in leaf column 1 -- not
+    any mismatch ellipsoid. That is the base case D22 showed was missing: at level 1 the
+    branch was assuming a region millions of times larger than this.
+
+    The batch is reduced to one region because the covering tables are per-stage (D11).
+    Column 1 does not scale cleanly with `f0`: the higher-derivative half-widths come
+    from the FFA grid and are `f0`-independent, while the `d_1` half-width carries a
+    `C / f0`. Taking `max(half * f0)` per axis gives a single `f0 = 1` region that, once
+    rescaled by `1 / f0`, **contains** every leaf's true cell -- exact on the axes that
+    really scale, conservative on the rest, and never under-covering. The waste is the
+    batch's `f0` spread, which is the search band's fractional width.
+    """
+    # Column 1 is a full span (D24), so halve it to get the cell's half-width.
+    half_unit = 0.5 * np.max(
+        leaves_batch[:, :-2, 1] * leaves_batch[:, -1:, 0],
+        axis=0,
+    )
+    return np.ascontiguousarray(metric.region_form_from_box(half_unit))
 
 
 def generate_bp_poly_taylor_metric(
+    seed_region_unit: np.ndarray,
     tseg_ffa: float,
     nsegments: int,
     ref_seg: int,
@@ -356,17 +377,22 @@ def generate_bp_poly_taylor_metric(
     Under `"metric"` the answer is both simpler and exact rather than averaged: the
     covering depends only on the stage (D11), so every parent at level `s` emits the
     same number of children, with no `f0` dependence to average over.
+
+    Replays the same region recursion as the search (D23), starting from
+    `seed_region_unit`, so the early levels report the single child that the guard
+    actually emits rather than a covering of a region no leaf occupies.
     """
     scheme = MiddleOutScheme(nsegments, ref_seg, tseg_ffa, stride=1)
     branching_pattern = np.empty(nsegments - 1, dtype=np.float64)
+    region = np.asarray(seed_region_unit, dtype=np.float64)
     for prune_level in range(1, nsegments):
         ref_cur, t_half_cur = scheme.get_current_coord(prune_level, use_moving_grid)
-        _, t_half_prev = scheme.get_previous_coord(prune_level, use_moving_grid)
         ref_next, _ = scheme.get_coord(prune_level)
-        offsets, _ = metric_branch_tables(
-            t_half_prev,
+        delta_t = ref_next - ref_cur
+        offsets, _, region = metric_branch_tables(
+            region,
             t_half_cur,
-            ref_next - ref_cur,
+            delta_t,
             nbins,
             ducy,
             poly_order,
@@ -374,6 +400,7 @@ def generate_bp_poly_taylor_metric(
             branch_max,
         )
         branching_pattern[prune_level - 1] = float(len(offsets))
+        region, _ = metric_transform_region(region, delta_t, poly_order)
     return branching_pattern
 
 
