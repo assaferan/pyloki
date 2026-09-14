@@ -1295,4 +1295,31 @@ Open questions: O6, O7, (m_max, R) jointly, and now: which affordable regime, if
   makes `aggressive` visibly fail.
 Next session starts at: scanning for a Taylor config where `aggressive` under-reports
   badly; failing that, Phase 4's circular extension or a bigger machine.
+
+## 2026-09-14 (m) — the benefit side, measured at last
+Done:
+  - Costed `quadrature` at the Phase 3 config, which had never been done: **1.10e17**
+    against `aggressive`'s 1.51e12 and the metric's 1.35e19.
+  - **D36 — measured the coverage gap, and it is zero.** `T` is lower-triangular with
+    unit diagonal (C4), so the sheared lattice of leaf centres keeps each axis's period
+    and boxes of unchanged width tile exactly, for any shear. `aggressive` records
+    exactly `spacing * |diag(T)| == spacing`, which is precisely sufficient.
+    Uncovered fraction is 0.0000 for all three box strategies at `delta_t` from 0.5 to
+    100, verified by forward substitution and independently by brute force over a
+    +/-400 lattice in 2D.
+    Took three attempts; the first two searched a fixed neighbour block instead of
+    solving for the covering index and reported spurious holes, once claiming
+    `aggressive` leaves 100% uncovered. `docs/metric_gridding/coverage_loss.py` carries
+    the working version and its self-checks.
+Consequence: the project's premise does not hold as stated. `quadrature` and
+  `conservative` buy no coverage over `aggressive` at 1e5 x and 1e20 x the cost, and the
+  metric pays ~1070x at equal P_d for a guarantee `aggressive` already provides.
+  Consistent with step 3, where `aggressive` matched or beat the metric.
+Caveats that could overturn it, in order: pruning is not modelled (a signal migrating
+  into a thresholded-away leaf is still lost, and a better tiling does not fix that);
+  this is the Taylor basis only, and the Chebyshev and circular transforms are not
+  unit-diagonal triangular; and it contradicts the paper as this plan reads it.
+Open questions: O6, O7, (m_max, R) -- all now moot unless D36 is overturned.
+Next session starts at: checking D36 independently, and looking for the gap in the
+  Chebyshev/circular transforms where the argument does not apply.
 ```
