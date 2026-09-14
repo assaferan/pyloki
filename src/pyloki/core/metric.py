@@ -580,22 +580,49 @@ def _whitened_parent_form(
     return m_max * 0.5 * (w_mat + w_mat.T), chol
 
 
-def region_fits_in_one_child(
+def region_overhang(
     a_parent: np.ndarray, g_child: np.ndarray, m_max: float,
-) -> bool:
-    """Report whether the parent region already fits in one child's ellipsoid.
-
-    The guard the metric branch was missing (D22/D23), and the exact counterpart of the
-    box strategy's `shift_bins < eta` test: when the stage cannot resolve anything finer
-    than the parent already is, branching must emit **one** child, not tile a region the
-    parent does not occupy.
+) -> float:
+    """How far the parent region sticks out past one child ellipsoid, worst direction.
 
     In the child's whitened coordinates the parent is `{w : w^T a_mat w <= m_max}` and
-    the child is the ball `|w|**2 <= m_max`, so containment is exactly
-    `a_mat >= I`, i.e. `lambda_min(a_mat) >= 1`.
+    the child is the ball `|w|**2 <= m_max`, so the parent's longest semi-axis in units
+    of the child's radius is `1 / sqrt(lambda_min(a_mat))`. A value of 1 means exact
+    containment; 2 means the parent reaches twice as far as a child can cover.
+
+    A leaf left unbranched at overhang `R` carries a worst-case mismatch of
+    `R**2 * m_max`, which is the price of deferring (D26).
     """
     a_mat, _ = _whitened_parent_form(a_parent, g_child, m_max)
-    return bool(np.linalg.eigvalsh(a_mat)[0] >= 1.0 - 1e-12)
+    lam_min = float(np.linalg.eigvalsh(a_mat)[0])
+    if lam_min <= 0.0:
+        return np.inf
+    return 1.0 / math.sqrt(lam_min)
+
+
+def region_fits_in_one_child(
+    a_parent: np.ndarray,
+    g_child: np.ndarray,
+    m_max: float,
+    defer_factor: float = 1.0,
+) -> bool:
+    """Report whether branching should be deferred at this stage.
+
+    The guard the metric branch was missing (D22/D23), and the counterpart of the box
+    strategy's `shift_bins < eta` test: when the stage cannot usefully resolve anything
+    finer than the parent already is, branching must emit **one** child rather than
+    re-tile for a negligible gain.
+
+    With `defer_factor = 1.0` this is exact containment, and the `m_max` guarantee holds
+    for every leaf at every level. Larger values trade that guarantee for cost: a leaf
+    may then carry up to `defer_factor**2 * m_max` of mismatch between branch events.
+    Re-covering costs the lattice thickness whatever the volume gain is, so without some
+    deferral the overhead compounds over the levels -- see D26 for the measurements.
+    """
+    if defer_factor < 1.0:
+        msg = f"defer_factor must be >= 1, got {defer_factor}"
+        raise ValueError(msg)
+    return region_overhang(a_parent, g_child, m_max) <= defer_factor * (1.0 + 1e-12)
 
 
 def lattice_children_for_region(
