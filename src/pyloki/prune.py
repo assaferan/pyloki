@@ -891,6 +891,7 @@ class Pruning:
                 cfg.prune_poly_order,
                 cfg.m_max,
                 cfg.metric_branch_max,
+                cfg.metric_defer_factor,
             )
             self._region_form, trans_dparams = taylor.metric_transform_region(
                 region,

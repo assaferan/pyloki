@@ -506,6 +506,11 @@ accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
 
 ## Branching-factor comparison (2026-09-14) — the Figure 7 analogue
 
+> **READ THE SECOND HALF FIRST.** The comparison below was initially run on one small
+> config and reported as "the metric strategy is not competitive". **That conclusion was
+> wrong** — it generalised from the single regime where the box strategy is at its best
+> and where there is no problem to solve. Corrected under "Regime dependence" below.
+
 Config: `T_obs = 16.8 s`, 32 segments, `poly_order = 3`, `eta = 1`, `nbins = 64`,
 `ducy_max = 0.2`, `m_max = 0.2`. Config-only, no FFA run needed.
 
@@ -557,6 +562,54 @@ it is the real Phase 3 experiment.
 
 Deferral is **not implemented**; the table above is a simulation over the same schedule.
 
+- **D26 — `metric_defer_factor`: branch only once the region overhangs by `R`.**
+  Generalises the D23 guard from exact containment (`lambda_min >= 1`) to
+  `region_overhang <= R`, where the overhang `1 / sqrt(lambda_min(a_mat))` is how far
+  the parent reaches past one child in the worst direction — the direct counterpart of
+  the box's `shift_bins < eta`.
+
+  **Default 1.0, i.e. exact containment**, so the shipped behaviour keeps the `m_max`
+  guarantee for every leaf at every level. `R > 1` trades it for cost: a leaf may then
+  carry up to `R**2 * m_max` of mismatch between branch events. That price is steep and
+  easy to overlook — at `R = 3, m_max = 0.2` a leaf reaches `m = 1.8`, outside the
+  regime where the quadratic mismatch model is even valid — so it is not defaulted on.
+
+  Deferral is nonetheless **necessary**, not optional: re-covering costs the lattice
+  thickness whatever the volume gain, so at `R = 1` the overhead compounds over levels.
+
+## Regime dependence — the correction that matters
+
+`prod B(s)` at **equal worst-case leaf mismatch**, optimising `R` for the metric. The
+box reference uses `conservative` error propagation, i.e. an honest bound on its region.
+
+| config | box `prod B(s)` | box worst `m` | metric best | ratio |
+|---|---|---|---|---|
+| 16.8 s, 32 seg, `po=3` | 27 | 0.024 | 2 773 (`R=6`) | **103x worse** |
+| 16.8 s, 32 seg, `po=4` | 27 | 0.024 | 1.4e4 (`R=6`) | **521x worse** |
+| 67.1 s, 64 seg, `po=3` | 1.77e5 | 0.047 | 5.05e4 (`R=12`) | **3.5x better** |
+| 67.1 s, 64 seg, `po=4` | 7.41e15 | 0.368 | 1.17e9 (`R=8`) | **6.3e6 x better** |
+| 268 s, 64 seg, `po=4` | 1.48e32 | 0.533 | 8.46e20 (`R=12`) | **1.8e11 x better** |
+
+**The sign of the answer flips with the regime, and the small config is the misleading
+one.** On the 16.8 s config the box costs 27 with a leaf mismatch of 0.024 and
+`aggressive` under-reports its own region by only **1.003x** — there is no coverage gap
+there to fix, so the metric can only lose. As the baseline and polynomial order grow the
+box degrades on both axes at once: by `po=4` at 268 s it is spending `1e32` branches
+*and* carrying `m = 0.53`, while the metric reaches the same mismatch for `1e21`.
+
+That is the project's premise, quantified, and it holds: the metric exploits the
+correlation between coefficients (D8's ill-conditioning) exactly where an axis-aligned
+box cannot. The covering overhead is real and compounds, but it is a constant factor
+per branch event, whereas the box's penalty grows as a power of the baseline per axis.
+
+**Caveats before anyone quotes these.** They are branching factors, not detections:
+`prod B(s) = 1e32` is not something the box ever realises, since EP caps candidates and
+thresholds hard — the box's real failure there is lost sensitivity, which only
+injection-recovery measures. The comparison also holds *worst-case* mismatch equal,
+which is generous to neither side at `m = 0.5`. And deferral at the winning `R` means
+few branch events, so the pruning-diversity question from the earlier section is still
+open.
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
@@ -568,12 +621,11 @@ Deferral is **not implemented**; the table above is a simulation over the same s
   Note that column 1 is no longer write-only under `"metric"`: D23 reads a seed's cell
   back out of it, so it is load-bearing at the start of every run.
 
-- **Implement deferral, then re-measure.** The comparison above says the metric
-  strategy needs a deferral rule to be viable at all, and that `R` near 3 is the
-  operating point on this config. It should become a config knob
-  (`metric_defer_factor`), with the guard generalised from strict containment
-  (`lambda_min >= 1`) to `lambda_min >= 1 / R**2`. Then re-measure `prod B(s)` on the
-  Phase 3 schedule, and check how `R` interacts with `m_max` and O7.
+- **Choose the operating point.** `metric_defer_factor` exists (D26) but defaults to
+  1.0, which is correct but expensive. The winning `R` is regime-dependent (8-12 in the
+  target regime) and trades the `m_max` guarantee for cost at `R**2`. Phase 3 has to
+  settle `(m_max, R)` jointly, together with O6 and O7 — all four are scale factors on
+  the same criterion.
 
 - **An upstream oddity found while wiring step 2, deliberately not fixed.**
   `report_func` (both `dyn_poly_taylor.py` and `dyn_circular_taylor.py`) calls
@@ -959,4 +1011,24 @@ Verdict: viable, but only with deferral, and the R=3 operating point buys cost p
 Open questions: O6, O7, and the deferral factor R (new).
 Next session starts at: implement `metric_defer_factor`, re-measure on the Phase 3
   schedule, then step 5.
+
+## 2026-09-14 (g) — metric_defer_factor, and a corrected verdict
+Done:
+  - `metric_defer_factor` implemented end to end (D26): `metric.region_overhang`,
+    the generalised `region_fits_in_one_child`, threaded through `metric_branch_tables`,
+    `generate_bp_poly_taylor_metric`, `config.py` and `prune.py`. Default **1.0**, so
+    the shipped behaviour keeps the `m_max` guarantee. 10 tests.
+  - Full suite **163 passed**, ruff clean.
+CORRECTION to the previous session entry: "the metric strategy is not competitive, by
+  24 orders of magnitude" was measured on ONE small config and does not generalise. At
+  equal worst-case mismatch the sign flips with the regime — 103x worse at 16.8 s /
+  po=3, but 3.5x / 6.3e6 x / 1.8e11 x BETTER at 67 s po=3, 67 s po=4 and 268 s po=4.
+  See "Regime dependence" above for the table.
+Why the small config misleads: there `aggressive` under-reports its region by 1.003x
+  and its leaf carries m=0.024 at prod B(s)=27 — it is both cheap and honest, so there
+  is no gap to fix and the covering overhead is pure loss. The premise of the project
+  only bites once the baseline and poly_order grow, and there it bites hard.
+Open questions: O6, O7, and (m_max, R) jointly — all four are scale factors on the same
+  criterion and Phase 3 should settle them together.
+Next session starts at: step 5, then Phase 3 with the target-regime config.
 ```

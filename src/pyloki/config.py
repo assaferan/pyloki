@@ -435,6 +435,10 @@ class PulsarSearchConfig:
             attrs.validators.gt(0),
         ],
     )
+    metric_defer_factor: float = attrs.field(
+        default=1.0,
+        validator=attrs.validators.ge(1.0),
+    )
     metric_resolve_diagnostic: bool = attrs.field(default=False)
     # 0.0 means "follow ducy_max"; see _metric_ducy_default.
     metric_ducy: float = attrs.field(
@@ -849,6 +853,7 @@ class PulsarSearchConfig:
                 self.prune_poly_order,
                 self.m_max,
                 self.metric_branch_max,
+                self.metric_defer_factor,
                 use_moving_grid=kind == "poly_taylor_moving",
             )
         if kind in {"poly_chebyshev_moving", "poly_chebyshev_fixed"}:

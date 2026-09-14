@@ -256,6 +256,7 @@ def metric_branch_tables(
     poly_order: int,
     m_max: float,
     branch_max: int,
+    defer_factor: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Per-stage covering tables, given the parent's region explicitly.
 
@@ -277,6 +278,10 @@ def metric_branch_tables(
     delta_t
         `coord_next[0] - coord_cur[0]`: how far ahead of the leaf's expansion epoch the
         child window is centred (D20).
+    defer_factor
+        Branch only once the parent overhangs a child ellipsoid by this factor in the
+        worst direction. `1.0` is exact containment and keeps the `m_max` guarantee;
+        larger values trade it for cost (D26).
 
     Returns
     -------
@@ -294,7 +299,9 @@ def metric_branch_tables(
     g_child = metric.poly_phase_metric(
         0.0, delta_t - t_half_cur, delta_t + t_half_cur, poly_order, 1.0, nbins, ducy,
     )
-    if metric.region_fits_in_one_child(region_parent_unit, g_child, m_max):
+    if metric.region_fits_in_one_child(
+        region_parent_unit, g_child, m_max, defer_factor,
+    ):
         offsets_unit = np.zeros((1, poly_order), dtype=np.float64)
         region_new = region_parent_unit
     else:
@@ -371,6 +378,7 @@ def generate_bp_poly_taylor_metric(
     poly_order: int,
     m_max: float,
     branch_max: int,
+    defer_factor: float = 1.0,
     *,
     use_moving_grid: bool,
 ) -> np.ndarray:
@@ -404,6 +412,7 @@ def generate_bp_poly_taylor_metric(
             poly_order,
             m_max,
             branch_max,
+            defer_factor,
         )
         branching_pattern[prune_level - 1] = float(len(offsets))
         region, _ = metric_transform_region(region, delta_t, poly_order)
