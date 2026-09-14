@@ -197,3 +197,72 @@ The metric strategy is then paying ~1070x at equal `P_d` to guarantee something
    look for it.
 3. It contradicts the stated motivation of Kumar & Zackay (2026) §5.2.4 as this plan
    reads it, so it deserves an independent check before anyone acts on it.
+
+## The sensitivity loss, quantified — the paper's actual open question
+
+§5.2.4 closes with *"Further work is required to quantify the sensitivity loss and
+compare basis strategies."* That is a different measurement from anything above, and it
+is cheap. For a signal anywhere inside a leaf's cell, what phase error does it actually
+incur, against the promised `eta / N_b`?
+
+Two facts the self-checks pin first, both about what `eta` means:
+
+- the **naive** per-axis grid is calibrated so a full-step offset costs exactly
+  `eta / N_b` — the promise is kept, per axis;
+- the **shipped** grid is coarser by exactly `2**(k-1)` on the order-`k` axis. That is
+  the paper's own metric diagonalisation (§3.4, D38), deliberate, and it means `eta`
+  does *not* mean "phase error below `eta / N_b`".
+
+Sampling offsets uniformly inside each leaf, 268 s / 64 seg / `po=4`, in units of
+`eta / N_b`:
+
+| strategy | median stage | worst corner | median mismatch |
+|---|---|---|---|
+| `aggressive` | 3.35 | 16.80 | 0.0240 |
+| `quadrature` | 3.58 | 14.38 | 0.0258 |
+| `conservative` | 3.42 | 14.20 | 0.0251 |
+
+**The three strategies are indistinguishable.** A typical signal costs ~3.4x the nominal
+phase budget and ~2.5% in amplitude; a corner signal costs ~15x. Identical across
+strategies that differ by **twenty orders of magnitude** in cost.
+
+### Why, and it settles the question
+
+`branch_param_padded` refines each parent to the criterion step `dparam_new` at every
+stage: `num_points = ceil(dparam_cur / dparam_new)`, so the child cell is
+`dparam_cur / num_points`, which lands just under `dparam_new` whatever
+`dparam_cur` was. Measured cell half-widths at the final stage, against the criterion
+step of `[9.7e-3, 0.163, 3.64, 122]`:
+
+| strategy | final cell half-widths | `prod B(s)` |
+|---|---|---|
+| `aggressive` | `[1.10e-2, 0.123, 5.00, 96.4]` | 1.51e12 |
+| `quadrature` | `[1.10e-2, 0.288, 4.02, 133]` | 1.10e17 |
+| `conservative` | `[1.10e-2, 0.344, 6.99, 239]` | 1.48e32 |
+
+All within a factor of ~2 of the criterion and of each other; the scatter is the integer
+`ceil`. **The transported width does not set the cell — the criterion does. It sets only
+how much redundant subdivision is done on the way.** So it can only buy cost, never
+sensitivity.
+
+That is the general statement, and it applies to the metric strategy too: a covering is
+just another transport rule. It cannot improve sensitivity, and it measurably worsens
+cost. Which closes the question this branch was opened to answer.
+
+### What is worth reporting upstream
+
+The `~3.4x` typical and `~15x` worst-corner excursion is a real, quantified answer to
+the paper's request, and it is actionable: `eta` is optimistic by about a factor of
+three for a typical signal under the recommended strategy, most of it the `2**(k-1)`
+coarsening compounded across axes, the rest multi-axis corner addition. Anyone choosing
+`eta` from equation `grid_criteria` alone will over-estimate their sensitivity. That
+holds for the shipped default and does not depend on any of the metric work.
+
+### Caveats
+
+Deterministic geometry only. Pruning is not modelled, and it is the one place a wider
+claimed region could still help — a signal near a cell edge may fall in a leaf that was
+thresholded away, and a strategy claiming more territory keeps more such signals alive.
+That is a threshold-scheme interaction, measurable only by injection, and nothing here
+rules it out. Taylor basis only: the Chebyshev transform is not unit-diagonal
+triangular, so neither D36 nor this section carries over to it.
