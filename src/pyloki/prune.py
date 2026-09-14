@@ -651,6 +651,13 @@ class Pruning:
             coord_prev,
             coord_next,
         )
+        self._log_resolve_mismatch(
+            coord_add,
+            coord_cur,
+            coord_init,
+            branch_offsets,
+            branch_extents,
+        )
         world_tree, stats_dict, timers = pruning_iteration_batched(
             self.world_tree,
             fold_segment,
@@ -781,6 +788,67 @@ class Pruning:
             idx = int(bt[0])
             lvl -= 1
         return steps_rev[::-1]
+
+    # Parents sampled for the resolve diagnostic. It re-branches them outside the
+    # njit loop, so the cost is n_parents * children-per-parent; a sample is enough to
+    # place a p95 and keeps a debug flag from dominating the run.
+    _RESOLVE_DIAG_PARENTS: ClassVar[int] = 64
+
+    def _log_resolve_mismatch(
+        self,
+        coord_add: tuple[float, float],
+        coord_cur: tuple[float, float],
+        coord_init: tuple[float, float],
+        branch_offsets: np.ndarray,
+        branch_extents: np.ndarray,
+    ) -> None:
+        """Report how much mismatch `resolve` costs by snapping children to `G0`.
+
+        metric_PLAN.md Phase 2 step 4, behind ``cfg.metric_resolve_diagnostic``. Under
+        ``"metric"`` children do not sit on the rectangular base grid, so rounding them
+        to it spends mismatch the covering never budgeted for. The plan's gate: if the
+        p95 exceeds the per-stage budget ``m_max``, stop and discuss.
+
+        Deliberately outside ``pruning_iteration_batched``: it re-branches a sample of
+        parents in Python rather than instrumenting the ``@njit`` hot path.
+        """
+        cfg = self.dyp.cfg
+        if cfg.tiling_strategy != "metric" or not cfg.metric_resolve_diagnostic:
+            return
+        parents = self.world_tree.leaves[: self._RESOLVE_DIAG_PARENTS]
+        if len(parents) == 0:
+            return
+        children, _ = taylor.poly_taylor_branch_metric_apply(
+            parents,
+            branch_offsets,
+            branch_extents,
+        )
+        mismatch = taylor.metric_resolve_mismatch(
+            children,
+            coord_add,
+            coord_cur,
+            coord_init,
+            self.dyp.param_arr,
+            self.dyp.param_grid_count,
+            cfg.param_limits,
+            cfg.nbins,
+            cfg.metric_ducy,
+        )
+        p50, p95, pmax = np.percentile(mismatch, [50, 95, 100])
+        verdict = "OVER BUDGET" if p95 > cfg.m_max else "within budget"
+        self.logger.info(
+            f"Resolve mismatch at level {self.prune_level} "
+            f"({len(children)} children of {len(parents)} parents): "
+            f"p50={p50:.4g} p95={p95:.4g} max={pmax:.4g} "
+            f"vs m_max={cfg.m_max:.4g} -- {verdict}",
+        )
+        if p95 > cfg.m_max:
+            self.logger.warning(
+                f"Level {self.prune_level}: resolving onto the base grid spends more "
+                f"than the whole per-stage budget at the p95 ({p95:.4g} > "
+                f"{cfg.m_max:.4g}). The covering's guarantee does not hold end to end; "
+                f"see metric_PLAN.md Phase 2 step 4.",
+            )
 
     def _metric_stage_tables(
         self,

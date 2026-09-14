@@ -435,6 +435,7 @@ class PulsarSearchConfig:
             attrs.validators.gt(0),
         ],
     )
+    metric_resolve_diagnostic: bool = attrs.field(default=False)
     # 0.0 means "follow ducy_max"; see _metric_ducy_default.
     metric_ducy: float = attrs.field(
         default=0.0,

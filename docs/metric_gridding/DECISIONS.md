@@ -385,24 +385,103 @@ The counts fall with level because the covering depends on the *ratio* of the
 accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
 `aggressive` completes the identical run, unchanged.
 
+- **D22 — STEP 4 RESULT: the covering has no idea where its parent actually is, and
+  the plan's gate has tripped. STOP AND DISCUSS.** (2026-09-14.)
+
+  Step 4 asked for the mismatch between each child and the base-grid point it resolves
+  to, with the instruction "if the p95 exceeds the per-stage budget, stop and discuss".
+  Measured on the 3-level smoke run at `m_max = 0.2`:
+
+  | level | children | p50 | p95 | max | verdict |
+  |---|---|---|---|---|---|
+  | 1 | 7839 | 76.2 | 454 | 688 | **2270x over** |
+  | 2 | 10944 | 99.6 | 598 | 1180 | **2990x over** |
+  | 3 | 5952 | 315 | 5770 | 6664 | **28900x over** |
+
+  **The diagnostic is not at fault**; the control settles that. Run on `aggressive`
+  children over the identical step, the same code returns **p50 = 7.0e-10**, as it
+  should: box children sit on a rectangular refinement of `G0` by construction. Two
+  unit tests pin the forward map independently -- a child placed exactly on a cell
+  centre costs `< 1e-18`, and a half-cell offset matches a hand computation of
+  `g[1,1] * dv**2` to 1e-5.
+
+  **Root cause, and it is not rounding.** `metric_branch_tables` defines the parent's
+  region as `{d : d^T g_parent d <= m_max}`, built from the accumulated baseline alone.
+  Nothing in that expression refers to the region the parent *actually* occupies. On
+  the short baselines of the early levels the two are wildly different. At
+  `t_half = 0.131 s`, against the search space:
+
+  | axis | `m_max` ellipsoid / search half-span |
+  |---|---|
+  | `d_3` (jerk) | 9.2e7 |
+  | `d_2` (accel) | 4.1e6 |
+  | `d_1` (freq) | 0.66 |
+
+  A 0.13 s baseline cannot constrain jerk or acceleration at all, so the `m_max`
+  ellipsoid on those axes runs millions of times past the entire search range. The
+  covering dutifully tiles it. Children then land at 82-204 Hz against a 141.9-143.9 Hz
+  band and at accelerations of +/-9.6e8 against a range of +/-4; `resolve` clamps them
+  to the grid edge, and the clamped distance is what the table above is measuring.
+
+  **What is NOT wrong.** The metric itself is sound: on the same baseline the ellipsoid
+  tracks the eta-box to within a factor of a few (`< 100x`, and about 4-11x in
+  practice), consistent with D8-as-corrected. The covering, the retention bound, the
+  lattice and the `1/f0` law are all fine. The defect is one of *scope*: the metric
+  branch sizes leaves **absolutely**, from `m_max` and the baseline, where the box
+  strategy only ever **subdivides** the region it was given -- and keeps a single child
+  when `shift_bins < eta` says refinement is not yet warranted. The metric branch has
+  no equivalent of either the starting region or that guard.
+
+  This is why the Phase 2 coverage tests pass and missed it: they ask whether the
+  children cover *the stage-(s-1) `m_max` ellipsoid*, which is the same wrong region
+  the branch assumes. Self-consistent, and not the question.
+
+  **It also reframes the Phase 2 cost findings.** The recorded 869 / 171 / 93 children
+  per parent, and the "45x the volume bound" redundancy, are the cost of covering a
+  region the parent never occupied. The true branching factor cannot be known until the
+  scope is fixed; it should fall, possibly a great deal, since most of that volume is
+  outside the search space.
+
 ## Still to do in Phase 2
 
-- **Step 4** — the `resolve` diagnostic: children no longer sit on the rectangular base
-  grid `G0`, and the plan wants the metric mismatch between each child and the base-grid
-  point it resolves to, logged behind a debug flag, with a stop-and-discuss if the p95
-  exceeds the per-stage budget.
+- **Step 4's fix, which is a design change and needs the human.** The metric branch has
+  to be given the parent's actual region, not a region inferred from the baseline. The
+  options, none of them costed yet:
+
+  1. **Intersect with the parent's box.** Keep only lattice points inside the parent's
+     `dparam` box (column 1), which already encodes both `param_limits` and every prior
+     subdivision. Cheap, and it reuses information the leaf already carries -- but D13
+     rejected column 1 as a parent descriptor precisely because a box cannot express
+     the ellipsoid's orientation, so this reintroduces the corner problem at the
+     boundary. Probably still much better than nothing.
+  2. **Intersect with `param_limits` only.** Simplest, and it kills the 82-204 Hz
+     children, but it leaves the level-1 seed mismatch untouched, since a seed's region
+     is one FFA cell rather than the whole search space.
+  3. **Carry the parent's ellipsoid explicitly.** Store the parent's metric (or its
+     Cholesky factor) per leaf, or per stage plus a provenance tag, so the branch knows
+     the real region. Exact, and the natural end point of D11/D12, but it is the
+     per-leaf storage the Phase 2 "metric storage" decision deliberately avoided.
+  4. **Add the `shift_bins < eta` analogue.** Independently of the above: when the
+     child ellipsoid is not meaningfully smaller than the parent's region, emit one
+     child. This alone would collapse the early levels, where the metric says no
+     refinement is possible yet.
+
+  My reading is that (4) plus (1) is the cheap, honest combination, and (3) is the
+  principled one. Not started -- this is the "discuss" the plan asked for.
+
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
-  that still matter under `"metric"` are `poly_taylor_report_batch`, `periodogram.
-  add_run` and `io/cands.py`, all of which turn column 1 into *reported* uncertainties.
-  Worth confirming that an ellipsoid bounding box is what those should print.
+  that still matter under `"metric"` are `poly_taylor_report_batch`,
+  `periodogram.add_run` and `io/cands.py`, all of which turn column 1 into *reported*
+  uncertainties. Worth confirming that an ellipsoid bounding box is what those should
+  print.
 
-  Note what the trace now implies: inside the search loop column 1 is **write-only**
-  under `"metric"`. The metric branch reads the stage tables, not the parent's column 1;
+  Note what the trace implies: inside the search loop column 1 is **write-only** under
+  `"metric"`. The metric branch reads the stage tables, not the parent's column 1;
   `resolve` never touches column 1; `validate_func` is a no-op in the Taylor path;
-  `ascend` does not read it; `world_tree.py` does not interpret it. So D18's exactness
-  buys correct *reported error bars*, and cannot affect the grid or the coverage.
+  `ascend` does not read it; `world_tree.py` does not interpret it. (Option 1 above
+  would change that, making column 1 load-bearing again.)
 
-- **An upstream oddity found while wiring this, deliberately not fixed.**
+- **An upstream oddity found while wiring step 2, deliberately not fixed.**
   `report_func` (both `dyn_poly_taylor.py` and `dyn_circular_taylor.py`) calls
   `poly_taylor_transform_batch` under `not use_moving_grid` and **discards the result**,
   reporting `leaves_batch` unshifted — the call is already a no-op on `main`. `"metric"`
@@ -708,4 +787,29 @@ Not done: step 4, which is what I was scoping when this turned up.
 Open questions: O6, O7 (unchanged).
 Next session starts at: Phase 2 step 4 (the resolve diagnostic), on a metric that now
   means what it says.
+
+## 2026-09-14 (d) — Phase 2, step 4
+Done:
+  - `taylor.metric_resolve_mismatch`: replays resolve's forward map, looks up the cell
+    centre actually loaded, and prices the residual in the base-segment metric
+    (`poly_order=2`, since `G0` grids only accel and freq).
+  - `Pruning._log_resolve_mismatch` behind `cfg.metric_resolve_diagnostic`, sampling 64
+    parents per level. Deliberately outside the `@njit` loop: it re-branches the sample
+    in Python rather than instrumenting the hot path.
+  - 3 tests: on-grid children cost < 1e-18; a half-cell offset matches a hand
+    computation to 1e-5; and the step 4 finding itself is pinned.
+  - Full suite **144 passed**, ruff clean.
+Result: **the gate tripped, hard** — p95 of 454 / 598 / 5770 against `m_max = 0.2`.
+  See D22. The diagnostic is sound: the same code on `aggressive` children returns
+  p50 = 7.0e-10.
+Root cause: the metric branch sizes the parent region from the baseline alone
+  (`m_max` ellipsoid of the stage metric) and never consults the region the parent
+  actually occupies. On short baselines that ellipsoid exceeds the whole search space
+  by 9.2e7x in jerk and 4.1e6x in accel, so children land far outside `param_limits`
+  and `resolve` clamps them. The metric is fine; the *scope* is wrong.
+Consequence: the Phase 2 child-count and redundancy findings measure the cost of
+  covering a region the parent never had, and should fall once the scope is fixed.
+Open questions: O6, O7, and now the step 4 design choice (four options under
+  "Still to do in Phase 2"), which needs a human decision before Phase 3.
+Next session starts at: that decision, then step 5.
 ```
