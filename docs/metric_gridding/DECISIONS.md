@@ -623,6 +623,54 @@ failure is that it is unrunnable, while `aggressive`'s is lost sensitivity. And 
 *worst-case* mismatch at m ~ 0.5 is a poor operating point for anybody; the comparison
 is a like-for-like, not a recommendation.
 
+## Phase 3 reduced-grid validation (2026-09-14)
+
+Run before committing to a full injection grid, and it changed the config twice.
+
+- **D30 — Phase 3 runs at 268 s / 64 segments / `poly_order=4`, chosen by measurement.**
+
+  | config | FFA fold array | base grid `[snap, jerk, accel, freq]` |
+  |---|---|---|
+  | 67 s, 64 seg | 0.01 GB | `[1, 1, 1, 12]` — **degenerate** |
+  | 268 s, 64 seg | 0.1 GB | `[1, 1, 5, 467]` |
+  | 537 s, 128 seg | 5.0 GB | `[1, 1, 22, 3383]` |
+  | **1074 s, 128 seg (the plan's)** | **3778 GB** | `[1, 2, 526, 53151]` |
+
+  Two hard facts. The plan's 18-minute config needs a **3.8 TB** fold array and is not
+  runnable on this machine; 537 s / 128 segments needs 5 GB and is a spot check at
+  best. And below ~268 s the base grid is degenerate — at 67 s only frequency is
+  gridded, so all three strategies recover the *same* candidate with an identical
+  mismatch of 8.716e-4 and nothing is discriminated. My earlier choice of 67 s was
+  therefore wrong, and any 67 s number in this document should be read with that in
+  mind. 268 s is the smallest config that both fits and discriminates.
+
+- **D31 — the metric's apparent recovery failure is thresholding, not coverage.**
+  With a *shared* placeholder threshold ramp (1.5 → 8.0) and `max_sugg = 2**11`:
+
+  | strategy | recovered | best mismatch | best score | candidates |
+  |---|---|---|---|---|
+  | `aggressive` | yes | 0.0015 | 19.5 | 1090 |
+  | `conservative` | yes | 0.167 | 13.5 | 1730 |
+  | `metric` | **no** | 2.8e6 | 4.9 | 217 |
+
+  Re-run with zero thresholds and `max_sugg = 2**14`, the metric recovers cleanly —
+  best mismatch **0.0037** at score **19.0**, against `aggressive`'s 0.024 at 17.3 on
+  the same setting. So the covering contains the injected signal; the true track was
+  simply thresholded away.
+
+  That is exactly the failure the plan's ordering guards against: "Recalibrate
+  thresholds ... **before any sensitivity comparison**", because `B(s)` differs between
+  strategies and a scheme tuned for one is meaningless for another. It is now
+  demonstrated rather than assumed, and no sensitivity number should be quoted until
+  step 2 is done per strategy.
+
+  `conservative`'s degraded 0.167 / 13.5 is the same effect: its `B(s)` is enormous, so
+  it overruns `max_sugg` and thresholds hard.
+
+Harness: `docs/metric_gridding/injection_recovery.py`. Recovery is judged by mismatch to
+the truth in the full-baseline metric, not by parameter distance — a tolerance in Hz
+would favour whichever grid happens to be finer in frequency.
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
@@ -1087,4 +1135,23 @@ Open questions: O6, O7, (m_max, R) jointly.
 Next session starts at: Phase 3 step 2 — recalibrate thresholds for both strategies at
   P_d = 0.1 on the Taylor-analogue config, then step 3 (injection-recovery), which is
   now the decisive experiment.
+
+## 2026-09-14 (j) — Phase 3 reduced-grid validation
+Done:
+  - `injection_recovery.py`: inject, prune, judge recovery by mismatch in the
+    full-baseline metric. Runs for all three strategies.
+  - Validated on a reduced grid before committing to the full one, which was the right
+    call — it moved the Phase 3 config twice and caught a false negative.
+Findings:
+  - D30: the plan's 18-min config needs a 3.8 TB FFA fold array and cannot run here.
+    And 67 s -- which I had picked -- has a degenerate base grid `[1,1,1,12]`, where all
+    three strategies return an identical mismatch and nothing is discriminated. Phase 3
+    now runs at 268 s / 64 seg / po=4: 0.1 GB, FFA 2.9 s, grid `[1,1,5,467]`.
+  - D31: the metric appeared to fail recovery (best m 2.8e6, score 4.9). It does not --
+    with zero thresholds it recovers at m=0.0037 / score 19.0, better than aggressive on
+    the same setting. The failure was a shared, uncalibrated threshold ramp. The plan's
+    "recalibrate before comparing sensitivity" is now demonstrated, not assumed.
+Open questions: O6, O7, (m_max, R) jointly.
+Next session starts at: Phase 3 step 2 proper -- `DynamicThresholdScheme` per strategy
+  at P_d = 0.1 on the 268 s config -- then step 3 on a real injection grid.
 ```
