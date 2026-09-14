@@ -11,7 +11,7 @@ These are **observed from the code**, not chosen, and any metric code must match
 |---|---|---|---|
 | C1 | Axis ordering | reverse `k`: `[d_kmax, ..., d_2, d_1]` for the `poly_order` branchable axes | `core/taylor.py:52-64`, `:106-109` |
 | C2 | Leaf layout | `(n_leaves, poly_order+2, 2)`; row `[-1]` = `f_0`/basis-flag, `[-2]` = `d_0` (never branched), `[-3]` = `d_1`, `[:-3]` = `[d_kmax..d_2]` | `poly_taylor_seed` |
-| C3 | Column meaning | col 0 = value, col 1 = per-axis **half-width** | `core/common.py:50`, `core/taylor.py:109` |
+| C3 | Column meaning | col 0 = value, col 1 = per-axis **full span** (see D24; this row said *half-width* and was wrong) | `psr_utils.branch_param_padded`, `core/taylor.py:109` |
 | C4 | `Δt` sign | `delta_t = t_new − t_old`; `t_mat` lower-triangular, **unit diagonal** | `transforms.py::shift_taylor_params`, callers at `taylor.py:222,352` |
 | C5 | Units | `d_k` in m·s⁻ᵏ, `f_0` in Hz, `C_VAL` in m/s | `utils/misc.py` |
 | C6 | Phase units | **cycles**, and `phase = f0 * d / C_VAL` with **no 2π** | `poly_taylor_resolve_batch:228-234` |
@@ -442,44 +442,72 @@ accumulated intervals, which drops from 2.0 to 1.33 as the baseline grows.
   scope is fixed; it should fall, possibly a great deal, since most of that volume is
   outside the search space.
 
+- **D23 — The parent region is carried explicitly, as run state.** (Human's choice,
+  2026-09-14: option (3), the principled one, from the four D22 offered.)
+
+  A region is represented as a form `A` with `{d : d^T A d <= 1}`. The recursion:
+
+  | | region |
+  |---|---|
+  | seed | the FFA cell it came from, from leaf column 1 (`taylor.metric_seed_region`) |
+  | level that refines | the stage's mismatch ellipsoid, `g_s / m_max` |
+  | level that cannot refine | **unchanged** — the parent's region is inherited |
+  | after the transform | `T^-T A T^-1`, the same map a metric takes |
+
+  `Pruning._region_form` holds it, seeded in `initialize` and advanced once per level in
+  `_metric_stage_tables`. No per-leaf storage: it is one region per stage, which is what
+  D11 already established for everything else on this path.
+
+  **The guard is the other half, and it is the exact counterpart of `shift_bins < eta`.**
+  `metric.region_fits_in_one_child` asks whether the parent already sits inside a single
+  child's ellipsoid; in the child's whitened coordinates that is exactly
+  `lambda_min(a_mat) >= 1`. When it holds the branch emits **one** child and the region
+  is untouched. Its absence is what let the covering tile regions no leaf occupied.
+
+  **Result: the step 4 gate now passes, at the control's own value.** p95 goes from
+  454 / 598 / 5770 to **7.0e-10 / 7.0e-10 / 2.8e-9** against `m_max = 0.2` — identical
+  to what `aggressive` scores on the same step, which is the floor the diagnostic can
+  return. Children no longer leave `param_limits`.
+
+  **What the fix reveals about cost.** On the 1-second smoke config the metric strategy
+  now emits **one child at every level**: over a 0.26-1.05 s baseline, `m_max = 0.2` is
+  looser than a single FFA cell, so no refinement is possible and the honest branching
+  factor is 1. That is correct, not inert — the guard releases as soon as the baseline
+  can resolve something. On a 64-segment schedule refinement starts at **level 9** and
+  then runs 9 / 33 / 33 / 29 / 27 / 27 children per level; with `m_max = 1e-6` on the
+  short config it starts at level 3. Both are pinned.
+
+  **This retires the Phase 2 redundancy findings.** The recorded 869 / 171 / 93 children
+  per parent, and the "45x the volume bound", were the cost of covering the over-large
+  region. Real branching factors must be re-measured on a schedule long enough to
+  refine, and Phase 3 cannot quote the old ones.
+
+- **D24 — CORRECTION: leaf column 1 is a full span, not a half-width.** C3 said
+  half-width; `psr_utils.branch_param_padded` reads it as `param_cur -/+ dparam / 2`,
+  and a seed's jerk entry is 16.0 for a search range of `[-8, 8]`. So it is the full
+  cell span, and C3 above is corrected.
+
+  D12 and D18 had been writing `ellipsoid_axis_extents` — a half-width — into it, a
+  factor of 2 too small. The metric path now writes `2 * region_axis_extents`, and
+  `metric_seed_region` halves column 1 when reading a cell back. Inside the search loop
+  this changed nothing (column 1 is write-only there under `"metric"`), but it was
+  wrong in everything `report` and `io/cands.py` print, and it now feeds the region
+  recursion, where a factor of 2 is not cosmetic.
+
 ## Still to do in Phase 2
-
-- **Step 4's fix, which is a design change and needs the human.** The metric branch has
-  to be given the parent's actual region, not a region inferred from the baseline. The
-  options, none of them costed yet:
-
-  1. **Intersect with the parent's box.** Keep only lattice points inside the parent's
-     `dparam` box (column 1), which already encodes both `param_limits` and every prior
-     subdivision. Cheap, and it reuses information the leaf already carries -- but D13
-     rejected column 1 as a parent descriptor precisely because a box cannot express
-     the ellipsoid's orientation, so this reintroduces the corner problem at the
-     boundary. Probably still much better than nothing.
-  2. **Intersect with `param_limits` only.** Simplest, and it kills the 82-204 Hz
-     children, but it leaves the level-1 seed mismatch untouched, since a seed's region
-     is one FFA cell rather than the whole search space.
-  3. **Carry the parent's ellipsoid explicitly.** Store the parent's metric (or its
-     Cholesky factor) per leaf, or per stage plus a provenance tag, so the branch knows
-     the real region. Exact, and the natural end point of D11/D12, but it is the
-     per-leaf storage the Phase 2 "metric storage" decision deliberately avoided.
-  4. **Add the `shift_bins < eta` analogue.** Independently of the above: when the
-     child ellipsoid is not meaningfully smaller than the parent's region, emit one
-     child. This alone would collapse the early levels, where the metric says no
-     refinement is possible yet.
-
-  My reading is that (4) plus (1) is the cheap, honest combination, and (3) is the
-  principled one. Not started -- this is the "discuss" the plan asked for.
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
   that still matter under `"metric"` are `poly_taylor_report_batch`,
   `periodogram.add_run` and `io/cands.py`, all of which turn column 1 into *reported*
-  uncertainties. Worth confirming that an ellipsoid bounding box is what those should
-  print.
+  uncertainties. D24 means those were a factor of 2 out until now. Worth confirming that
+  an ellipsoid bounding box is what they should print.
 
-  Note what the trace implies: inside the search loop column 1 is **write-only** under
-  `"metric"`. The metric branch reads the stage tables, not the parent's column 1;
-  `resolve` never touches column 1; `validate_func` is a no-op in the Taylor path;
-  `ascend` does not read it; `world_tree.py` does not interpret it. (Option 1 above
-  would change that, making column 1 load-bearing again.)
+  Note that column 1 is no longer write-only under `"metric"`: D23 reads a seed's cell
+  back out of it, so it is load-bearing at the start of every run.
+
+- **Re-measure the cost.** D23 retires the recorded child counts. Phase 3 needs
+  branching factors from a schedule long enough that the guard releases, and the
+  comparison against `aggressive` has to be redone on the same schedule.
 
 - **An upstream oddity found while wiring step 2, deliberately not fixed.**
   `report_func` (both `dyn_poly_taylor.py` and `dyn_circular_taylor.py`) calls
@@ -812,4 +840,34 @@ Consequence: the Phase 2 child-count and redundancy findings measure the cost of
 Open questions: O6, O7, and now the step 4 design choice (four options under
   "Still to do in Phase 2"), which needs a human decision before Phase 3.
 Next session starts at: that decision, then step 5.
+
+## 2026-09-14 (e) — Phase 2, the D22 fix
+Done:
+  - Option (3) chosen by the human, the principled one: regions are carried explicitly
+    as forms `{d : d^T A d <= 1}`, per stage rather than per leaf (D23).
+  - `core/metric.py`: `region_form_from_box`, `region_axis_extents`,
+    `region_from_metric`, `region_fits_in_one_child`, `lattice_children_for_region`.
+    `lattice_children` is now a thin wrapper, so the old two-metric call is the special
+    case it always looked like.
+  - `core/taylor.py`: `metric_branch_tables` takes the region and returns the new one;
+    `metric_transform_region` replaces `metric_transform_extents`;
+    `metric_seed_region` reads a seed's FFA cell out of column 1.
+  - `prune.py`: `_region_form` seeded in `initialize`, advanced per level. The stage
+    cache is gone — the tables are history-dependent now, and were only ever computed
+    once per level anyway.
+  - `generate_bp_poly_taylor_metric` replays the same recursion, so `B(s)` reports the
+    single child the guard really emits.
+  - D24: column 1 is a full span, not a half-width; C3 corrected, and the metric path
+    now writes `2 * region_axis_extents`.
+  - Full suite **146 passed**, ruff clean.
+Result: the step 4 gate passes at the control's own floor — p95 7.0e-10 / 7.0e-10 /
+  2.8e-9 vs `m_max = 0.2`, matching `aggressive` exactly. Children stay inside
+  `param_limits`. Both strategies complete the 3-level end-to-end run.
+Consequence worth flagging: on the smoke config the metric strategy now emits ONE child
+  per level, because `m_max = 0.2` over a 1-second observation is looser than an FFA
+  cell. Correct, not inert: on 64 segments refinement starts at level 9 and runs
+  9/33/33/29/27/27. The old 869/171/93 counts and the 45x redundancy are retired.
+Open questions: O6, O7. The step 4 design question is closed by D23.
+Next session starts at: step 5 (the consumer audit, now with D24 to check), then
+  re-measuring cost on a schedule long enough to refine, then Phase 3.
 ```
