@@ -577,91 +577,51 @@ Deferral is **not implemented**; the table above is a simulation over the same s
   Deferral is nonetheless **necessary**, not optional: re-covering costs the lattice
   thickness whatever the volume gain, so at `R = 1` the overhead compounds over levels.
 
-## Regime dependence — the correction that matters
+## Regime dependence — the corrected comparison (superseding two earlier attempts)
 
-`prod B(s)` at **equal worst-case leaf mismatch**, optimising `R` for the metric. The
-box reference uses `conservative` error propagation, i.e. an honest bound on its region.
+> **This section has been wrong twice.** First it reported "the metric strategy is not
+> competitive" from a single small config. Then the correction over-swung: it compared
+> the metric against a baseline computed with **`conservative`** error propagation while
+> labelling it "the box", which flattered the metric by up to 6 orders of magnitude.
+> `conservative` is a *different, more expensive strategy*, not an honest accounting of
+> `aggressive`. The table below is the third and, as far as I can check, correct
+> version: the hand-rolled box loop now reproduces `generate_branching_pattern` exactly
+> for `aggressive` (5.314e5 both ways at 67 s / `po=4`), which is the validation the
+> earlier attempts lacked.
 
-| config | box `prod B(s)` | box worst `m` | metric best | ratio |
-|---|---|---|---|---|
-| 16.8 s, 32 seg, `po=3` | 27 | 0.024 | 2 773 (`R=6`) | **103x worse** |
-| 16.8 s, 32 seg, `po=4` | 27 | 0.024 | 1.4e4 (`R=6`) | **521x worse** |
-| 67.1 s, 64 seg, `po=3` | 1.77e5 | 0.047 | 5.05e4 (`R=12`) | **3.5x better** |
-| 67.1 s, 64 seg, `po=4` | 7.41e15 | 0.368 | 1.17e9 (`R=8`) | **6.3e6 x better** |
-| 268 s, 64 seg, `po=4` | 1.48e32 | 0.533 | 8.46e20 (`R=12`) | **1.8e11 x better** |
+`prod B(s)` at **equal worst-case leaf mismatch**, against **both** box strategies. The
+metric column is optimised over the deferral factor `R` to reach `conservative`'s
+mismatch.
 
-**The sign of the answer flips with the regime, and the small config is the misleading
-one.** On the 16.8 s config the box costs 27 with a leaf mismatch of 0.024 and
-`aggressive` under-reports its own region by only **1.003x** — there is no coverage gap
-there to fix, so the metric can only lose. As the baseline and polynomial order grow the
-box degrades on both axes at once: by `po=4` at 268 s it is spending `1e32` branches
-*and* carrying `m = 0.53`, while the metric reaches the same mismatch for `1e21`.
+| config | `aggressive` | `conservative` | metric (at `conservative`'s `m`) |
+|---|---|---|---|
+| 17 s, 32 seg, `po=3` | 27 @ m=0.024 | 27 @ m=0.024 | 147 (`R=16`) |
+| 67 s, 64 seg, `po=3` | 243 @ m=0.038 | 1.77e5 @ m=0.047 | 5.05e4 (`R=12`) |
+| 67 s, 64 seg, `po=4` | 5.31e5 @ m=0.291 | 7.41e15 @ m=0.368 | 1.17e9 (`R=8`) |
+| 268 s, 64 seg, `po=4` | 1.51e12 @ m=0.521 | 1.48e32 @ m=0.533 | 1.35e19 (`R=16`) |
 
-That is the project's premise, quantified, and it holds: the metric exploits the
-correlation between coefficients (D8's ill-conditioning) exactly where an axis-aligned
-box cannot. The covering overhead is real and compounds, but it is a constant factor
-per branch event, whereas the box's penalty grows as a power of the baseline per axis.
+**This is the tiling dilemma, quantified — and the metric lands between the horns.**
+`aggressive` is cheap and gappy; `conservative` is gap-free and, by `po=4`, absurd
+(`1e32`). They diverge by ten to twenty orders of magnitude, and that gap *is* the
+problem the project exists to attack. The metric sits consistently about **a third of
+the way** from `aggressive` to `conservative` on a log scale — 33% at 67 s/`po=4`, 34%
+at 268 s/`po=4`.
 
-**Caveats before anyone quotes these.** They are branching factors, not detections:
-`prod B(s) = 1e32` is not something the box ever realises, since EP caps candidates and
-thresholds hard — the box's real failure there is lost sensitivity, which only
-injection-recovery measures. The comparison also holds *worst-case* mismatch equal,
-which is generous to neither side at `m = 0.5`. And deferral at the winning `R` means
-few branch events, so the pruning-diversity question from the earlier section is still
-open.
+So the honest headline is neither "the metric wins" nor "the metric loses":
 
-- **D27 — Step 5 audit: `"metric"` publishes axis extents, and nothing needs to skip.**
-  Phase 0 traced ten consumers of column 1. Re-checked against what the metric path now
-  writes:
+- against `conservative`, the only gap-free box option, the metric is **6.3e6 x cheaper**
+  at 67 s/`po=4` and **1.1e13 x cheaper** at 268 s/`po=4`;
+- against `aggressive`, it is **2200x** and **8900x** *dearer* at the same two points.
 
-  | consumer | under `"metric"` | action |
-  |---|---|---|
-  | `common.get_leaves` / `poly_taylor_seed` | writes the FFA cell; now **read back** by `metric_seed_region` (D23) | none — the D24 halving makes it consistent |
-  | `poly_taylor_branch_batch` | not on the metric path | none |
-  | `poly_taylor_branch_metric_apply` | writes the region's full span (D24) | none |
-  | `poly_taylor_transform_batch` | writes the transported region's span (D18) | none |
-  | `poly_taylor_report_batch` | gauge-transforms it into the published uncertainty | works; see caveats |
-  | `periodogram.add_run` | writes it out as the `d<name>` columns | works |
-  | `io/cands.py` | persists it to HDF5 | works |
-  | `validate` | no-op in the Taylor path | none |
-  | `ascend`, `world_tree.py` | never read column 1 | none |
-  | `circular`, `chebyshev` | `"metric"` is refused on those bases (D16) | none |
+Whether that trade is worth taking depends entirely on **how much detection
+`aggressive` actually loses to its gaps** — which no branching-factor calculation can
+answer. That is Phase 3 step 3, and it is now unambiguously the decisive experiment.
 
-  So the plan's "use axis extents or skip" resolves to **use axis extents** everywhere,
-  which is what D12/D18/D24 already do. Verified end to end, not just read: a real
-  `prune_dyp_tree` run under each strategy publishes comparable numbers for the same
-  candidate — jerk span 15.99 (box) vs 16.15 (metric), accel 8.39 vs 8.76, frequency
-  0.0741 Hz vs 0.2223 Hz. The frequency span is 3x wider under `"metric"` because on
-  that config it never refines (one child per level, correctly), so it keeps the seed
-  cell where the box split 3x.
-
-  **Two caveats, neither a metric regression.**
-
-  1. `poly_taylor_report_batch` combines column 1 **in quadrature**, i.e. it treats a
-     full cell span as a 1-sigma uncertainty and assumes the axes are independent. They
-     are not — an ellipsoid's bounding box is correlated by construction, and a sheared
-     box is too. This is pre-existing behaviour that the box strategies get as well, so
-     it is out of scope here, but the published `d<name>` should not be read as a
-     Gaussian sigma by either strategy.
-  2. The published span is the ellipsoid's **bounding box**, i.e. the honest marginal
-     extent along each axis. It is deliberately not a covering box (D12): it does not
-     tile, and downstream code must not treat `dfreq` as a cell width it can step by.
-
-  `d_0` and the basis-flag row carry `0` in column 1 under both strategies — neither is
-  a searched axis, so that is correct rather than a gap.
-
-- **D28 — PR #7 cherry-picked to unblock Phase 3 step 2.**
-  `DynamicThresholdScheme.run()` aborts with SIGABRT on this base (nested numba parallel
-  regions), and Phase 3 step 2 is "rerun the Viterbi optimisation for the `metric`
-  strategy" — so threshold recalibration, and everything downstream of it, was blocked.
-  The fix lives on the sibling branch `fix-threshold-nested-parallel` and is **open
-  upstream as PR #7** since 2026-09-10, unmerged.
-
-  Unlike O1, waiting was not viable, so `575b1f5` is cherry-picked onto this branch.
-  It touches only `detection/scoring.py` and `detection/thresholding.py`, is orthogonal
-  to the metric work, and a `git rebase` onto upstream will drop it automatically by
-  patch-id once #7 lands — so D1's "keep the diff upstreamable" survives. Verified:
-  the scheme now runs to completion (2.4 s on a 6-level pattern).
+Two things the table does not say. These are branching factors, not detections: EP caps
+candidates and thresholds hard, so `1e32` is never realised and `conservative`'s real
+failure is that it is unrunnable, while `aggressive`'s is lost sensitivity. And equal
+*worst-case* mismatch at m ~ 0.5 is a poor operating point for anybody; the comparison
+is a like-for-like, not a recommendation.
 
 ## Still to do in Phase 2
 
@@ -1104,4 +1064,27 @@ Phase 2 is now complete: steps 1-6 all done.
 Open questions: O6, O7, and (m_max, R) jointly.
 Next session starts at: Phase 3, on a target-regime config (67 s+, poly_order 4), with
   the four scale factors settled together.
+
+## 2026-09-14 (i) — Phase 3 setup, and a second correction to the cost comparison
+Done:
+  - Phase 3 scoped (D29): the plan's circular-orbit config cannot run, since `"metric"`
+    is refused on the circular basis (D16). Human chose the **Taylor analogue** at
+    `poly_order=4`, 67 s, 64 segments. Figures 8/11/12 will be reproduced in spirit,
+    not literally; the circular extension stays in Phase 4 where the plan put it.
+  - D28: cherry-picked PR #7 (open upstream, unmerged) to unblock threshold
+    recalibration. Verified `DynamicThresholdScheme.run()` now completes.
+  - `docs/metric_gridding/phase3_config.py` — one config for every Phase 3 experiment.
+  - `cost_at_equal_sensitivity.py` rewritten around a validated box reference.
+CORRECTION, the second on this comparison: the previous entry compared the metric
+  against a baseline computed with `conservative` propagation while calling it "the
+  box". That is a different, dearer strategy, and it flattered the metric by up to 6
+  orders. Validated the loop this time — it reproduces `generate_branching_pattern`
+  exactly for `aggressive` — and rebuilt the table against both baselines.
+  Corrected reading: the metric sits ~1/3 of the way from `aggressive` to
+  `conservative` on a log scale, i.e. far cheaper than the only gap-free box option and
+  far dearer than the gappy one. Whether that is a good trade is a detection question.
+Open questions: O6, O7, (m_max, R) jointly.
+Next session starts at: Phase 3 step 2 — recalibrate thresholds for both strategies at
+  P_d = 0.1 on the Taylor-analogue config, then step 3 (injection-recovery), which is
+  now the decisive experiment.
 ```
