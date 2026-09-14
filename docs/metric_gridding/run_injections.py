@@ -6,6 +6,7 @@ this is a CLI: `python run_injections.py <strategy> <n_rep> <snr...>`.
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from pathlib import Path
@@ -27,6 +28,9 @@ def main() -> None:
     n_rep = int(sys.argv[2])
     snrs = [float(x) for x in sys.argv[3:]]
 
+    # The metric strategy's branching is spiky -- a single parent can emit ~1.8e4
+    # children -- so the candidate buffer is not a neutral knob for it (D35).
+    max_sugg = int(os.environ.get("MAX_SUGG", 2**14))
     cfg = make_config(strategy, **KWARGS.get(strategy, {}))
     thresholds = np.load(SCHEMES / f"{strategy}.npz")["thresholds"]
 
@@ -34,12 +38,12 @@ def main() -> None:
         t0 = time.perf_counter()
         recovered, mism, scores = 0, [], []
         for _ in range(n_rep):
-            r = run_one(cfg, INJECTION, snr, max_sugg=2**14, thresholds=thresholds)
+            r = run_one(cfg, INJECTION, snr, max_sugg=max_sugg, thresholds=thresholds)
             recovered += int(r.recovered)
             mism.append(r.best_mismatch)
             scores.append(r.best_score)
         print(
-            f"RESULT {strategy:>13} snr={snr:5.1f} "
+            f"RESULT {strategy:>13} max_sugg=2^{int(np.log2(max_sugg)):<2d} snr={snr:5.1f} "
             f"recovered={recovered}/{n_rep} "
             f"median_m={np.median(mism):11.4g} "
             f"median_score={np.median(scores):7.3f} "
