@@ -301,7 +301,13 @@ def metric_branch_tables(
         offsets_unit = metric.lattice_children_for_region(
             region_parent_unit, g_child, m_max, max_children=branch_max,
         )
-        region_new = metric.region_from_metric(g_child, m_max)
+        # The child is inside its parent's region AND its own ellipsoid, so the
+        # region is the intersection. Taking only the ellipsoid lets the region grow
+        # on unrefined axes, which is what made the branch re-tile forever (D25).
+        region_new = metric.region_intersection(
+            region_parent_unit,
+            metric.region_from_metric(g_child, m_max),
+        )
     # Column 1 is a FULL cell span, not a half-width: `branch_param_padded` reads it
     # as `param_cur -/+ dparam / 2`. (C3 said half-width and was wrong; D24.)
     dparam_unit = 2.0 * metric.region_axis_extents(region_new)

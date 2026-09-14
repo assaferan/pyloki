@@ -535,6 +535,36 @@ def region_from_metric(g: np.ndarray, m_max: float) -> np.ndarray:
     return g / m_max
 
 
+def region_intersection(a_form: np.ndarray, b_form: np.ndarray) -> np.ndarray:
+    """Smallest ellipsoid of the family `t*A + (1-t)*B` containing `A ∩ B`.
+
+    A child lies inside **both** its parent's region and its own mismatch ellipsoid, so
+    its region is the intersection. Taking just the ellipsoid (as this code did before
+    D25) lets the region *grow* on every axis the stage did not actually refine, and
+    since the ellipsoid then shrinks only slowly the covering guard never fires again --
+    the branch re-tiles at every level and pays the covering overhead each time.
+
+    The intersection is not an ellipsoid, so an outer approximation is needed. For any
+    `t` in `[0, 1]`, `x^T A x <= 1` and `x^T B x <= 1` together give
+    `x^T (t A + (1-t) B) x <= 1`, so the whole family is sound; `t` is chosen to
+    minimise the volume, i.e. to maximise `det`. Being an *outer* bound is the safe
+    direction: the covering it feeds can only be conservative.
+    """
+    grid = np.linspace(0.0, 1.0, 1001)
+    forms = grid[:, None, None] * a_form + (1.0 - grid)[:, None, None] * b_form
+    sign, logdet = np.linalg.slogdet(forms)
+    logdet = np.where(sign > 0, logdet, -np.inf)
+    best = int(np.argmax(logdet))
+    lo = grid[max(best - 1, 0)]
+    hi = grid[min(best + 1, grid.size - 1)]
+    fine = np.linspace(lo, hi, 1001)
+    forms = fine[:, None, None] * a_form + (1.0 - fine)[:, None, None] * b_form
+    sign, logdet = np.linalg.slogdet(forms)
+    logdet = np.where(sign > 0, logdet, -np.inf)
+    out = forms[int(np.argmax(logdet))]
+    return 0.5 * (out + out.T)
+
+
 def _whitened_parent_form(
     a_parent: np.ndarray, g_child: np.ndarray, m_max: float,
 ) -> tuple[np.ndarray, np.ndarray]:
