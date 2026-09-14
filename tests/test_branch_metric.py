@@ -27,6 +27,7 @@ from pyloki.core import metric, taylor
 from pyloki.dynamic import PrunePolyTaylorDPFuncts
 from pyloki.prune import Pruning
 from pyloki.utils import psr_utils, transforms
+from pyloki.utils.misc import C_VAL
 from pyloki.utils.snail import MiddleOutScheme
 
 RNG = np.random.default_rng(20260910)
@@ -878,3 +879,113 @@ class TestMetricBranchingPattern:
         cfg = _search_config("metric")
         with pytest.raises(ValueError, match="no approximate branching pattern"):
             cfg.generate_branching_pattern_approx(kind="poly_taylor_moving", ref_seg=1)
+
+
+class TestResolveMismatch:
+    """Phase 2 step 4: what `resolve` costs by snapping children onto `G0`."""
+
+    T_HALF = 0.131
+    T_ADD = 0.393
+
+    @staticmethod
+    def _grid() -> tuple[list[np.ndarray], np.ndarray, np.ndarray]:
+        """Build a 2D base grid in (accel, freq), the axes `resolve` snaps to."""
+        limits = np.array([[-8.0, 8.0], [-4.0, 4.0], [F0 - 1.0, F0 + 1.0]])
+        counts = np.array([1, 8, 16], dtype=np.int64)
+        param_arr = [
+            psr_utils.range_param(
+                limits[i, 0], limits[i, 1], (limits[i, 1] - limits[i, 0]) / counts[i],
+            )
+            for i in range(3)
+        ]
+        return param_arr, counts, limits
+
+    def _leaf_resolving_to(self, accel: float, freq: float) -> np.ndarray:
+        """Build a leaf whose forward map lands exactly on `(accel, freq)`.
+
+        With `coord_init` at the origin and `coord_add` at `T_ADD`, resolve computes
+        `accel_new = d_2 + d_3 * t_a` and `vel_new = d_2 * t_a + d_3 * t_a**2 / 2`.
+        Two equations, two unknowns.
+        """
+        t_a = self.T_ADD
+        vel = C_VAL * (1.0 - freq / F0)
+        d_3 = 2.0 * (accel * t_a - vel) / t_a**2
+        d_2 = accel - d_3 * t_a
+        leaf = np.zeros((1, 5, 2))
+        leaf[0, 0, 0] = d_3
+        leaf[0, 1, 0] = d_2
+        leaf[0, -1, 0] = F0
+        return leaf
+
+    def _mismatch(self, leaves: np.ndarray) -> np.ndarray:
+        param_arr, counts, limits = self._grid()
+        return taylor.metric_resolve_mismatch(
+            leaves,
+            (self.T_ADD, self.T_HALF),
+            (0.0, self.T_HALF),
+            (0.0, self.T_HALF),
+            param_arr,
+            counts,
+            limits,
+            NBINS,
+            DUCY,
+        )
+
+    def test_children_on_grid_centres_cost_nothing(self) -> None:
+        """The floor of the diagnostic: a child already on `G0` loses no mismatch."""
+        param_arr, _, _ = self._grid()
+        leaves = np.concatenate([
+            self._leaf_resolving_to(float(param_arr[-2][i]), float(param_arr[-1][j]))
+            for i, j in ((0, 0), (3, 5), (7, 15))
+        ])
+        m = self._mismatch(leaves)
+        assert np.all(m < 1e-18), f"on-grid children should be free, got {m}"
+
+    def test_half_cell_offset_matches_a_hand_computation(self) -> None:
+        """Half a frequency cell, priced by hand against the base-segment metric."""
+        param_arr, _, _ = self._grid()
+        step = float(param_arr[-1][1] - param_arr[-1][0])
+        # A hair inside the next cell up, so the nearest centre is half a cell away.
+        freq = float(param_arr[-1][5]) + 0.5 * step * (1 - 1e-9)
+        leaf = self._leaf_resolving_to(float(param_arr[-2][3]), freq)
+        got = self._mismatch(leaf)[0]
+
+        d_vel = C_VAL * 0.5 * step / F0
+        g = metric.poly_phase_metric(
+            0.0, -self.T_HALF, self.T_HALF, 2, F0, NBINS, DUCY,
+        )
+        assert got == pytest.approx(g[1, 1] * d_vel**2, rel=1e-5)
+
+    def test_the_metric_region_exceeds_the_whole_search_space(self) -> None:
+        """The step 4 finding, pinned (D22).
+
+        `metric_branch_tables` takes the parent's region to be the `m_max` ellipsoid of
+        the previous stage's metric, computed from the accumulated baseline alone. Over
+        the short baselines of the early pruning levels that ellipsoid is larger than
+        the entire search space -- a 0.13 s baseline constrains almost nothing -- so the
+        covering scatters children far outside `param_limits`, where `resolve` can only
+        clamp them to the grid edge.
+
+        Note what is *not* wrong: on the same baseline the ellipsoid tracks the eta-box
+        to within a factor of a few (see the ratio below). The metric is fine. What is
+        missing is any reference to the region the parent actually occupies.
+        """
+        g_parent = metric.poly_phase_metric(
+            0.0, -self.T_HALF, self.T_HALF, 3, F0, NBINS, DUCY,
+        )
+        ellipsoid = metric.ellipsoid_axis_extents(g_parent, M_MAX)
+        box = psr_utils.poly_taylor_step_d_vec(
+            3, self.T_HALF, NBINS, 1.0, np.array([F0]), t_ref=0,
+        )[0] / 2.0
+        # The metric is not the problem: it agrees with the box to a factor of a few.
+        assert np.all(ellipsoid / box < 100.0)
+
+        # The search space is: half-spans of jerk, accel, and the frequency band.
+        search_half = np.array([8.0, 4.0, C_VAL * 1.0 / F0])
+        ratio = ellipsoid / search_half
+        # A 0.13 s baseline cannot constrain the higher derivatives at all, so the
+        # ellipsoid runs past the whole search range on those axes by 6-8 orders.
+        assert np.all(ratio[:-1] > 1e6), f"jerk/accel should blow out, got {ratio}"
+        # Frequency is the exception: there the ellipsoid is comparable to the band,
+        # which is why the damage shows up as jerk/accel scatter, not a frequency sweep.
+        assert 0.1 < ratio[-1] < 10.0, f"d_1 should be comparable, got {ratio[-1]}"

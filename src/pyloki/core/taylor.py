@@ -419,6 +419,80 @@ def poly_taylor_branch_metric_apply(
     return leaves_branch_batch, batch_origins
 
 
+def metric_resolve_mismatch(
+    leaves_batch: np.ndarray,
+    coord_add: tuple[float, float],
+    coord_cur: tuple[float, float],
+    coord_init: tuple[float, float],
+    param_arr: list[np.ndarray],
+    param_grid_count_init: np.ndarray,
+    param_limits: np.ndarray,
+    nbins: int,
+    ducy: float,
+) -> np.ndarray:
+    """Mismatch each child loses by being resolved onto the base grid `G0`.
+
+    metric_PLAN.md Phase 2 step 4. Under the box strategies a child sits on a
+    rectangular refinement of `G0` by construction, so resolving it is exact up to the
+    cell it was built from. Under `"metric"` children sit wherever the lattice puts
+    them, so `resolve` rounds them to the nearest `G0` cell centre and that rounding is
+    an *extra* mismatch the covering never accounted for.
+
+    This measures it. For each child it replays `poly_taylor_resolve_batch`'s forward
+    map to the added segment, looks up the cell centre actually loaded, and returns the
+    mismatch between the two in the **base-segment** metric -- the metric of the single
+    FFA segment being added, which is the interval over which that fold is valid.
+
+    Returns
+    -------
+    np.ndarray
+        Per-child mismatch, directly comparable to `m_max`. Diagnostic only: nothing in
+        the search consumes it, and this is not called on the hot path.
+
+    Notes
+    -----
+    `G0` is two-dimensional -- `get_nearest_indices_2d_batch` grids only acceleration
+    and frequency -- so the residual lives entirely in `[d_2, d_1]` and the base metric
+    is built at `poly_order=2`. Higher derivatives are not resolved to a grid at all;
+    they enter only through the shift to the segment's epoch.
+    """
+    t0_cur, _ = coord_cur
+    t0_init, _ = coord_init
+    t0_add, t_half_add = coord_add
+
+    param_vec_batch = np.ascontiguousarray(leaves_batch[:, :-1, 0])
+    f0_batch = leaves_batch[:, -1, 0]
+
+    # Exactly poly_taylor_resolve_batch's forward map.
+    dvec_t_add = transforms.shift_taylor_params(param_vec_batch, t0_add - t0_cur)
+    dvec_t_init = transforms.shift_taylor_params(param_vec_batch, t0_init - t0_cur)
+    accel_new = dvec_t_add[:, -3]
+    vel_new = dvec_t_add[:, -2] - dvec_t_init[:, -2]
+    freq_new = f0_batch * (1 - vel_new / C_VAL)
+    param_idx = psr_utils.get_nearest_indices_2d_batch(
+        accel_new,
+        freq_new,
+        param_grid_count_init,
+        param_limits,
+    )
+    # What the loaded fold actually corresponds to: `range_param` lays down cell
+    # centres and the index is the containing cell, so this is the nearest grid point.
+    accel_grid = np.asarray(param_arr[-2])[param_idx[:, -2]]
+    freq_grid = np.asarray(param_arr[-1])[param_idx[:, -1]]
+    vel_grid = C_VAL * (1.0 - freq_grid / f0_batch)
+
+    delta = np.empty((len(leaves_batch), 2), dtype=np.float64)
+    delta[:, 0] = accel_grid - accel_new
+    delta[:, 1] = vel_grid - vel_new
+
+    # g is exactly proportional to f0**2 (D11), so build it once at f0 = 1 and scale.
+    # The window is the added segment, symmetric about its own epoch (D20).
+    g_unit = metric.poly_phase_metric(
+        0.0, -t_half_add, t_half_add, 2, 1.0, nbins, ducy,
+    )
+    return f0_batch**2 * np.einsum("ni,ij,nj->n", delta, g_unit, delta)
+
+
 @njit(cache=True, fastmath=True)
 def poly_taylor_resolve_batch(
     leaves_batch: np.ndarray,

@@ -237,6 +237,24 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    base-grid point it resolves to, using the *base-segment* metric.
    Log the distribution. If the p95 exceeds the per-stage budget, stop
    and discuss (options: denser `G0`, or accept and fold into thresholds).
+
+   **DONE 2026-09-14, and the gate TRIPPED. See DECISIONS.md D22.**
+   `taylor.metric_resolve_mismatch` + `Pruning._log_resolve_mismatch` behind
+   `cfg.metric_resolve_diagnostic`. Measured p95 of **454 / 598 / 5770** against
+   `m_max = 0.2` over three levels. The diagnostic is sound — the same code on
+   `aggressive` children returns p50 = 7e-10.
+
+   Neither of the plan's two anticipated options is the answer, because the cause is
+   not `G0` being too coarse. `metric_branch_tables` infers the parent's region from
+   the accumulated baseline alone and never consults the region the parent actually
+   occupies; on short baselines that `m_max` ellipsoid exceeds the **whole search
+   space** by 9.2e7x in jerk and 4.1e6x in accel, so children land outside
+   `param_limits` and `resolve` can only clamp them. The metric is fine; the scope is
+   wrong. Four candidate fixes are in DECISIONS.md under "Still to do in Phase 2";
+   picking one is a design decision for the human.
+
+   This also reframes the Phase 2 cost findings: the recorded child counts are the
+   cost of covering a region the parent never had.
 5. `validate`, `report`, `ascend`, `io/cands.py`: audit each consumer from
    Phase 0 step 2; make `metric` strategy either use axis extents or skip.
 6. `dynamic/dyn_poly_taylor.py`: dispatch only. No logic here.
@@ -285,10 +303,15 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
 - Shape/`batch_origins` contract identical to the existing branch function.
 
 Exit criterion: coverage test green; redundancy known; `aggressive` path
-untouched. **All three met.** As of 2026-09-14 steps 1, 2, 3 and 6 are done and
-`tiling_strategy="metric"` completes a real `prune_dyp_tree` run over three pruning
-levels, threshold scheme included; `aggressive` completes the identical run unchanged.
-Steps 4 (the `resolve` diagnostic) and 5 (the consumer audit) remain.
+untouched. Steps 1, 2, 3, 4 and 6 are done and `tiling_strategy="metric"` completes a
+real `prune_dyp_tree` run over three pruning levels, threshold scheme included;
+`aggressive` completes the identical run unchanged. Step 5 (the consumer audit) remains.
+
+**But the exit criterion should not be read as met.** Step 4 (D22) showed the coverage
+test is self-consistent rather than correct: it asks whether children cover the
+stage-(s-1) `m_max` ellipsoid, which is the same over-large region the branch wrongly
+assumes the parent occupies. Phase 3 must not start until that scope bug is fixed, since
+both the detection claim and the cost claim depend on it.
 
 ---
 
