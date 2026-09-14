@@ -650,6 +650,19 @@ open.
   `d_0` and the basis-flag row carry `0` in column 1 under both strategies — neither is
   a searched axis, so that is correct rather than a gap.
 
+- **D28 — PR #7 cherry-picked to unblock Phase 3 step 2.**
+  `DynamicThresholdScheme.run()` aborts with SIGABRT on this base (nested numba parallel
+  regions), and Phase 3 step 2 is "rerun the Viterbi optimisation for the `metric`
+  strategy" — so threshold recalibration, and everything downstream of it, was blocked.
+  The fix lives on the sibling branch `fix-threshold-nested-parallel` and is **open
+  upstream as PR #7** since 2026-09-10, unmerged.
+
+  Unlike O1, waiting was not viable, so `575b1f5` is cherry-picked onto this branch.
+  It touches only `detection/scoring.py` and `detection/thresholding.py`, is orthogonal
+  to the metric work, and a `git rebase` onto upstream will drop it automatically by
+  patch-id once #7 lands — so D1's "keep the diff upstreamable" survives. Verified:
+  the scheme now runs to completion (2.4 s on a 6-level pattern).
+
 ## Still to do in Phase 2
 
 - **Step 5** — the consumer audit. Phase 0 traced ten consumers of column 1; the ones
