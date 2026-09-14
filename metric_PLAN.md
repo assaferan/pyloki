@@ -342,6 +342,20 @@ with `metric`. Config for all: 18-min observation, 128 segments, `η = 1.0`,
 `N_b = 64`, circular-orbit search with `P_orb^min = T_obs`,
 `m_c,max = 10 M⊙`, `m_p,min = 1.2 M⊙`, spin period 7 ms, unless stated.
 
+**AMENDED 2026-09-14 (D29): the config above cannot run.** A circular-orbit search is
+`prune_poly_order = 5`, and `"metric"` is refused on the circular basis (D16) because
+`core/metric.py` builds `g` on the Taylor kinematic basis. Phase 3 therefore runs a
+**Taylor analogue** — `poly_order = 4`, 67 s, 64 segments — pinned in
+`docs/metric_gridding/phase3_config.py`. That is the regime where the aggressive /
+conservative cost gap actually opens (ten orders at `po=4`), so it tests the same
+mechanism; but the paper's Figures 8/11/12 are circular-orbit panels, so these
+reproduce them in spirit and not literally. The circular extension stays in Phase 4,
+where the plan put it — pulling it forward would repeat the step-6 ordering error.
+
+Also amended: experiments must be run against **both** `aggressive` and `conservative`.
+The dilemma is the distance between them, and comparing against either one alone
+misstates the result — as two earlier attempts in DECISIONS.md did.
+
 1. **Figure 7 analogue** — cumulative `∏ B(s)` versus stage. Expectation:
    `metric` lies near the aggressive curve. If it is near the quadrature
    curve, the covering is too redundant; revisit lattice / margin.
