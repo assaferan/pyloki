@@ -266,6 +266,16 @@ Deliverables: changes in `config.py`, `utils/transforms.py`,
    level 9 and runs 9 / 33 / 33 / 29 / 27 / 27. Phase 3 must re-measure.
 5. `validate`, `report`, `ascend`, `io/cands.py`: audit each consumer from
    Phase 0 step 2; make `metric` strategy either use axis extents or skip.
+
+   **DONE 2026-09-14 (D27): axis extents everywhere, no code change needed.**
+   Of the ten consumers Phase 0 traced, `validate` is a no-op, `ascend` and
+   `world_tree.py` never read column 1, `branch` reads the per-stage tables instead,
+   and `circular`/`chebyshev` refuse `"metric"` outright (D16). What is left is the
+   publishing path, which already receives the region's per-axis full span from
+   D12/D18/D24. Verified end to end: both strategies publish comparable spans for the
+   same candidate. Two pre-existing caveats are recorded in D27 — `report` combines
+   column 1 in quadrature as if the axes were independent, and the published span is a
+   bounding box that does not tile.
 6. `dynamic/dyn_poly_taylor.py`: dispatch only. No logic here.
 
    **AMENDED 2026-09-10 — this step was blocked as originally written.**

@@ -1180,3 +1180,73 @@ class TestDeferFactor:
                 **{**attrs.asdict(_search_config("metric")),
                    "metric_defer_factor": 0.5},
             )
+
+
+class TestReportConsumers:
+    """Phase 2 step 5: the consumers that *publish* column 1.
+
+    Phase 0 traced ten consumers. Only three interpret column 1's semantics, and under
+    `"metric"` two of them are inert: `validate` is a no-op in the Taylor path and
+    `branch` reads the per-stage tables rather than the parent's column. What is left is
+    the publishing path -- `poly_taylor_report_batch` -> `periodogram.add_run` ->
+    `io/cands.py` -- which the plan says must "use axis extents or skip". It uses them.
+    """
+
+    @staticmethod
+    def _metric_leaf() -> tuple[np.ndarray, np.ndarray]:
+        """One metric leaf, plus the per-axis full span it should be carrying."""
+        _, dparam_unit, _ = branch_tables(3)
+        leaf = np.zeros((1, 5, 2))
+        leaf[0, :-2, 0] = [1.0e-3, 2.0e-3, 5.0e2]
+        leaf[0, :-2, 1] = dparam_unit / F0
+        leaf[0, -2, 0] = 0.25
+        leaf[0, -1, 0] = F0
+        return leaf, dparam_unit / F0
+
+    def test_report_publishes_the_region_span(self) -> None:
+        leaf, span = self._metric_leaf()
+        out = taylor.poly_taylor_report_batch(leaf)
+        v_final, dv_final = leaf[0, -3, 0], leaf[0, -3, 1]
+        s = 1.0 - v_final / C_VAL
+
+        # Velocity becomes frequency, and its span converts with it.
+        assert out[0, -3, 0] == pytest.approx(F0 * s)
+        assert out[0, -3, 1] == pytest.approx(F0 * dv_final / C_VAL)
+        # The higher axes keep their span up to the gauge factor.
+        expected = np.sqrt(
+            (span[:-1] / s) ** 2
+            + (leaf[0, :-3, 0] / (C_VAL * s**2)) ** 2 * dv_final**2,
+        )
+        np.testing.assert_allclose(out[0, :-3, 1], expected, rtol=1e-12)
+
+    def test_d0_and_the_basis_flag_carry_no_span(self) -> None:
+        """True for the box too -- neither is a searched axis (not a metric quirk)."""
+        leaf, _ = self._metric_leaf()
+        out = taylor.poly_taylor_report_batch(leaf)
+        assert out[0, -2, 1] == 0.0
+        assert out[0, -1, 1] == 0.0
+
+    def test_published_span_is_the_full_width_not_a_half_width(self) -> None:
+        """D24, at the point a user actually reads it.
+
+        `periodogram.add_run` writes column 1 straight out as `d<name>`, so the number
+        in the candidate table is a full cell span for both strategies. If the metric
+        path ever reverts to writing half-widths, the two become silently
+        incomparable -- which is what D24 fixed.
+        """
+        _, _, region = branch_tables(3)
+        _, dparam_unit, _ = branch_tables(3)
+        np.testing.assert_allclose(
+            dparam_unit, 2.0 * metric.region_axis_extents(region), rtol=1e-12,
+        )
+
+    def test_validate_is_a_no_op_so_there_is_nothing_to_audit(self) -> None:
+        """Pins the Phase 0 correction to the plan's step-5 list."""
+        cfg = _search_config("metric")
+        funcs = _dp_functs(cfg)
+        leaves = np.zeros((3, 5, 2))
+        leaves[:, -1, 0] = F0
+        origins = np.arange(3)
+        out, out_org = funcs.validate(leaves, origins, (0.0, T_CHILD))
+        np.testing.assert_array_equal(out, leaves)
+        np.testing.assert_array_equal(out_org, origins)
