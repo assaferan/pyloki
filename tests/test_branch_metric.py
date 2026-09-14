@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
+import attrs
 import numpy as np
 import pytest
 from numba import njit, prange
@@ -1108,3 +1109,74 @@ class TestRegionIntersection:
         np.testing.assert_allclose(
             metric.region_intersection(inner, outer), inner, rtol=1e-9,
         )
+
+
+class TestDeferFactor:
+    """D26: `metric_defer_factor` — how far a region may overhang before re-covering."""
+
+    def test_overhang_is_one_for_an_exactly_matching_region(self) -> None:
+        _, g_child = metrics_for(3, 1.0)
+        region = metric.region_from_metric(g_child, M_MAX)
+        assert metric.region_overhang(region, g_child, M_MAX) == pytest.approx(1.0)
+
+    @pytest.mark.parametrize("scale", [0.5, 1.0, 2.0, 5.0])
+    def test_overhang_tracks_a_uniform_dilation(self, scale: float) -> None:
+        """Scaling a region by `s` must move the overhang to `s`."""
+        _, g_child = metrics_for(3, 1.0)
+        region = metric.region_from_metric(g_child, M_MAX) / scale**2
+        assert metric.region_overhang(region, g_child, M_MAX) == pytest.approx(scale)
+
+    def test_defer_factor_one_is_exact_containment(self) -> None:
+        """The default must keep the `m_max` guarantee for every leaf."""
+        _, g_child = metrics_for(3, 1.0)
+        just_outside = metric.region_from_metric(g_child, M_MAX) / 1.01**2
+        assert not metric.region_fits_in_one_child(just_outside, g_child, M_MAX)
+        just_inside = metric.region_from_metric(g_child, M_MAX) * 1.01**2
+        assert metric.region_fits_in_one_child(just_inside, g_child, M_MAX)
+
+    def test_a_larger_factor_defers_branching(self) -> None:
+        _, g_child = metrics_for(3, 1.0)
+        region = metric.region_from_metric(g_child, M_MAX) / 2.5**2  # overhang 2.5
+        assert not metric.region_fits_in_one_child(region, g_child, M_MAX, 1.0)
+        assert not metric.region_fits_in_one_child(region, g_child, M_MAX, 2.0)
+        assert metric.region_fits_in_one_child(region, g_child, M_MAX, 3.0)
+
+    def test_deferring_emits_one_child_and_keeps_the_region(self) -> None:
+        """Branching deferred means the parent rides on unchanged, as the box does."""
+        region = parent_region(3)
+        g_child = metric.poly_phase_metric(
+            0.0, DELTA_T - T_CHILD, DELTA_T + T_CHILD, 3, 1.0, NBINS, DUCY,
+        )
+        overhang = metric.region_overhang(region, g_child, M_MAX)
+        assert overhang > 1.0, "test is vacuous unless the region really overhangs"
+
+        # Just under the overhang: still branches.
+        offsets, _, _ = taylor.metric_branch_tables(
+            region, T_CHILD, DELTA_T, NBINS, DUCY, 3, M_MAX, 500_000,
+            overhang * 0.99,
+        )
+        assert len(offsets) > 1
+
+        # Just over it: one child, and the region rides on untouched.
+        offsets, _, region_new = taylor.metric_branch_tables(
+            region, T_CHILD, DELTA_T, NBINS, DUCY, 3, M_MAX, 500_000,
+            overhang * 1.01,
+        )
+        assert len(offsets) == 1
+        np.testing.assert_array_equal(offsets, np.zeros((1, 3)))
+        np.testing.assert_array_equal(region_new, region)
+
+    def test_below_one_is_rejected(self) -> None:
+        _, g_child = metrics_for(3, 1.0)
+        with pytest.raises(ValueError, match="defer_factor"):
+            metric.region_fits_in_one_child(parent_region(3), g_child, M_MAX, 0.5)
+
+    def test_config_default_keeps_the_guarantee(self) -> None:
+        """Shipping a relaxed default would silently weaken every metric run."""
+        fields = {f.name: f for f in PulsarSearchConfig.__attrs_attrs__}
+        assert fields["metric_defer_factor"].default == 1.0
+        with pytest.raises(ValueError, match="metric_defer_factor"):
+            _search_config("metric").__class__(
+                **{**attrs.asdict(_search_config("metric")),
+                   "metric_defer_factor": 0.5},
+            )
