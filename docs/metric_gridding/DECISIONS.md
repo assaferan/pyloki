@@ -1496,4 +1496,53 @@ Open questions: unchanged — the pruning interaction (needs injections) and the
   Chebyshev/circular transforms.
 Next session starts at: posting `04_upstream_report.md` once reviewed, then either the
   injection test of the pruning interaction or closing the branch.
+
+## 2026-09-16 (q) — the pruning interaction, and D39's conclusion refuted
+Done:
+  - `docs/metric_gridding/pruning_multiplicity.py`: follows the true signal down the
+    tree with the shipped `poly_taylor_branch_batch` / `poly_taylor_transform_batch`,
+    keeping every leaf within one claimed width of the truth and transporting the truth
+    with the same `T`. Measures the excursion to the **nearest** leaf centre, not to the
+    centre of the cell the signal happens to sit in.
+  - **D43 — D39's conclusion is wrong, and the mechanism it rests on is still right.**
+    `sensitivity_loss.py` sampled offsets inside a cell and measured from *that* cell's
+    centre, which is only the right quantity at covering multiplicity 1. The box
+    strategies over-claim under transport, so sibling cells overlap and the signal is
+    covered many times over. 12 random signal positions, `n_seed=1` (81 base cells):
+
+    | strategy | nearest excursion (median) | worst signal | multiplicity | mismatch at nearest |
+    |---|---|---|---|---|
+    | `aggressive` | 1.89 | 3.09 | 1 | 0.00878 |
+    | `quadrature` | 0.617 | 1.07 | 3696 | 0.00210 |
+    | `conservative` | 0.615 | 1.35 | 13042 | 0.00205 |
+
+    So redundancy *does* buy sensitivity: 3.1x in phase error (per-signal 1.8-4.9x), and
+    `aggressive` alone fails to deliver `eta / N_b` (1.89 > 1) while the redundant
+    strategies keep it. D39's cell-size mechanism (D41) is unaffected and still verified
+    -- the cell is criterion-set -- but "it can buy cost and never sensitivity" does not
+    follow from it, because effective template *density* is not the cell size.
+  - **D44 — the gain is 0.34% in S/N, which settles the pruning question without
+    injections.** Converting the nearest-leaf mismatch to amplitude: 0.44% loss for
+    `aggressive` against 0.105% for `quadrature`, i.e. an S/N ratio of 1.0034. Against
+    that, step 2's recalibrated ladders differ by far more (top threshold 7.70 for
+    `aggressive` vs 9.10 for `conservative`), and at equal `P_d` `aggressive` is 2^41.8
+    cheaper than `conservative`. A 0.34% amplitude edge cannot survive a threshold
+    ladder that much higher, and no injection run at these statistics could resolve it.
+    The pruning interaction is therefore real in mechanism and negligible in magnitude.
+  - **D45 — `conservative` is strictly dominated by `quadrature`**: identical nearest
+    excursion (0.615 vs 0.617) and mismatch (0.00205 vs 0.00210) for `2^15` times the
+    cost (1.48e32 vs 1.10e17). Worth reporting upstream on its own.
+Process note: two bookkeeping artefacts were caught and fixed before they became
+  findings. Seeding a single base cell charged the signal's drift out of that family to
+  the strategy and produced a spurious 86.5x worst case for `aggressive` (3.09 once a
+  81-cell block is seeded, as the real search does). A +/-3-cell tracking window was
+  also unaffordable and unnecessary; results are stable between window 1 and 2, and
+  against an 10x larger tracked-leaf cap.
+Conventions fixed: nearest-leaf excursion, not own-cell excursion, is the sensitivity
+  quantity whenever multiplicity > 1. `sensitivity_loss.py` numbers stand as own-cell
+  measurements and must not be quoted as sensitivity for the redundant strategies.
+Open questions: the Chebyshev/circular transforms remain untested (not unit-diagonal
+  triangular, so neither D36 nor D41 carries over). The pruning interaction is closed.
+Next session starts at: `04_upstream_report.md` needs rewriting around D43/D44/D45 --
+  its current headline ("buys no sensitivity") is refuted by D43 and must not be posted.
 ```

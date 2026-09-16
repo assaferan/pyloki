@@ -1,55 +1,110 @@
 # 04_upstream_report.md — draft report for pravirkr/pyloki
 
 Status: **draft, not yet posted.** Upstream has Discussions disabled, so this would be an
-issue. Numbers re-verified 2026-09-16; see DECISIONS.md session (p).
+issue. Rewritten 2026-09-16 around D43-D46; the previous headline ("`tiling_strategy`
+buys no sensitivity") was refuted by D43 and must not be posted. Numbers verified in
+session (q).
 
-**Title:** `tiling_strategy` cannot affect the final grid cell, so `quadrature`/`conservative` buy no sensitivity for their cost
+---
 
-Section 5.2.4 of the paper closes by asking for the sensitivity loss of aggressive tiling to be quantified. I measured it, and the answer is more specific than expected: the choice of `tiling_strategy` has no effect on sensitivity at all.
+**Title:** Taylor grid: the cell corner costs `(2^(k_max-1) - 1/2) * eta/N_b`, so `eta` is not the phase bound it looks like
 
-Sampling parameter offsets uniformly inside each leaf's own cell and evaluating the incurred phase error against the promised `eta / N_b` (268.4 s, 64 segments, `poly_order=4`, `N_b=64`, `eta=1.0`, 7 ms spin period), in units of that tolerance:
+Everything below is the **Taylor basis** (`poly_basis="taylor"`, the shipped default).
+The Chebyshev path transforms differently and I have not measured it; see Scope.
 
-| `tiling_strategy` | median over stages | worst corner | `prod B(s)` |
-|---|---|---|---|
-| `aggressive` | 3.35 | 16.80 | 1.5e12 |
-| `quadrature` | 3.58 | 14.38 | 1.1e17 |
-| `conservative` | 3.42 | 14.20 | 1.5e32 |
+Section 5.2.4 asks for the sensitivity loss of aggressive tiling to be quantified. The
+largest term turns out not to be the tiling at all — it is in the grid criterion itself,
+and it has a closed form.
 
-Twenty orders of magnitude of cost, and the phase error is the same to within the sampling noise.
+### The corner of the optimal grid
 
-### Why
+Eq. `dk_criteria` promises `|dPhi| <= eta/N_b`. Eq. `dk_optimal` sets
 
-`branch_param_padded` (`utils/psr_utils.py:360-368`) sets
+    Delta d_k^opt = 2^(k-1) * (c/f_max) * (eta/N_b) * k!/t_s^k
 
-```python
-num_points = max(1, math.ceil(dparam_cur / dparam_new - FLOAT_EPSILON))
-dparam_new_actual = dparam_cur / num_points
-```
+Each axis is bounded *independently*, so a signal at the corner of the cell — offset by
+half a step on every axis at once — incurs the sum. Axis `k` contributes
 
-so a branched child cell is `dparam_cur / ceil(dparam_cur / dparam_new)`, which is always `<= dparam_new` and depends on `dparam_cur` only through the integer `ceil`. The complementary case is in `core/taylor.py:148-154`: when the accumulated shift on an axis is below `eta`, the axis is not branched at all and keeps its `dparam_cur`.
+    (Delta d_k^opt / 2) * (f_max/c) * t_s^k/k!  =  2^(k-2) * eta/N_b
 
-Either way the criterion, not the transport, fixes the scale: a branched axis is pulled to just under `dparam_new`, and an unbranched one is by construction still within tolerance. The transported width survives only as the `ceil` remainder and as the slack in that guard, which is why the measured cells sit within a factor of two of the criterion on both sides.
+and summing `k = 1..k_max` telescopes:
 
-`shift_taylor_errors` is what the three strategies differ in, and it sets only `dparam_cur`. So the strategy controls how much redundant subdivision happens on the way to the cell, never the cell itself. Measured final half-widths against the criterion step `[9.7e-3, 0.163, 3.64, 122]`:
+    corner phase error = (2^(k_max-1) - 1/2) * eta/N_b
 
-| `aggressive` | `[1.10e-2, 0.123, 5.00, 96.4]` |
-| `quadrature` | `[1.10e-2, 0.288, 4.02, 133]` |
-| `conservative` | `[1.10e-2, 0.344, 6.99, 239]` |
+Verified against `psr_utils.poly_taylor_step_d_vec` for `k_max = 2..8`, exact to machine
+precision and **independent of `t_s` and `f_max`** (both cancel):
 
-All within a factor of two of the criterion, on both sides — cells can exceed it where the shift guard skipped branching. This also means the geometric inflation that Figure `moving_reference` costs out is pure overhead in the current branching implementation — it cannot translate into coverage, because the cell it produces is re-refined to the criterion at the next stage regardless.
+| `poly_order` | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|
+| corner, in `eta/N_b` | 1.5 | 3.5 | 7.5 | 15.5 | 31.5 | 63.5 | 127.5 |
 
-### Separately: what `eta` delivers
+At the default `poly_order = 4` the corner costs **7.5x** the nominal tolerance; at
+`poly_order = 5`, which is what a circular-orbit search runs, **15.5x**. The `2^(k-1)`
+coarsening is sound per coefficient — it comes from `|T_k| <= 1` in the Chebyshev basis
+(appendix `app:optimal_gridding`) — but applied as independent bounds on monomial `d_k`
+cells it is the same factor that makes the corner sum grow geometrically.
 
-The same measurement pins what `eta` means for the shipped default, and it is not what eq. `grid_criteria` suggests. Two self-checks:
+So `eta` regulates grid density, not the worst-case phase error, and the gap widens by
+`2x` per polynomial order. Anyone reading `eta = 1` as "at most one bin of drift" is
+optimistic by `7.5x` at `poly_order=4`. The amplitude cost is second order and therefore
+much gentler (below), but the phase bound is not what the symbol suggests.
 
-- the naive per-axis grid (`use_cheby=False`) costs exactly one tolerance at a full step — the promise is kept per axis, to 1e-6;
-- the shipped grid is coarser by exactly `2**(k-1)` on the order-`k` axis, i.e. eq. `dk_optimal` / appendix `app:optimal_gridding`, as intended.
+### What the tiling strategies actually buy
 
-The coarsening is per-coefficient and derived in the Chebyshev basis, where `|T_k| <= 1` bounds each coefficient independently. Applied as independent bounds on monomial `d_k` cells, a signal offset in several coefficients at once accumulates: hence `3.4x` for a typical signal and `~15x` at a corner. So a sensitivity estimate taken from `eta` alone is optimistic by about a factor of three under the recommended `aggressive` Taylor default. Tightening `eta` to recover the nominal budget is the remedy 5.2.4 already suggests; this just puts a number on how much.
+Two things that were not obvious to me, both measured at 268.4 s / 64 segments /
+`poly_order=4` / `N_b=64` / `eta=1`:
 
-### Caveats
+The final cell is set by the **criterion**, not by what transport delivered.
+`branch_param_padded` (`utils/psr_utils.py:360-368`) uses
+`num_points = ceil(dparam_cur/dparam_new)` and returns `dparam_cur/num_points`, so a
+branched axis lands just under `dparam_new` whatever `dparam_cur` was; the complementary
+case in `core/taylor.py:148-154` leaves an axis unbranched while its shift is below
+`eta`. Measured final half-widths agree within the factor of two that the `ceil` and
+that guard allow, across strategies differing by `10^20` in `prod B(s)`.
 
-Deterministic geometry only. Pruning is not modelled, and it is the one place a wider claimed region could still help — a signal near a cell edge may sit in a leaf that was thresholded away, and a strategy claiming more territory keeps more such leaves alive. That is a threshold-scheme interaction and needs injections to settle; nothing here rules it out. Taylor basis only: the Chebyshev and circular transforms are not unit-diagonal triangular, so the argument above does not carry over to them.
+But the strategies still differ in sensitivity, through **redundancy** rather than cell
+size. `quadrature` and `conservative` over-claim under transport, so sibling cells
+overlap and the signal is covered many times; the template that scores is the *nearest*,
+not the one whose cell contains it. Following the true signal down the tree (12 random
+signal positions, seeding an 81-cell base block as the real search does):
 
-Reproducer: `docs/metric_gridding/sensitivity_loss.py` on
-https://github.com/assaferan/pyloki/tree/metric-gridding — self-contained, pure NumPy, carries the two self-checks above. Happy to open a PR adding it as a test if useful.
+| strategy | nearest-template phase error | worst signal | leaves covering the signal | mismatch |
+|---|---|---|---|---|
+| `aggressive` | 1.89 | 3.09 | 1 | 0.0088 |
+| `quadrature` | 0.617 | 1.07 | ~3 700 | 0.0021 |
+| `conservative` | 0.615 | 1.35 | ~13 000 | 0.0021 |
+
+`aggressive` partitions exactly (multiplicity 1), and is the one strategy that does not
+deliver `eta/N_b` even in this averaged sense. The redundant strategies do, and the
+phase-error gain is `3.1x` (per-signal 1.8-4.9x). In amplitude, though, that gain is
+about **0.34% in S/N** (0.44% loss against 0.105%) — second order, so three orders of
+magnitude of extra branching buy a third of a percent.
+
+### The one actionable item
+
+**`conservative` is strictly dominated by `quadrature`.** Same nearest-template error
+(0.615 vs 0.617), same mismatch (0.0021), for `2^15` times the cost
+(`prod B(s)` 1.48e32 vs 1.10e17). If `conservative` is kept as an option it is worth
+saying in the docstring that it buys nothing over `quadrature`.
+
+### Scope
+
+- **Taylor basis only.** `T(delta_t)` is lower-triangular with unit diagonal here, which
+  is what makes the box strategies' cells tile and the corner analysis clean. The
+  Chebyshev interval-change matrix mixes orders off-diagonally, so none of the tiling
+  results above transfer to `poly_basis="chebyshev"`, and I have not measured that path.
+  The closed form for the corner is basis-independent in derivation but is stated for the
+  Taylor kinematic grid.
+- **Deterministic geometry.** The nearest-template numbers are geometric; they do not
+  model pruning. The 0.34% amplitude edge is far smaller than the difference between the
+  recalibrated threshold ladders (top threshold 7.70 for `aggressive` vs 9.10 for
+  `conservative` at equal `P_d`), so I would not expect it to survive a real search, and
+  no injection run at reachable statistics could resolve it either way.
+- Mismatch figures are second-order estimates from a parameter-space metric built for
+  this work, not from folded S/N.
+
+Reproducers on https://github.com/assaferan/pyloki/tree/metric-gridding :
+`docs/metric_gridding/sensitivity_loss.py` (corner closed form, self-checks) and
+`docs/metric_gridding/pruning_multiplicity.py` (nearest-template and multiplicity).
+Happy to open a PR adding the closed-form check as a test — it is three lines and it
+pins eq. `dk_optimal` against the code.
