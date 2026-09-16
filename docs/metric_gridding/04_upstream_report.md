@@ -1,11 +1,29 @@
 # 04_upstream_report.md — draft report for pravirkr/pyloki
 
-Status: **draft, not yet posted.** Upstream has Discussions disabled, so this would be an
-issue. Rewritten 2026-09-16 around D43-D46; the previous headline ("`tiling_strategy`
-buys no sensitivity") was refuted by D43 and must not be posted. Numbers verified in
-session (q).
+Status: **NOT PUBLISHABLE. Do not post any part of this.** Both load-bearing claims
+below were withdrawn in session (r), 2026-09-16:
+
+- the **headline** reading of D46 ("`eta` is optimistic by 7.5x") is retracted by D48.
+  The 7.5x is the distance to the *containing cell's* centre; a search enumerates every
+  grid point, so the operative quantity is the covering radius, measured at 0.58 to a
+  neighbouring centre and 0.50 over a wider lattice. The grid covers at O(1). The
+  closed form itself is exact and survives — only what it *measures* was misread.
+- the **nearest-template table** (D43) is retracted by D47. The tracked-leaf cap binds
+  in 37-61 of 63 stages for `quadrature`/`conservative`, and the reported minimum is
+  not monotone in the search width, which a true minimum cannot be. `aggressive`'s
+  entry survives, converged and cap-free, but at **~1.09**, not the 1.89 below.
+
+Consequently D44 (0.34% in S/N) and D45's sensitivity half are withdrawn too, the
+pruning interaction is **re-opened**, and D39's conclusion is undetermined rather than
+refuted. What is left that would survive review: the closed form as arithmetic (D46
+with the `t = t_s` hypothesis), the covering radius O(1) reading (D48), and
+`aggressive`'s ~1.09 (D49). That is a different and much shorter report, and it needs a
+cap-free nearest-template method before the strategy comparison can go in at all.
+
+The text below is kept verbatim as the withdrawn draft, for the record only.
 
 ---
+
 
 **Title:** Taylor grid: the cell corner costs `(2^(k_max-1) - 1/2) * eta/N_b`, so `eta` is not the phase bound it looks like
 

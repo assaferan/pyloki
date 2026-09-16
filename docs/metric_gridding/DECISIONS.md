@@ -1561,4 +1561,68 @@ Open questions: the Chebyshev/circular transforms remain untested (not unit-diag
 Next session starts at: `04_upstream_report.md` has been rewritten around D46 (headline)
   plus D43-D45; it is reviewed-but-unposted, pending the human. The old headline
   ("buys no sensitivity") was refuted by D43 and is gone.
+
+## 2026-09-16 (r) — RETRACTIONS: D43/D44/D45 withdrawn, D46 reinterpreted
+Done:
+  - **D47 — `pruning_multiplicity.py` is unsound for multiplicity > 1, and the proof is
+    internal.** Widening the tracking window can only *add* candidate leaves, so the
+    reported minimum must be non-increasing. Measured, 6 signal positions:
+
+    | window | `aggressive` | `quadrature` | `conservative` |
+    |---|---|---|---|
+    | 1.0 | 1.6889 | 0.6173 | 0.6681 |
+    | 2.0 | 1.1751 | 0.5662 | 0.7931 |
+    | 3.0 | 1.0897 | 0.9957 | 4.6284 |
+    | 4.0 | 1.0857 | 1.0554 | 10.4606 |
+    | 6.0 | 1.0857 | 1.0314 | 6.4246 |
+
+    `aggressive` is monotone and converges; the other two rise and wander, which a true
+    minimum cannot do. Cause: `MAX_TRACKED` keeps the best 20000 leaves *by current
+    excursion*, discarding leaves that would become nearest after later branching. It
+    binds in **37-60 of 63 stages for `quadrature`, 58-61 for `conservative`, and 0 of
+    63 for `aggressive` at window <= 3**. The earlier cap check (20000 vs 200000 at
+    window 1) was not a sensitive enough test and gave false reassurance.
+  - **D43 quantitative claim — WITHDRAWN.** The *principle* stands and is now sharpened:
+    nearest-template rather than own-cell is the sensitivity quantity whenever the
+    signal has more than one template near it -- which, per D48, is true even on the
+    base grid, so it was never specific to redundant tiling. The 1.89 / 0.617 / 0.615
+    table and the "3.1x gain" are gone: 1.89 was a too-narrow window (converges to
+    1.09) and the other two are cap artefacts.
+  - **D44 — WITHDRAWN.** It was a conversion of the withdrawn 3.1x. **This reopens the
+    pruning interaction**, which (q) wrongly recorded as closed; the injection campaign
+    is not cancelled.
+  - **D45 — WITHDRAWN as to sensitivity** (rested on 0.615 vs 0.617, both cap
+    artefacts). The cost side, `prod B(s)` 1.48e32 vs 1.10e17, is unaffected.
+  - **D48 — D46's arithmetic stands; its interpretation is retracted.** The corner
+    figure is the distance to the *containing cell's* centre, and a search enumerates
+    every grid point, so the operative quantity is the covering radius. Verified at
+    `k_max=4`: own-cell 7.5, best adjacent centre (±half-step per axis) **0.5829**,
+    best over integer offsets in -2..2 **0.5000**. The coarsened coefficients are
+    Chebyshev-like, so a sign choice makes the polynomial nearly cancel over the
+    interval instead of adding. Also verified: the naive uncoarsened grid's own-cell
+    corner is exactly `k_max/2`, so the geometric growth is *entirely* the `2^(j-1)`
+    coarsening, and the mechanism is not `|T_k| <= 1`. So "`eta` is optimistic by 7.5x"
+    is wrong and must not be published; on this evidence the grid covers at O(1) and the
+    coarsening is economization working, not a defect.
+  - **D49 — what survives as a defensible number.** `aggressive`'s nearest-template
+    error converges to **~1.09 tolerances** (window-converged at 4 and 6, cap never
+    binds, 6 signal positions). Under the shipped default the nearest template sits
+    roughly one tolerance from the signal. Cap-free, and the one Table 2 entry to keep.
+  - **D39's conclusion is back to undetermined**, *not* vindicated. There is no sound
+    measurement either way for the redundant strategies.
+Process failure worth naming: I published a table into a report and told a peer session
+  the pruning question was "closed analytically" on the strength of a measurement whose
+  convergence I had not tested. The window sweep that broke it costs seconds and should
+  have been the first thing run, not the last. The peer's internal-inconsistency
+  argument -- that my own 1.89 contradicted my own 7.5 headline three sections apart --
+  is what exposed it; I had both numbers in one document and did not reconcile them.
+Conventions fixed: any "nearest template" measurement must report a window/cap
+  convergence sweep, and must state at how many stages the cap binds. A minimum that is
+  not monotone in the search width is an artefact, full stop.
+Open questions: a cap-free method for multiplicity > 1. The leaf set is a Cartesian
+  product per axis, so branch-and-bound over the product with a per-axis bound on the
+  sup-norm contribution is the likely route; materialising leaves and truncating cannot
+  work. Until then the strategy comparison is open, and so is the pruning interaction.
+Next session starts at: either building the branch-and-bound nearest-template search, or
+  accepting D48/D49 and rewriting the report around only those.
 ```
