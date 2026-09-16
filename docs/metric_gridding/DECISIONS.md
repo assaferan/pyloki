@@ -1532,6 +1532,21 @@ Done:
   - **D45 — `conservative` is strictly dominated by `quadrature`**: identical nearest
     excursion (0.615 vs 0.617) and mismatch (0.00205 vs 0.00210) for `2^15` times the
     cost (1.48e32 vs 1.10e17). Worth reporting upstream on its own.
+  - **D46 — the corner of the shipped optimal grid costs exactly
+    `(2**(poly_order-1) - 1/2) * eta/N_b`.** Axis `k` of eq. `dk_optimal` contributes
+    `(Delta d_k/2) * (f_max/c) * t_s^k/k! = 2**(k-2) * eta/N_b`, and the sum over
+    `k = 1..k_max` telescopes. Verified against `poly_taylor_step_d_vec` for orders 2-8,
+    exact to machine precision and independent of `t_s` and `f_max` (both cancel):
+    1.5 / 3.5 / 7.5 / 15.5 / 31.5 / 63.5 / 127.5. So 7.5x at the default `poly_order=4`
+    and 15.5x at 5, which is what a circular-orbit search runs. This is the largest term
+    in the whole sensitivity question and it is in the criterion, not in any tiling.
+    It also **reconciles the 7.5x single-cell figure with the 16.80x** reported in (o):
+    the two measure different things, and the difference is the moving grid's displaced
+    validity window, not the grid. Evaluating the same nominal corner over a window
+    displaced by `delta_t` reproduces 7.500 at `delta_t=0` and grows from there; the
+    realized-vs-nominal cell width (D41) does *not* explain it, since nominal cells give
+    a larger worst corner (19.83) than realized ones (13.94).
+
 Process note: two bookkeeping artefacts were caught and fixed before they became
   findings. Seeding a single base cell charged the signal's drift out of that family to
   the strategy and produced a spurious 86.5x worst case for `aggressive` (3.09 once a
@@ -1543,6 +1558,7 @@ Conventions fixed: nearest-leaf excursion, not own-cell excursion, is the sensit
   measurements and must not be quoted as sensitivity for the redundant strategies.
 Open questions: the Chebyshev/circular transforms remain untested (not unit-diagonal
   triangular, so neither D36 nor D41 carries over). The pruning interaction is closed.
-Next session starts at: `04_upstream_report.md` needs rewriting around D43/D44/D45 --
-  its current headline ("buys no sensitivity") is refuted by D43 and must not be posted.
+Next session starts at: `04_upstream_report.md` has been rewritten around D46 (headline)
+  plus D43-D45; it is reviewed-but-unposted, pending the human. The old headline
+  ("buys no sensitivity") was refuted by D43 and is gone.
 ```
