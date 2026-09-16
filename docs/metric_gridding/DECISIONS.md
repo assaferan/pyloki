@@ -1415,4 +1415,56 @@ Open questions: whether anything in the plan's premise survives D37 and D38. The
   metric covering, and it is not what this branch has built.
 Next session starts at: deciding whether to pivot to the sensitivity-loss measurement,
   or to stop.
+
+## 2026-09-14 (o) — the sensitivity loss, measured; and the verdict
+(Written 2026-09-16: the session that produced commit 04183d4 was cut off by a machine
+reset before it wrote this entry. The code and `03_results.md` in that commit are the
+record; this reconstructs the log from them.)
+Done:
+  - Pivoted as (n) proposed, to §5.2.4's actual request rather than more metric work.
+  - `docs/metric_gridding/sensitivity_loss.py`: samples offsets uniformly inside each
+    leaf and reports the incurred phase error against the promised `eta / N_b`.
+    268 s / 64 seg / `po=4`, in units of `eta / N_b`:
+        strategy      median stage   worst corner   median mismatch
+        aggressive    3.35           16.80          0.0240
+        quadrature    3.58           14.38          0.0258
+        conservative  3.42           14.20          0.0251
+  - **D39 — the three tilings are indistinguishable in sensitivity**, across twenty
+    orders of magnitude of cost (`prod B(s)` 1.51e12 / 1.10e17 / 1.48e32).
+    Mechanism: `branch_param_padded` sets `num_points = ceil(dparam_cur / dparam_new)`,
+    so the child cell is `dparam_cur / num_points`, landing just under the criterion
+    step `dparam_new` whatever was transported. Confirmed by the final cell
+    half-widths: all within ~2x of the criterion `[9.7e-3, 0.163, 3.64, 122]` and of
+    each other, the scatter being the integer `ceil`. **The transported width never
+    sets the cell; the criterion does.** It sets only how much redundant subdivision
+    happens on the way, so it can buy cost and never sensitivity.
+  - D39 generalises to the metric strategy: a covering is just another transport rule,
+    so it cannot improve sensitivity either, and it measurably worsens cost (~1070x at
+    equal `P_d`, D35). Together with D36 (zero coverage gap) and D38 (the shipped box
+    grid is already the paper's metric diagonalisation), this closes the question the
+    branch was opened on.
+  - D40 — two self-checks pin what `eta` means: the naive per-axis grid costs exactly
+    one tolerance at a full step (promise kept per axis), while the shipped grid is
+    coarser by exactly `2**(k-1)` on the order-`k` axis. So `eta` does *not* mean
+    "phase error below `eta / N_b`".
+Conventions fixed: none new.
+Verdict (Phase 3 deliverable): **abandon** the metric covering. Not because the metric
+  is wrong, but because the sensitivity it was meant to recover is not lost in the first
+  place (D36), the box grid is already metric-derived (D38), and the cell size is set by
+  the criterion rather than by transport (D39).
+Worth reporting upstream, independent of all metric work: under the recommended
+  `aggressive` Taylor default a typical signal costs ~3.4x the nominal phase budget and
+  ~2.5% in amplitude, a corner signal ~15x. Choosing `eta` from the grid criterion alone
+  over-estimates sensitivity by roughly a factor of three, most of it the `2**(k-1)`
+  coarsening compounded across axes and the rest multi-axis corner addition.
+Open questions: O6, O7 and `(m_max, R)` are moot under D39. Two live ones remain, both
+  places D36/D39 provably do not reach:
+  - the pruning interaction, unmodelled here (deterministic geometry only): a signal
+    near a cell edge may sit in a leaf that was thresholded away, and a strategy
+    claiming more territory keeps more such signals alive. Measurable only by injection.
+  - the Chebyshev and circular transforms, which are not unit-diagonal triangular, so
+    neither D36 nor D39 carries over. If the paper's gap is real, it is there.
+Next session starts at: writing up the `~3.4x` / `~15x` sensitivity-loss result for
+  upstream (it stands on its own), then deciding whether to test the pruning
+  interaction by injection or to close the branch.
 ```
