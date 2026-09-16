@@ -31,6 +31,13 @@ and summing `k = 1..k_max` telescopes:
 
     corner phase error = (2^(k_max-1) - 1/2) * eta/N_b
 
+One hypothesis is doing work there and is worth stating: the corner is evaluated at the
+**same span `t_s` that enters the step formula**. In general axis `k` contributes
+`2^(k-2) * (eta/N_b) * (t/t_s)^k`, so it is only at `t = t_s` that the `t_s` and `f_max`
+dependence cancels and the sum telescopes. That is the relevant case for a grid quoted
+over its own span, and it is also why the figure is larger under a moving reference
+frame, where a leaf's validity window is displaced from its own epoch and `t/t_s > 1`.
+
 Verified against `psr_utils.poly_taylor_step_d_vec` for `k_max = 2..8`, exact to machine
 precision and **independent of `t_s` and `f_max`** (both cancel):
 
