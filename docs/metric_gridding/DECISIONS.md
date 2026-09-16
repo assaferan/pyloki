@@ -1467,4 +1467,33 @@ Open questions: O6, O7 and `(m_max, R)` are moot under D39. Two live ones remain
 Next session starts at: writing up the `~3.4x` / `~15x` sensitivity-loss result for
   upstream (it stands on its own), then deciding whether to test the pruning
   interaction by injection or to close the branch.
+
+## 2026-09-16 (p) — upstream report drafted; numbers re-verified
+Done:
+  - Re-ran `sensitivity_loss.py` from a clean session: `self_check` passes and all six
+    headline numbers reproduce exactly (3.35/16.80/0.0240, 3.58/14.38/0.0258,
+    3.42/14.20/0.0251). Also re-derived the final half-widths and `prod B(s)`
+    (1.51e12 / 1.10e17 / 1.48e32) independently. D39 stands.
+  - D41 — corrected the D39 mechanism as stated. The claim "the cell lands just under
+    the criterion" is only the `branch_param_padded` half. The shipped code also has a
+    guard (`core/taylor.py:148-154`): when an axis's accumulated shift is below `eta`
+    it is not branched at all and keeps `dparam_cur`, so cells can sit *above* the
+    criterion, up to ~2x. Verified the reimplementation in `sensitivity_loss.py`
+    matches the shipped guard. The conclusion is unchanged and slightly stronger: the
+    criterion fixes the scale on both sides, and transport survives only as the `ceil`
+    remainder plus the guard slack.
+  - D42 — verified against the paper that the `2**(k-1)` coarsening in
+    `psr_utils.poly_taylor_step_f:93-94` is faithful. §3.4 eq. `dk_optimal` carries
+    `2**(2k-1)` in terms of `Tobs` while appendix eq. at line 1585 carries `2**(k-1)`
+    in terms of the half-span `t_s`; these agree since `Tobs = 2 t_s`, and the code
+    uses the half-span form. No discrepancy, contra a first reading of §3.4.
+  - `docs/metric_gridding/04_upstream_report.md`: draft report for upstream, leading
+    with the strategy-independence result rather than the metric work. Not posted.
+Conventions fixed: none new.
+Note: upstream has GitHub Discussions disabled, so Phase 4's "discussion issue" would
+  be a plain issue on `pravirkr/pyloki`.
+Open questions: unchanged — the pruning interaction (needs injections) and the
+  Chebyshev/circular transforms.
+Next session starts at: posting `04_upstream_report.md` once reviewed, then either the
+  injection test of the pruning interaction or closing the branch.
 ```
