@@ -125,12 +125,15 @@ detection is actually decided, and `aggressive`'s own loss there is 1.03% rather
 | **14** | **+0.50 pt** | **0.50%** | **772** |
 | 16 | +0.53 pt | 0.53% | 723 |
 
-So **~770 pairs for Arm B**, not 290 — and at **S/N 15-17, not 14-16**. The model has
-now been checked against the only data external to it, a pilot batch recovering 3 of 24
-at S/N 12 against the ladder's nominal `P_d = 0.1031`: it is not rejected
-(`P(X <= 3 | 0.1771) = 0.36`) but it reaches nominal at S/N 11.00 where the pilot is
-consistent with nominal at 12, so it runs about **1 S/N optimistic** and the discordance
-peak should be shifted up by that much. Arm A (Chebyshev) is weaker again —
+So **~770 pairs for Arm B**, not 290. The **S/N 15-17 recommendation is withdrawn.**
+
+It came from fitting a constant offset to a single pilot point, and a second measurement
+falsified it: against the real search my model is *high* at S/N 12 (0.177 vs 0.125) and
+*low* at S/N 14 (0.368 vs 0.600 at 2^14), so the discrepancy changes sign and the
+measured curve is 2.0x steeper rather than shifted. An offset fitted to one point cannot
+tell those apart. **The operating point must come from the measured on-grid `P_d` ~ 0.5
+criterion at the final buffer, which brackets below S/N 14**, not from this model's
+discordance peak. Arm A (Chebyshev) is weaker again —
 its early gain is 1.15x against Taylor's 1.71x — so it needs materially more than that,
 and the figure should be recomputed on the Chebyshev ladder before committing.
 

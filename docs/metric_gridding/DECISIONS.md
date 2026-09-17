@@ -2007,7 +2007,7 @@ Done:
     consistent with nominal at S/N 12, so it runs about **1.0 S/N optimistic**. Weak
     (n = 24) but it is the only check on the ladder from outside either model, and it is
     the one thing that is not circular in the way D70's amendment describes.
-  - **D78 — consequence for the design: inject at S/N 15-17, not 14.** The model's
+  - **D78 — WITHDRAWN by D86. Was: inject at S/N 15-17, not 14.** The model's
     discordance peak is flat over S/N 14-16 (0.50-0.53%, 723-772 pairs); shifted by the
     ~1 S/N bias that becomes **S/N 15-17**. Injecting at the model's nominal peak would
     sit below the real one, where the ladder is cleared less often than the model
@@ -2127,4 +2127,56 @@ Conventions fixed: before presenting corrections as a chain, check they are
 Open questions: the 3-point pilot result, which now gates `n`; power-calculation
   ownership (still assaferan's).
 Next session starts at: their paired `max_sugg` result and the operating-point pilot.
+
+## 2026-09-17 (ac) — D77/D78 withdrawn: the model is differently shaped, not shifted
+Done:
+  - **D85 — my own falsifiable prediction failed, and their new data is what tested it.**
+    I predicted the pilot offset would be "roughly constant in S/N over 12-16", so that a
+    second point would sit ~1 S/N left of my curve just as the first did. Checked against
+    their paired run (`aggressive`, 50 realisations, S/N 14, 2^14 buffer):
+
+    | | model | measured | |
+    |---|---|---|---|
+    | S/N 12 | 0.177 | 0.125 (batch A, 3/24) | model **high** by +0.052 |
+    | S/N 14 | 0.368 | 0.600 (30/50) | model **low** by -0.232 |
+
+    The discrepancy **changes sign**, and the measured slope over S/N 12-14 is 0.237 per
+    unit against my model's 0.095 -- **2.0x steeper**. So no constant offset describes it:
+    the real recovery curve is differently *shaped*, which is exactly the alternative I
+    said one more point would distinguish. It did, and against me.
+  - **D86 — D77's "~1 S/N optimistic" and D78's "inject at S/N 15-17" are withdrawn.**
+    Both were an offset fitted to a single point (batch A, n=24), which cannot separate
+    offset from shape. Their §9 criterion stands instead: fix the operating point where
+    the *measured* on-grid `P_d` is ~0.5, because discordance peaks at the steepest part
+    of the recovery curve. At S/N 14 and 2^18 they measure `P_d` = 0.76 and 0.80, so the
+    3-point pilot should bracket **below** S/N 14, not above it. A direct measurement at
+    the final buffer beats my survival model plus an inferred offset, and I am not going
+    to defend the latter. One caveat I have asked them to confirm: I assumed batch A ran
+    at 2^14; if it did not, the S/N 12 row above is not like-for-like. It does not change
+    the conclusion, because the S/N 14 row alone (model 0.368 against 0.600 measured at
+    2^14, 0.76 at 2^18) already shows the model is too pessimistic at the final buffer
+    for its discordance peak to locate an operating point.
+  - **D87 — inherited: the `max_sugg` pressure is arm-dependent and measured, and it
+    blocks the run at 2^18.** Saturation > 0.9 in 1/50 (`aggressive`) against 10/50
+    (`quadrature`) at 2^18, McNemar p = 0.012; at 2^14 both arms are pinned and the
+    asymmetry is invisible (8/5, p = 0.58). Median saturation 0.165 against 0.724, median
+    candidates 43k against 190k. Raising the buffer only ever helped: 20 flips, all one
+    direction. The **outcome** bias is unresolved rather than null -- sign test
+    `p = 0.34`, mean `Delta = +0.080`, 95% CI [-0.043, +0.203] against an effect of
+    interest of 0.06, i.e. the point estimate **exceeds** the effect and points the same
+    way. Bounding it below 0.06 needs n ~ 211 per cell.
+  - **D88 — so my stage-split geometry is not currently measurable in a real search.** The
+    arm the geometry favours (`quadrature`) is also the arm still sitting inside the
+    candidate buffer at 2^18, and at n = 50 the two cannot be separated. That is not
+    evidence the gain is unreal -- it is that this apparatus cannot see it yet. The fix is
+    theirs and already stated: raise `max_sugg` until both arms clear 0.9 saturation.
+    Worth recording plainly: the geometric result (D52/D60/D70) is unaffected, and its
+    *relevance* now waits on an instrument change.
+Conventions fixed: an offset inferred from one point is not an offset, it is a guess with
+  one degree of freedom. Prefer a direct measurement at the final configuration over a
+  model plus a fitted correction, and when the two disagree say which is measuring the
+  real thing.
+Open questions: batch A's buffer (asked); whether the outcome bias can be bounded below
+  0.06; the operating point from their 3-point pilot, which now replaces D78.
+Next session starts at: their operating-point pilot at the raised buffer.
 ```
