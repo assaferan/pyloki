@@ -1,111 +1,111 @@
-# 05_injection_design.md — power calculation for the `tiling_strategy` injection campaign
+# 05_injection_design.md — the `tiling_strategy` injection campaign: design, and why it cannot be run here
 
-> ## ⚠ WORK IN PROGRESS — handed off mid-experiment
+> ## ⚠ The campaign was NOT run, and at this configuration it CANNOT be
 >
-> Written across two sessions. The second one finished §11.6's paired experiment
-> (**§6.5**), checked §11.4's `rho_AB` assumption and found it wrong (**§5.2**), and
-> propagated that into the stratification and the design (**§5.1, §9**). Read §6.5 and
-> §5.2 first: between them they change the verdict, `pi`, `n`, and the number of strata.
-> **§11 is the original handoff** and still separates what was verified from what was
-> taken on trust; §11.4 and §11.6 are now closed out in the body.
+> Written across two sessions. The second one completed the two experiments the first
+> left open and, in doing so, established that the campaign this document designs is not
+> executable at Phase 3's configuration. **Read §1, then §6.6.**
 >
-> The power calculation (§2–§5) is complete and self-consistent *given* §5.2's
-> correction. The empirical part is no longer silent on the confound but has **not**
-> eliminated it — §6.5 is a failure to reject, not a null, and says so.
+> One thing did ship: the silent-ratchet defect found along the way is
+> [PR #14](https://github.com/pravirkr/pyloki/pull/14) upstream, written up in
+> `06_upstream_max_sugg_logging.md`.
 >
-> No production campaign was run. No inherited code was modified.
-
-Status: **design and power calculation only.** Everything below is either measured in
-this session or derived from a model whose assumptions are listed, with a sensitivity,
-in the assumption register (§10).
+> **This document contains retracted claims that are kept visible rather than deleted**,
+> because the branch's failure mode is a correct measurement carrying a framing that
+> does not hold. Struck-through text and ⚠/⚑ boxes mark them. §8 lists the three
+> conclusions that were withdrawn; §10 is the assumption register and now has **no**
+> independently verified row.
+>
+> No inherited library code was modified by the design work. The one library change,
+> the logging patch, was built on a separate branch off `upstream/main`.
 
 Arm analysed: **Chebyshev basis, `aggressive` vs `quadrature`, at the shipped
-`branch_max = 16`** — the only pairing with a proven geometric gain (D60: `quadrature`
-strictly closer in 87/90 cells, ≥1.56x) that builds at the default (D62), and therefore
-the only one that tests behaviour a user gets without changing config. Config throughout
-is Phase 3's: 268.4 s / 64 segments / `poly_order = 4` / `N_b = 64` / `eta = 1`.
+`branch_max = 16`** — the only pairing with a proven geometric gain (D60) that builds at
+the default (D62). Config throughout is Phase 3's: 268.4 s / 64 segments /
+`poly_order = 4` / `N_b = 64` / `eta = 1`.
 
 ---
 
 ## 1. Verdict
 
-**Reachable. ~30 core-hours for the design in §9 — but the measurement is not yet
-trustworthy, because `max_sugg` changes outcomes on identical data and it has not been
-shown to do so symmetrically between the arms.**
+**The campaign cannot be run at this configuration, and the obstacle is not cost.** The
+comparison requires both arms to run against the threshold scheme rather than the
+candidate buffer. `aggressive` can; `quadrature` cannot, at any buffer size, and raising
+the buffer does not help because the candidate count rises with it.
 
-- **Power.** At the discordance rate the pilot measured (`p_disc` = 0.08–0.30), 80%
-  power at two-sided α = 0.05 needs **156 pairs if `pi` = 0.70, 647 if 0.60, 2 609 if
-  0.55**, and 1.6 × 10⁴ in the pessimistic corner `pi` = 0.52 (all at `p_disc` = 0.30;
-  scale inversely for smaller). The pre-committed design is **n = 2 000 pairs**.
+### What blocks it
 
-- **`pi` is 0.63, not 0.70 — `rho_AB` was the wrong quantity (§5.2, new).** The code set
-  `rho_AB` to the *profile* overlap `snr_ratio(delta_A − delta_B)`; M4 needs the *score*
-  correlation. They are the same smearing factor `S(k)` weighted by the pulse's spectrum
-  and the filter's respectively, and the bank's selected boxcar has 4.10x the pulse's
-  `<k²>`. Median `1 − rho` at ducy 0.10 is **0.0265, not 0.0088**; `pi` falls 0.697 →
-  **0.628** and the pairs needed at `p_disc` = 0.30 rise **161 → 391** on that aggregate.
-  **The operative figure is §9's 954**, not 391: the primary test runs on the mid
-  stratum, where `pi` = 0.593, and the null stratum's 21% of screened positions do not
-  enter it. **`n = 2 000` still covers that** at the operating point but no longer across
-  the whole measured `p_disc` range — it covers `p_disc` ≥ 0.145. It was §10's row 3 and
-  is now measured; row 1 is still the one to worry about.
+**`quadrature`'s candidate set never converges (§6.6).** On one fixed set of
+realisations swept across four buffers:
 
-- **Cost, measured.** At `max_sugg = 2^18` (the library default) a pair costs **49.8 s**
-  — `aggressive` 2.3 s, `quadrature` 47.5 s — so 2 000 pairs is **28 core-hours** and
-  the pessimistic corner ~230. At `max_sugg = 2^14` it is 3.8–5.1 s/pair, but §6.3 says
-  that setting is not sound. There is no statistical or computational obstacle.
+| arm | 2^18 | 2^19 | 2^20 | 2^21 | saturation at 2^21 |
+|---|---|---|---|---|---|
+| `aggressive` | 16 778 | 16 778 | 16 778 | **16 778** | 0.008 |
+| `quadrature` | 152 007 | 390 575 | 808 116 | **1 610 052** | 0.768 |
 
-- **What is *established* about the confound.** On a **single fixed noise realisation**,
-  changing only `max_sugg` from 2^14 to 2^18 changed `aggressive` from **0 surviving
-  candidates to 110** and `quadrature` from 8 553 to 134 418. Across a **fixed set of 20
-  realisations**, `aggressive` recovered **11/20 at 2^14 and 13/20 at 2^18**, flipping 2
-  runs, both toward recovery. So the candidate buffer is not a neutral knob: it changes
-  the search outcome on data the search has already seen, at both the shipped default
-  and the value the existing injection driver uses.
+`aggressive` returns an identical count at all four and is done. `quadrature`'s count
+grows by a factor of **10.6** over a factor of 8 in buffer — span exponents 1.135, 1.022,
+0.994 — with saturation pinned near 0.77. The overflow ratchet relaxes the cut to keep
+the buffer full at whatever size it is given, so there is no escape by spending more.
 
-  The mechanism is `world_tree.py:527-551`: on overflow the effective cut ratchets to
-  `max(stage threshold, top-K, median)`, and `PruneStats` logs only the nominal
-  threshold (`prune.py:685`), so it is silent. A direct probe showed the *final*-stage
-  cut was nominal in all four runs tested (minimum surviving score below
-  `thresholds[-1]`), so the ratchet is firing at **intermediate** stages, which is where
-  it matters and where it is hardest to see.
+**Consequence: in the `quadrature` arm the scheme's thresholds have never been the
+operative cut**, at any buffer used on this branch. The equal-`P_d` recalibration (§6.3)
+is not doing what §6.3 says in that arm.
 
-- **The arm-dependence question, now measured (§6.5, 50 realisations, all four cells).**
-  Two separate answers, and they must not be collapsed:
-  - **The buffer *pressure* is arm-dependent, significantly.** At 2^18, 10/50
-    `quadrature` runs exceed 0.9 saturation against 1/50 for `aggressive` (paired
-    McNemar **p = 0.012**), median saturation 0.724 vs 0.165. `aggressive` has largely
-    escaped the buffer at 2^18; `quadrature` has not.
-  - **Whether that becomes an arm-dependent *outcome* bias is unresolved, and the point
-    estimate is worse than the effect being measured.** The pre-registered sign test
-    gives p = 0.34 — a failure to reject, *not* a null. The interval is
-    `+0.080 [−0.043, +0.203]` against a campaign effect of interest of **0.06**: the
-    best estimate of the confound **exceeds** the signal, and points the same way.
-    Closing it needs **211 realisations per cell**, 4.2x this experiment (~10–14
-    core-hours).
+### What was measured before that became clear
 
-  Also established: raising the buffer produced **20 flips, all toward recovery, none
-  away**, in both arms.
+- **The paired `max_sugg` experiment (§6.5, 50 realisations, all four cells,
+  pre-registered before the first cell ran).** Two answers that must not be collapsed:
+  - *Buffer **pressure** is arm-dependent, significantly* — at 2^18, 10/50 `quadrature`
+    runs exceed 0.9 saturation against 1/50 for `aggressive`, paired McNemar **p = 0.012**.
+  - *Whether it biases **outcomes** is unresolved, and the point estimate is worse than
+    the effect being measured* — the pre-registered sign test gives p = 0.34, a failure
+    to reject and **not** a null, with mean Δ = **+0.080 [−0.043, +0.203]** against a
+    campaign effect of interest of **0.06**. Closing it needs n ≈ 211 per cell.
+  - Raising the buffer produced **20 recovery flips, all toward recovery, none away.**
+- **`rho_AB` was the wrong quantity (§5.2).** The code used the *profile* overlap where
+  the model needs the *score* correlation — the same smearing factor weighted by the
+  pulse's spectrum rather than the filter's, and the selected boxcar has 4.10x the
+  pulse's `<k²>`. Median `1 − rho` 0.0088 → **0.0265**; `pi` 0.697 → **0.628**.
+- **The stratification inherited that error (§5.1).** Corrected, the **`effect` stratum
+  does not exist** — no sampled position reaches `pi` > 0.70 — so §9's three strata
+  collapse to two. The `null` stratum, the design's main control, roughly doubles to
+  ~1 position in 5.
 
-**Recommendation: the campaign in §9 cannot be run as designed, at any buffer (§6.6).**
-Stage 1 of the remedy — raise `max_sugg` until it stops binding in both arms — **fails**.
-`aggressive` converges at 2^18 (16 778 candidates, identical at 2^18, 2^19 and 2^20);
-`quadrature` never does, its candidate count tracking the buffer with growth exponent
-0.95 / 1.36 / 1.05 across three successive increases while its saturation *rises*. So in
-the `quadrature` arm the scheme's thresholds have never been the operative cut, at any
-buffer used on this branch, and the idealised question §9 asks is not answerable in this
-configuration. What remains answerable is the *user-facing* question at the shipped
-default — a different claim, and it has to be reported as one. The earlier
-recommendation, now superseded but still true as far as it went:
+### What was withdrawn
 
-**Do not run the campaign, and specifically do not run it at 2^18.**
-§6.4 is **not closed**. The systematic large enough to reverse the answer is now
-measured at the mechanism level (arm-dependent buffer pressure, p = 0.012) and
-unresolved at the outcome level, with a point estimate above the effect of interest.
-§7.1's remedy is therefore mandatory rather than advisory: `quadrature`'s 99th-percentile
-saturation at 2^18 is **0.975** against the < 0.9 the design requires. Raise the buffer
-until both arms clear it, re-measure cost there, and only then re-run §6.5's four cells
-at n ≈ 211 to confirm the interaction is bounded.
+- **§4.3's "the decision is made where the geometry isn't" is backwards.** The measured
+  per-stage survival profile puts the first loss at level 13 and none before it, against
+  a modelled 99% of losses by stage 10. This was *the* structural reason the effort
+  expected a small effect. The per-stage `pi` profile survives (it is geometry, with no
+  survival model in it); the weighting over it does not.
+- **The equal-`P_d` ladder check (§10 row 8).** Batch A's 3/24 agreement ran at 2^14
+  where both arms saturate, so it cannot be credited to the ladders. The register now
+  has no verified row.
+- **The "defensible upstream sentence" about tiling (§8).** Nothing in this document
+  currently supports one.
+
+### `n`, and why it is a range
+
+`n` is **368–691** and the precise value is not established. The early-decision corner
+(2 842 pairs) is excluded by the measured survival profile; the spread that remains is
+the profile's own, whose two criteria disagree on where the survival curve falls. The
+survival profile is **inherited from the `metric-gridding` session, uncontradicted but
+not validated** (§4.3 ⚑) — its shape is robust across two criteria, two parameter sets
+and three batches; its absolute levels are not. Earlier figures of 954 and 368 in this
+document are superseded and marked.
+
+### What would unblock it
+
+1. **A stricter ladder (§6.6, untested).** The candidate count is set by how much the
+   scheme admits. A ladder calibrated to a smaller `P_d` admits fewer leaves and might
+   converge, keeping both the deployed configuration and the idealised question. One
+   ladder plus 10 realisations at 2^20 settles it.
+2. **The user-facing question instead.** "What does a user get at the shipped default,
+   ratchet included" is answerable now with §6.5's apparatus — but it is a claim about
+   pyloki-as-shipped, not about tiling, and must be reported as one.
+3. **A smaller configuration.** Tests conversion in a regime nobody deploys; the
+   geometry is already proven at the deployed one.
 
 ---
 
@@ -241,7 +241,7 @@ Two things worth noting. The ladders are **nearly identical** (7.10 vs 7.00), un
 Taylor pair (7.70 vs 9.10) — one fewer confound, and a point in this arm's favour.
 `quadrature` pays 2^17.9 ≈ 2.4e5 times the work for it.
 
-### 4.3 Where the decision is actually made — and it is not where the geometry is
+### 4.3 ~~Where the decision is actually made — and it is not where the geometry is~~ — **REVERSED, see the box below**
 
 The cumulative H1 success of the Viterbi ladder drops from 1.0 to 0.1031 over stages
 1–30 and is **flat thereafter**. So the survival decision is made early, where
@@ -397,6 +397,54 @@ two-sided α = 0.05.
    a factor of 1.3 in `pi` (0.787 → 0.607) and a factor of 32 in `n` (31 → 997). All
    three remain affordable at 50 s/pair: 0.4 to 14 core-hours.
 
+### 5.1 Stratification: measured, and it does not stratify (corrected in §5.2)
+
+The brief asks for strata by within-cell position, measured rather than assumed.
+`injection_power.py --strata 24` samples 24 signal positions and computes, for each, the
+decision-weighted `pi` over stages 2–28:
+
+    decision-weighted pi:  min 0.440   q25 0.595   median 0.645   q75 0.704   max 0.741
+    positions with pi < 0.55 ("null"  stratum):   3/24
+    positions with pi > 0.75 ("effect" stratum):  0/24
+
+**There are no clean centre / face / corner strata in this configuration.** A signal is
+placed once in 4-D parameter space; its per-stage geometry then follows and cannot be
+dialled separately, and the resulting distribution is narrow and unimodal around 0.645.
+A genuine null stratum exists but is rare — about 1 position in 8 — so it has to be
+**pre-screened with `nearest_template_cheby.py`**, not obtained by random placement, and
+a "corner" stratum with a large effect cannot be obtained at all. This is a measured
+constraint on the design, and it is the opposite of what the sketch in the brief
+assumed.
+
+**Corrected for §5.2, and it changes the design, not just the numbers.**
+`injection_power.strata` builds each position's `pi` from the same wrong `rho_AB`
+(`injection_power.py:337`), so everything above inherits the error. Recomputed on the
+same 24 positions with the corrected score correlation (`rho_check.py --strata 24`,
+`rho_strata.json`):
+
+| `rho_AB` from | min | q25 | median | q75 | max | `pi` < 0.55 | `pi` > 0.70 |
+|---|---|---|---|---|---|---|---|
+| profile overlap (in use) | 0.440 | 0.595 | 0.645 | 0.704 | 0.741 | **12%** | **29%** |
+| **corrected** | 0.470 | 0.556 | **0.590** | 0.619 | **0.643** | **21%** | **0%** |
+
+*Control:* the profile row reproduces the cached per-position values to 5 × 10⁻⁵ on all
+24 positions, so the shift is the correction and nothing else.
+
+Two consequences, in opposite directions:
+
+- **The `effect` stratum of §9 does not exist.** It was defined as `pi > 0.70`; the
+  corrected maximum over 24 positions is **0.643**. No position reaches it, so the
+  three-stratum design collapses to two. The earlier `pi > 0.75` finding ("not
+  reachable") was right for the wrong threshold — it is `pi > 0.70` that is unreachable.
+- **The `null` stratum is roughly twice as easy to find**: about 1 position in 5 rather
+  than 1 in 8. That is the control §9 leans on hardest, and pre-screening for it gets
+  cheaper.
+
+The distribution is also *narrower* (0.470–0.643 against 0.440–0.741), which is what a
+larger common noise term does: it pulls every position toward ½.
+
+---
+
 ### 5.2 `rho_AB` corrected: it was the profile overlap, not the score correlation
 
 §10 row 3 and §11.4 both flagged this as unchecked and as the thing `pi` depends on most.
@@ -471,54 +519,6 @@ These are leading-order indicators, not corrections: the measured inflation at d
 was 2.95x against the 4.10 this predicts, because the linearisation overstates it once
 the smearing is large and the bank can re-optimise. The 0.05 and 0.20 rows of §5's table
 remain formally uncorrected.
-
-### 5.1 Stratification: measured, and it does not stratify
-
-The brief asks for strata by within-cell position, measured rather than assumed.
-`injection_power.py --strata 24` samples 24 signal positions and computes, for each, the
-decision-weighted `pi` over stages 2–28:
-
-    decision-weighted pi:  min 0.440   q25 0.595   median 0.645   q75 0.704   max 0.741
-    positions with pi < 0.55 ("null"  stratum):   3/24
-    positions with pi > 0.75 ("effect" stratum):  0/24
-
-**There are no clean centre / face / corner strata in this configuration.** A signal is
-placed once in 4-D parameter space; its per-stage geometry then follows and cannot be
-dialled separately, and the resulting distribution is narrow and unimodal around 0.645.
-A genuine null stratum exists but is rare — about 1 position in 8 — so it has to be
-**pre-screened with `nearest_template_cheby.py`**, not obtained by random placement, and
-a "corner" stratum with a large effect cannot be obtained at all. This is a measured
-constraint on the design, and it is the opposite of what the sketch in the brief
-assumed.
-
-**Corrected for §5.2, and it changes the design, not just the numbers.**
-`injection_power.strata` builds each position's `pi` from the same wrong `rho_AB`
-(`injection_power.py:337`), so everything above inherits the error. Recomputed on the
-same 24 positions with the corrected score correlation (`rho_check.py --strata 24`,
-`rho_strata.json`):
-
-| `rho_AB` from | min | q25 | median | q75 | max | `pi` < 0.55 | `pi` > 0.70 |
-|---|---|---|---|---|---|---|---|
-| profile overlap (in use) | 0.440 | 0.595 | 0.645 | 0.704 | 0.741 | **12%** | **29%** |
-| **corrected** | 0.470 | 0.556 | **0.590** | 0.619 | **0.643** | **21%** | **0%** |
-
-*Control:* the profile row reproduces the cached per-position values to 5 × 10⁻⁵ on all
-24 positions, so the shift is the correction and nothing else.
-
-Two consequences, in opposite directions:
-
-- **The `effect` stratum of §9 does not exist.** It was defined as `pi > 0.70`; the
-  corrected maximum over 24 positions is **0.643**. No position reaches it, so the
-  three-stratum design collapses to two. The earlier `pi > 0.75` finding ("not
-  reachable") was right for the wrong threshold — it is `pi > 0.70` that is unreachable.
-- **The `null` stratum is roughly twice as easy to find**: about 1 position in 5 rather
-  than 1 in 8. That is the control §9 leans on hardest, and pre-screening for it gets
-  cheaper.
-
-The distribution is also *narrower* (0.470–0.643 against 0.440–0.741), which is what a
-larger common noise term does: it pulls every position toward ½.
-
----
 
 ## 6. Prerequisites and cost, measured
 
@@ -848,7 +848,7 @@ exponents 1.022 and 0.994. **No longer provisional.**
 
 ---
 
-## 7. What has to change before this is worth running
+## 7. What has to change before this is worth running — **superseded by §6.6**
 
 > **§6.6 supersedes item 1 below: the ratchet cannot be eliminated for `quadrature`.**
 > Item 1 was written assuming a large enough buffer exists. It does not, in this
@@ -1125,9 +1125,16 @@ interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggr
 - `rho_check.py` — §5.2. Measures the score correlation against the profile overlap on
   the same cells and pushes the corrected value back through `power`/`mcnemar_n`.
   Self-checks the sampler against a closed form first. `rho_check.json` holds every cell.
-- `paired_max_sugg.py` — §11.6. The four-cell paired buffer experiment, with the
+- `paired_max_sugg.py` — §6.5. The four-cell paired buffer experiment, with the
   analysis pre-committed in `plan()` and written to the run directory before the first
-  cell runs. `--plan` / `--make` / `--run` / `--analyse`.
+  cell runs. `--plan` / `--make` / `--run` / `--analyse` / `--selftest` (which checks
+  the analysis detects a planted bias and does *not* fire on a symmetric one).
+  `paired_max_sugg_results.json` holds all 200 runs plus the pre-registration.
+- `saturation_sweep.py` — §6.6. The buffer sweep, reporting saturation percentiles and
+  the growth exponent `d log2(ncand)/d log2(max_sugg)` that decides whether a feasible
+  buffer exists. `--source` builds a paired subset from an existing realisation set.
+  `saturation_sweep_results.json` holds the rows.
+- `rho_strata.json` — §5.1's 24 positions, each with the uncorrected and corrected `pi`.
 - `injection_pilot_results.json` — every pilot run behind §6.3, per run, including the
   `saturation` column.
 - `schemes/cheby_aggressive.npz`, `schemes/cheby_quadrature.npz` — the recalibrated
@@ -1135,7 +1142,10 @@ interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggr
 
 Nothing inherited from the `metric-gridding` branch was modified. `nearest_template.py`,
 `nearest_template_cheby.py` and `amplitude_loss.py` are used as-is, and no defect was
-found in them.
+found in them. The one library change made on this work — recording the effective
+pruning threshold — was built on a **separate branch off `upstream/main`**
+(`upstream-max-sugg-logging`) and is [PR #14](https://github.com/pravirkr/pyloki/pull/14);
+`src/` in this worktree was never touched while a measurement was running.
 
 ---
 
@@ -1305,18 +1315,42 @@ Second: the `rho_AB` check in §11.4 (1). It is cheap, it has never been done, a
 
 ### 11.7 What the second session left open
 
-1. **The buffer.** Raise `max_sugg` past 2^18 until the 99th percentile of saturation is
-   below 0.9 **in both arms** — `quadrature` is at 0.975 at 2^18 — then re-measure the
-   per-pair cost there, and re-run §6.5's four cells at n ≈ 211 to bound the interaction
-   below 0.06. Nothing downstream is safe until this is done.
+1. ~~**The buffer.** Raise `max_sugg` past 2^18 until the 99th percentile of saturation
+   is below 0.9 in both arms.~~ **Attempted and it fails — §6.6.** There is no such
+   buffer for `quadrature`. The de-confound at n ≈ 211 is therefore not reachable
+   either, since it would have to run at a buffer where one arm still saturates. The
+   live successors are §6.6's four options, of which the **stricter ladder** is the only
+   one that keeps both the deployed configuration and the idealised question, and it is
+   untested.
 2. **The operating point.** §6.5 measures `P_d` = 0.76/0.80 at S/N 14 and 2^18, well
-   above the 0.5 §9 wants, so the 3-point pilot should bracket *below* S/N 14. This
-   contradicts the `metric-gridding` session's D78 (S/N 15–17) in direction; that
-   disagreement is unresolved and is called out in §6.5 item 6.
+   above the 0.5 §9 wants, so the 3-point pilot should bracket *below* S/N 14. ~~This
+   contradicts the `metric-gridding` session's D78 (S/N 15–17).~~ **Resolved:** that
+   session withdrew D78 on finding its own discordance peak sits at model `P_d` = 0.567
+   — the same criterion in different variables, the disagreement being entirely in its
+   `S/N ↔ P_d` mapping. §9 now records why the criterion is stated in the observable.
 3. **ducy 0.05 and 0.20** are still on the uncorrected `rho_AB` (§5.2). The
    leading-order factor says 0.05 barely moves and 0.20 moves more than 0.10 did.
 4. **Row 2 of §10** is retired for stages 1–10 *on the `metric-gridding` session's
    measurement, not mine.* If it has to carry weight, re-run it here.
-5. **The upstream logging patch** (`06_upstream_max_sugg_logging.md`) is written but not
-   applied or verified — deliberately, since editing `prune.py` would have changed the
-   library under §6.5's run. Applying and verifying it is now unblocked.
+5. ~~**The upstream logging patch** is written but not applied or verified.~~ **Done and
+   shipped** — implemented on `upstream-max-sugg-logging` off `upstream/main`, verified
+   both directions with a regression test, and merged upstream as
+   [PR #14](https://github.com/pravirkr/pyloki/pull/14).
+
+6. **The survival profile is inherited and unvalidated (§4.3 ⚑).** Its shape carries
+   §4.3's reversal, the `n` range and the strata critique; its absolute levels carry
+   nothing and should not be used. Replicating it here would settle the `n` range — but
+   note it can only be replicated honestly in the `aggressive` arm, since `quadrature`
+   cannot be run at a non-binding buffer at all (§6.6), so a "both arms" replication
+   would measure the ratchet in one of them.
+
+7. **`DECISION_STAGES` = [2, 6, 10, 14, 20, 28] is misplaced.** It sits almost entirely
+   *before* the measured decision window (first loss at level 13, median 27), so §5.1's
+   stratification and §9's strata — including the null stratum the design leans on —
+   are built over stages where little is decided. Not recomputed here, because that
+   would put a new headline on an unverified inherited measurement. First thing to redo
+   if the configuration question reopens.
+
+8. **The stricter-ladder test (§6.6, option 4)** — one ladder at a smaller `P_d` target,
+   10 realisations at 2^20, does `quadrature`'s count converge. The only untested route
+   that keeps both the deployed configuration and the idealised question.
