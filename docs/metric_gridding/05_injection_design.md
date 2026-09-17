@@ -45,7 +45,9 @@ realisations swept across four buffers:
 
 `aggressive` is done by 2^19 — its **per-realisation** counts are bit-identical across
 2^19–2^21, so the buffer is provably irrelevant there, not merely indistinguishable.
-(The 2^18 median coincides but one realisation is still clipped; see §6.6.) `quadrature`'s count
+(The 2^18 median coincides but one realisation is still clipped; see §6.6.) Confirmed
+directly in §6.7: `aggressive` ratchets on **0 of 192** levels while `quadrature`
+ratchets on 60, with the effective cut roughly double the nominal. `quadrature`'s count
 grows by a factor of **10.6** over a factor of 8 in buffer — span exponents 1.135, 1.022,
 0.994 — with saturation pinned near 0.77. The overflow ratchet relaxes the cut to keep
 the buffer full at whatever size it is given, so there is no escape by spending more.
@@ -99,15 +101,24 @@ document are superseded and marked.
 
 ### What would unblock it
 
-1. **A stricter ladder (§6.6, untested).** The candidate count is set by how much the
-   scheme admits. A ladder calibrated to a smaller `P_d` admits fewer leaves and might
-   converge, keeping both the deployed configuration and the idealised question. One
-   ladder plus 10 realisations at 2^20 settles it.
+1. ~~**A stricter ladder.**~~ **Tested and it fails — §6.7.** A tenfold reduction in the
+   detection target buys 4 ratcheted levels out of 192 and leaves zero clean runs,
+   because the effective cut is set by `top-K`, not by the scheme: raising the ladder by
+   0.87 moved the cut that actually ran by **−0.06**. No `P_d` target fixes a cut that
+   is not set by `P_d`.
 2. **The user-facing question instead.** "What does a user get at the shipped default,
    ratchet included" is answerable now with §6.5's apparatus — but it is a claim about
    pyloki-as-shipped, not about tiling, and must be reported as one.
 3. **A smaller configuration.** Tests conversion in a regime nobody deploys; the
    geometry is already proven at the deployed one.
+4. **A different buffer policy (§6.7, out of scope here).** The ratchet exists because
+   `max_sugg` is a hard cap enforced by discarding the lowest-scoring candidates. A
+   policy that refused to proceed, or reported the shortfall as a first-class output,
+   would let `quadrature` fail honestly instead of silently substituting a different
+   cut. A library change, and the natural successor to
+   [PR #14](https://github.com/pravirkr/pyloki/pull/14) — that made the substitution
+   visible; this would make it optional. **The only remaining route to the idealised
+   question at the deployed configuration.**
 
 ---
 
