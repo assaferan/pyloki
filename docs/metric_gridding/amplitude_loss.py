@@ -39,9 +39,14 @@ from nearest_template import _basis
 
 def smearing_factor(
     delta: np.ndarray, tau: np.ndarray, f0: float, poly_order: int, nbins: int,
+    basis_fn=None,
 ) -> np.ndarray:
-    """S(k) = <exp(-2 pi i k dPhi(t))>_t for k = 0..nbins//2."""
-    dphi = (f0 / C_VAL) * (_basis(tau, poly_order) @ delta)      # cycles, per time
+    """S(k) = <exp(-2 pi i k dPhi(t))>_t for k = 0..nbins//2.
+
+    `basis_fn` selects the phase basis: the Taylor monomials by default, or
+    `nearest_template_cheby.cheby_basis` for Chebyshev coefficients.
+    """
+    dphi = (f0 / C_VAL) * ((basis_fn or _basis)(tau, poly_order) @ delta)  # cycles
     k = np.arange(nbins // 2 + 1)
     return np.exp(-2j * np.pi * np.outer(k, dphi)).mean(axis=1)
 
@@ -56,6 +61,7 @@ def snr_ratio(
     ducy_max: float = 0.2,
     n_phase: int = 16,
     filt: str = "boxcar",
+    basis_fn=None,
 ) -> float:
     """Recovered S/N divided by the S/N at zero phase error.
 
@@ -70,7 +76,7 @@ def snr_ratio(
     but not what the code scores with. Quoting both is the point -- if they disagree the
     number is an artefact of the filter, not a property of the grid.
     """
-    smear = smearing_factor(delta, tau, f0, poly_order, nbins)
+    smear = smearing_factor(delta, tau, f0, poly_order, nbins, basis_fn)
     widths = generate_box_width_trials(nbins, ducy_max=ducy_max)
     num = den = 0.0
     for centre in 0.5 + np.arange(n_phase) / (n_phase * nbins):
@@ -94,6 +100,7 @@ def loss_for_leaves(
     ducy: float,
     ducy_max: float = 0.2,
     filt: str = "boxcar",
+    basis_fn=None,
 ) -> float:
     """Smallest fractional S/N loss over a set of candidate leaves.
 
@@ -101,6 +108,7 @@ def loss_for_leaves(
     near-optimal leaves are supplied.
     """
     return 1.0 - max(
-        snr_ratio(d, tau, f0, poly_order, nbins, ducy, ducy_max, filt=filt)
+        snr_ratio(d, tau, f0, poly_order, nbins, ducy, ducy_max, filt=filt,
+                  basis_fn=basis_fn)
         for _, d in leaves
     )

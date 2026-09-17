@@ -66,9 +66,45 @@ x 15 stages = 90 cells.
   the `>= 2.30x` phase gap in (2); the half-percent that follows from it is indicative.
 - **Pruning is not modelled.** These are geometric distances to the nearest leaf. Whether
   that leaf survives thresholding is a separate question and is open.
-- **Taylor basis only.** The Chebyshev and circular transforms are not unit-diagonal
-  triangular and none of this transfers.
+- **The circular basis is untested.** Chebyshev is now measured (below); the circular
+  transform is not.
 - `conservative`'s 62 unresolved cells are absence of proof, not evidence against it.
+
+## The Chebyshev basis
+
+The same search ports to `poly_basis="chebyshev"` -- the branch there also goes through
+`branch_param_padded`, and `shift_cheby_errors` ignores the values, so child offsets stay
+parent-independent and the Minkowski-sum structure holds. Same 90 cells:
+
+| basis | `aggressive` nearest template | `quadrature` closer | proven gain | loss at 10% duty |
+|---|---|---|---|---|
+| Taylor | 1.069 | 89/90 | >= 2.30x | 1.73% |
+| Chebyshev | **0.904** | 87/90 | >= 1.56x | **2.03%** |
+
+Chebyshev puts a ~15% closer template near the signal, and the tiling choice matters
+*less* there, not more. Its nominal cell corner is also far better behaved --
+`k_max/2 * eta/N_b` exactly, i.e. 2.0 at `poly_order=4` against the Taylor grid's 7.5,
+linear in the order rather than geometric.
+
+But note the nominal corner predicts the amplitude ordering **wrongly**: Chebyshev is
+3.75x better on that measure and 15% better on sup-norm, yet costs slightly *more* in
+S/N (2.03% against 1.73%). The Chebyshev residual oscillates across the whole domain
+while the Taylor residual peaks only briefly at the window edge, and what smears the
+profile is the residual's distribution, not its peak. On amplitude -- the thing that
+matters -- the two bases are within ~0.3 points of each other.
+
+## One practical point about `branch_max`
+
+Max per-axis child count, against the shipped `branch_max = 16`:
+
+| | `aggressive` | `quadrature` | `conservative` |
+|---|---|---|---|
+| Taylor | 7 | **28** | **27** |
+| Chebyshev | 9 | 16 | **20** |
+
+`aggressive` is the only strategy that fits in both bases. The others describe trees
+`branch_param_padded` would refuse to build, so their advantage above is conditional on
+raising that limit, and is not available at the shipped default.
 
 So `tiling_strategy` is a real but small sensitivity knob, and `quadrature`'s ~1e5x
 extra branching (and its higher recalibrated threshold ladder, 9.10 against 7.70 at
