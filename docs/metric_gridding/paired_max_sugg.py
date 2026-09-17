@@ -39,6 +39,7 @@ import numpy as np
 
 HERE = Path(__file__).resolve().parent
 PILOT = HERE / "injection_pilot.py"
+SRC = HERE.parent.parent / "src"
 ARMS = ("aggressive", "quadrature")
 BUFFERS = (2**14, 2**18)
 
@@ -113,12 +114,34 @@ def plan(n: int) -> dict:
 # ---------------------------------------------------------------------------- run
 
 
+def _env() -> dict:
+    """Force `pyloki` to resolve to THIS worktree's `src`, not the installed one.
+
+    The venv's editable install points at the main checkout, which is a different
+    branch. Here that fails loudly (`pyloki.core.metric` does not exist on `main`), but
+    a module that exists on both branches with different contents would be picked up
+    silently, and a campaign comparing two tilings under the wrong search code would
+    look exactly like a campaign comparing two tilings. So it is pinned, and checked.
+    """
+    import os
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(SRC), *(p for p in (env.get("PYTHONPATH", "").split(os.pathsep)) if p)])
+    resolved = subprocess.run(
+        [sys.executable, "-c", "import pyloki; print(pyloki.__file__)"],
+        env=env, capture_output=True, text=True, check=True).stdout.strip()
+    if not resolved.startswith(str(SRC)):
+        raise SystemExit(f"pyloki resolves to {resolved}, expected under {SRC}")
+    return env
+
+
 def out_path(outdir: Path, arm: str, buf: int) -> Path:
     return outdir / f"arm_{arm}_{buf}.json"
 
 
 def run(outdir: Path) -> None:
     """Drive the four combinations, one process each. Resumable: completed cells skip."""
+    env = _env()
     for arm, buf in product(ARMS, BUFFERS):
         dest = out_path(outdir, arm, buf)
         if dest.exists():
@@ -128,7 +151,7 @@ def run(outdir: Path) -> None:
         subprocess.run(
             [sys.executable, str(PILOT), "--dir", str(outdir), "--arm", arm,
              "--max-sugg", str(buf)],
-            check=True)
+            env=env, check=True)
         # injection_pilot.py always writes arm_{arm}.json; rename so the four cells
         # coexist. This is the renaming the killed driver did by hand (§11.6).
         (outdir / f"arm_{arm}.json").rename(dest)
@@ -220,6 +243,15 @@ def analyse(outdir: Path) -> dict:
                                 mean_delta + 1.96 * se_delta],
             "reject_at_0.05": bool(p_value < 0.05) if m else False,
         },
+        # What n WOULD bound the interaction below the campaign's effect of interest.
+        # The half-width goes as 1/sqrt(n), so n_needed = n * (halfwidth / effect)^2.
+        # The formula is fixed here before any cell was analysed; only the measured
+        # se that feeds it comes from the data. This exists because the cheap move on
+        # seeing a null is to call it good enough, and the price of an experiment that
+        # could actually clear the campaign belongs on the table next to it.
+        "n_to_bound_interaction": (
+            int(np.ceil(n * (1.96 * se_delta / EFFECT_OF_INTEREST) ** 2))
+            if np.isfinite(se_delta) and se_delta > 0 else None),
         "per_arm_buffer_flips": flips,
         "saturation": sat,
         "discordance": {
@@ -248,6 +280,10 @@ def _print(res: dict) -> None:
     lo_, hi_ = p["ci95_mean_Delta"]
     print(f"  mean Delta           {p['mean_Delta']:+.3f}  "
           f"[95% {lo_:+.3f}, {hi_:+.3f}]   effect of interest {EFFECT_OF_INTEREST}")
+    nb = res.get("n_to_bound_interaction")
+    print(f"  n to bound it < {EFFECT_OF_INTEREST}   "
+          f"{nb if nb else 'n/a'}   pairs per cell, i.e. this experiment "
+          f"{(nb / n):.1f}x over" if nb else "")
     print("\nper-arm buffer flips (raising 2^14 -> 2^18)")
     for arm, f in res["per_arm_buffer_flips"].items():
         print(f"  {arm:11s} {f['recovered_lo']:>3d} -> {f['recovered_hi']:<3d} "
@@ -283,7 +319,7 @@ def main() -> None:
     elif args.make:
         subprocess.run(
             [sys.executable, str(PILOT), "--dir", str(args.dir), "--make",
-             "--n", str(args.n), "--snr", str(args.snr)], check=True)
+             "--n", str(args.n), "--snr", str(args.snr)], env=_env(), check=True)
     elif args.run:
         run(args.dir)
     elif args.analyse:
