@@ -75,6 +75,22 @@ def snr_ratio(
     against the true profile instead, which is a cleaner and provably monotone reference
     but not what the code scores with. Quoting both is the point -- if they disagree the
     number is an artefact of the filter, not a property of the grid.
+
+    **This returns a profile overlap, and it is NOT a correlation between two templates'
+    scores.** Both quantities weight the same smearing factor `S(k)`, but by different
+    spectra:
+
+        this function   sum_k |P(k)|^2 S(k) / sum_k |P(k)|^2      (the PULSE's spectrum)
+        score corr.     sum_k |H(k)|^2 S(k) / sum_k |H(k)|^2      (the FILTER's)
+
+    They coincide only when the filter is the pulse, and it is not: at `ducy = 0.10` with
+    `N_b = 64` the bank selects a boxcar of width 3, whose `<k^2>` is about 4x the
+    pulse's, so the smearing is weighted toward higher harmonics and the score
+    decorrelates roughly 3x faster than the profile overlap suggests. Feeding a
+    *between-template* residual `delta_A - delta_B` to this function and reading the
+    result as a score correlation therefore understates the decorrelation substantially.
+    Found by the injection-campaign session in its own extension of this module; recorded
+    here so the next caller does not repeat it.
     """
     smear = smearing_factor(delta, tau, f0, poly_order, nbins, basis_fn)
     widths = generate_box_width_trials(nbins, ducy_max=ducy_max)
