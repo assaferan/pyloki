@@ -83,20 +83,20 @@ visible.
 
 The case above would be weak if raising `max_sugg` reliably escaped the ratchet: a user
 who noticed could just raise it. Measured on one fixed set of 10 realisations, sweeping
-the buffer at a 64-segment, `poly_order = 4`, `branch_max = 16` Chebyshev search:
+the buffer at a single 64-segment, `poly_order = 4`, `branch_max = 16` Chebyshev search — the two rows are the two `tiling_strategy` values of **one** configuration, not two configurations:
 
-| branching-pattern product | `max_sugg` | median `ncand` | median saturation |
+| tiling strategy (branching product) | `max_sugg` | median `ncand` | median saturation |
 |---|---|---|---|
-| 1.5 × 10¹² (low) | 2^18 | 16 778 | 0.064 |
+| `aggressive` (1.5 × 10¹²) | 2^18 | 16 778 | 0.064 |
 | | 2^19 | **16 778** | 0.032 |
 | | 2^20 | **16 778** | 0.016 |
 | | 2^21 | **16 778** | **0.008** |
-| 5.4 × 10²⁰ (high) | 2^18 | 152 007 | 0.580 |
+| `quadrature` (5.4 × 10²⁰) | 2^18 | 152 007 | 0.580 |
 | | 2^19 | 390 575 | 0.745 |
 | | 2^20 | 808 116 | 0.771 |
 | | 2^21 | **1 610 052** | **0.768** |
 
-The low-branching configuration converges: **identical candidate counts at four
+The low-branching strategy converges: **identical candidate counts at four
 buffers spanning a factor of 8**, saturation falling to 0.008, the ratchet gone. The
 high-branching one **never** converges — over the same factor of 8 its count grows by a
 factor of 10.6, with `d log2(ncand) / d log2(max_sugg)` = 1.135 over the full span and
