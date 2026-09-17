@@ -2,13 +2,16 @@
 
 > ## ⚠ WORK IN PROGRESS — handed off mid-experiment
 >
-> Written in one session and stopped before the last experiment finished. The power
-> calculation (§2–§5) is complete and self-consistent. The empirical part (§6) is not:
-> one confound was found, partly characterised, and **not** pinned down, and an early
-> draft of this file over-claimed it from a comparison that could not support the claim
-> (§6.4 says exactly what and why). **§11 is the handoff** — read it before trusting any
-> number here, because it separates what was verified in this session from what was
-> taken on trust from the `metric-gridding` branch.
+> Written across two sessions. The second one finished §11.6's paired experiment
+> (**§6.5**), checked §11.4's `rho_AB` assumption and found it wrong (**§5.2**), and
+> propagated that into the stratification and the design (**§5.1, §9**). Read §6.5 and
+> §5.2 first: between them they change the verdict, `pi`, `n`, and the number of strata.
+> **§11 is the original handoff** and still separates what was verified from what was
+> taken on trust; §11.4 and §11.6 are now closed out in the body.
+>
+> The power calculation (§2–§5) is complete and self-consistent *given* §5.2's
+> correction. The empirical part is no longer silent on the confound but has **not**
+> eliminated it — §6.5 is a failure to reject, not a null, and says so.
 >
 > No production campaign was run. No inherited code was modified.
 
@@ -65,18 +68,31 @@ shown to do so symmetrically between the arms.**
   `thresholds[-1]`), so the ratchet is firing at **intermediate** stages, which is where
   it matters and where it is hardest to see.
 
-- **What is NOT established, and what an early draft of this file wrongly claimed.** That
-  the confound is *arm-dependent* — i.e. that it penalises `quadrature` more than
-  `aggressive` because `quadrature`'s branching product is 2^28.4 times larger. It is
-  plausible from the code and from `quadrature`'s branching, but the experiment that
-  would show it (both arms, both buffers, identical realisations) **was killed before
-  the `quadrature`-at-2^18 arm finished**. See §6.4.
+- **The arm-dependence question, now measured (§6.5, 50 realisations, all four cells).**
+  Two separate answers, and they must not be collapsed:
+  - **The buffer *pressure* is arm-dependent, significantly.** At 2^18, 10/50
+    `quadrature` runs exceed 0.9 saturation against 1/50 for `aggressive` (paired
+    McNemar **p = 0.012**), median saturation 0.724 vs 0.165. `aggressive` has largely
+    escaped the buffer at 2^18; `quadrature` has not.
+  - **Whether that becomes an arm-dependent *outcome* bias is unresolved, and the point
+    estimate is worse than the effect being measured.** The pre-registered sign test
+    gives p = 0.34 — a failure to reject, *not* a null. The interval is
+    `+0.080 [−0.043, +0.203]` against a campaign effect of interest of **0.06**: the
+    best estimate of the confound **exceeds** the signal, and points the same way.
+    Closing it needs **211 realisations per cell**, 4.2x this experiment (~10–14
+    core-hours).
 
-**Recommendation: do not run the campaign until §6.4 is closed.** Not because the effect
-is out of reach — it is not — but because the one systematic large enough to reverse the
-answer is currently uncharacterised, and 20-pair batches are far too noisy to
-characterise it (§6.4 shows two batches at *identical settings* giving `quadrature`
-4/20 and 11/20).
+  Also established: raising the buffer produced **20 flips, all toward recovery, none
+  away**, in both arms.
+
+**Recommendation: do not run the campaign, and specifically do not run it at 2^18.**
+§6.4 is **not closed**. The systematic large enough to reverse the answer is now
+measured at the mechanism level (arm-dependent buffer pressure, p = 0.012) and
+unresolved at the outcome level, with a point estimate above the effect of interest.
+§7.1's remedy is therefore mandatory rather than advisory: `quadrature`'s 99th-percentile
+saturation at 2^18 is **0.975** against the < 0.9 the design requires. Raise the buffer
+until both arms clear it, re-measure cost there, and only then re-run §6.5's four cells
+at n ≈ 211 to confirm the interaction is bounded.
 
 ---
 
@@ -527,6 +543,90 @@ a real mechanism, a measurement too small to see it, and a conclusion drawn anyw
 
 *And 2^18 is still not obviously enough.* Saturation reached 0.94–0.98 somewhere in
 every batch. The buffer has to go higher, and `quadrature`'s cost goes with it.
+
+---
+
+### 6.5 The paired `max_sugg` experiment: §6.4 is NOT closed, and the confound may be bigger than the effect
+
+§11.6's experiment, run as specified: **one** fixed set of **50** realisations at S/N 14,
+all four `(arm, max_sugg)` cells, 2^14 and 2^18. The analysis was pre-registered in
+`paired_max_sugg.py:plan()` and **committed before the first cell ran** (`d238142`);
+`paired_max_sugg_results.json` carries the pre-registration alongside the result and all
+200 runs.
+
+**Recovery, all four cells (out of 50):**
+
+| | 2^14 | 2^18 |
+|---|---|---|
+| `aggressive` | 30 | 38 |
+| `quadrature` | 28 | 40 |
+
+**1. Raising the buffer only ever helps, in both arms.** `aggressive` gained 8 and lost
+**0** (McNemar p = 0.008); `quadrature` gained 12 and lost **0** (p < 0.001). Twenty
+flips, all in the same direction. The ratchet is purely destructive to recovery, and
+this confirms §6.4's central claim on 2.5x the realisations.
+
+**2. The buffer pressure IS arm-dependent — measured, and significant.** At 2^18,
+runs with `saturation > 0.9`:
+
+| buffer | `aggressive` | `quadrature` | paired `n01`/`n10` | McNemar `p` |
+|---|---|---|---|---|
+| 2^14 | 5/50 | 8/50 | 8 / 5 | 0.58 |
+| **2^18** | **1/50** | **10/50** | **10 / 1** | **0.012** |
+
+with median saturation 0.165 vs **0.724** and median candidate counts 43 314 vs
+**189 828**. At 2^14 both arms are slammed against the buffer and the asymmetry is
+invisible; at 2^18 `aggressive` has largely escaped and `quadrature` has not. **The
+mechanism for an arm-dependent bias is present and is now measured**, which is more than
+§6.4 could say.
+
+**3. Whether that becomes an arm-dependent OUTCOME bias is NOT resolved — and the point
+estimate is worse than the effect being measured.** The pre-registered primary, a sign
+test on `Delta_i = d_i(2^18) − d_i(2^14)`:
+
+    nonzero Delta   10/50        k positive   7        exact two-sided p = 0.34
+    mean Delta      +0.080       95% CI  [−0.043, +0.203]
+    campaign's effect of interest                       0.06
+
+**This is a failure to reject, not a null.** Read the interval, not the p-value: the
+best estimate of the arm-dependent buffer bias is **+0.080, which is larger than the
+0.06 the campaign is powered to detect**, and it points *toward* `quadrature` — the same
+direction as the effect the campaign would be trying to claim. The interval is
+consistent with no interaction, and equally consistent with one three times the size of
+the signal. n = 50 simply cannot tell them apart.
+
+**This was pre-committed, in exactly these words, before the data existed**: *"NOT a
+green light, and must not be reported as one … it excludes a gross arm-dependence and
+nothing more."* That is the reading, and the point estimate makes it stronger than
+anticipated, not weaker.
+
+**4. What it would take to close it.** From the measured `se`, bounding the interaction
+below 0.06 needs **211 realisations per cell**, 4.2x this experiment — roughly 10–14
+core-hours for all four cells at the measured per-pair costs. That is the honest price
+of an experiment that could *clear* the campaign rather than merely fail to condemn it.
+
+**5. The discordance direction flips with the buffer — and this is exactly the claim
+§6.4 retracted, so it is not being made again.** `n01`/`n10` is 4/6 at 2^14 and 5/3 at
+2^18. On *one fixed set* this time rather than independent batches, so it is not the
+same error — but 10 and 8 discordances cannot carry a direction, the sign test on
+`Delta` **is** the correct test of precisely this flip, and it gives p = 0.34. Recorded
+as an observation, tested, and not concluded from.
+
+**6. S/N 14 is the wrong operating point at 2^18 — and in the opposite direction to
+what the `metric-gridding` model predicts.** §9 wants on-grid `P_d ≈ 0.5` in both arms,
+because discordance is maximised at the steepest part of the recovery curve. Measured
+here: **0.76 and 0.80**. The operating point is well *above* the optimum, so the 3-point
+pilot should bracket **below** S/N 14 — while D78 from the `metric-gridding` session
+recommends 15–17, which is further above it. The two disagree on direction; this one is
+a direct measurement of recovery at the final buffer and that is the criterion §9 states.
+
+#### Verdict on §6.4
+
+**Not closed, and the campaign must not run at 2^18.** §7.1's remedy is no longer
+advisory: `quadrature`'s 99th-percentile saturation at 2^18 is **0.975**, against the
+< 0.9 the design requires, and it is 20% of runs above 0.9 versus `aggressive`'s 2%. The
+buffer must go higher — and the measured asymmetry says the *reason* to raise it is
+specifically that `quadrature` is still inside it when `aggressive` has left.
 
 ---
 
