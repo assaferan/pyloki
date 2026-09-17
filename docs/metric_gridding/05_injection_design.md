@@ -717,6 +717,24 @@ A third option is to shrink the configuration — fewer segments, smaller
 affordable, and ask the idealised question there. That is a different experiment with a
 different external validity, and it has not been costed.
 
+**A fourth option, which nothing above has considered and which keeps both the
+configuration and the idealised question: make the ladder stricter.** The candidate
+count is set by how much the threshold scheme admits, and the schemes here are
+calibrated to `P_d` = 0.1031. A ladder calibrated to a smaller `P_d` has higher
+thresholds at every stage and admits proportionally fewer leaves, so `quadrature`'s true
+count could fall by orders of magnitude while the comparison stays a fair equal-`P_d`
+one — both arms simply move to a stricter operating point together. That changes *which*
+operating point the campaign speaks about, which is a real cost and must be stated, but
+it does not change the configuration or make the question hypothetical.
+
+It is also cheap to test before committing to anything: generate one stricter
+`quadrature` ladder, run 10 realisations at 2^20, and see whether the count converges.
+If it does, stage 1 is back. **Untested** — noted here because it is the only route
+found so far that preserves both the deployed configuration and the idealised question,
+not because there is evidence it works. The obvious risk is that a stricter ladder
+lowers `P_d` below the ~0.5 operating point §9 wants, and the two constraints may not be
+simultaneously satisfiable; that is exactly what the 10-realisation test would show.
+
 *Scope.* Measured at Phase 3's configuration only (268.4 s, 64 segments,
 `poly_order = 4`, `N_b = 64`, `branch_max = 16`, Chebyshev, `eta = 1`) and on 10
 realisations. The `aggressive` convergence is exact and needs no more data; the
