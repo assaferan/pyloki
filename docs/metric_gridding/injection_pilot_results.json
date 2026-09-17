@@ -1,0 +1,2058 @@
+{
+ "note": "Pilot batches for docs/metric_gridding/05_injection_design.md. Paired runs, Chebyshev basis, branch_max=16, recalibrated ladders schemes/cheby_*.npz. p14 and p14b are the SAME 20 noise realisations at two max_sugg values: the discordance direction reverses.",
+ "batches": [
+  {
+   "snr": 12.0,
+   "max_sugg": 16384,
+   "pairs": 24,
+   "recovered_aggressive": 3,
+   "recovered_quadrature": 3,
+   "n01_quadrature_only": 1,
+   "n10_aggressive_only": 1,
+   "p_disc": 0.0833,
+   "median_seconds_aggressive": 0.67,
+   "median_seconds_quadrature": 3.11,
+   "max_saturation": 0.8803,
+   "runs_saturation_above_0.9": 0,
+   "per_run": {
+    "aggressive": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 10.140192332997685,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6976399169943761,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6434440829907544,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "mismatch": 393448.6354838538,
+      "score": 5.236412525177002,
+      "ncand": 3,
+      "seconds": 1.4401175000093644,
+      "saturation": 0.00018310546875
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6329436249943683,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": true,
+      "mismatch": 0.0205444061362887,
+      "score": 10.524374008178711,
+      "ncand": 4874,
+      "seconds": 1.020484167005634,
+      "saturation": 0.2974853515625
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": false,
+      "mismatch": 220679.96466226224,
+      "score": 3.0964012145996094,
+      "ncand": 27,
+      "seconds": 0.6759608329884941,
+      "saturation": 0.00164794921875
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": false,
+      "mismatch": 56.22909439721186,
+      "score": 6.982266426086426,
+      "ncand": 5175,
+      "seconds": 0.8830012919934234,
+      "saturation": 0.31585693359375
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": false,
+      "mismatch": 649310.8985936638,
+      "score": 3.9147942066192627,
+      "ncand": 6,
+      "seconds": 0.6237812499894062,
+      "saturation": 0.0003662109375
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.5969374169944786,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "mismatch": 1208.3610418385858,
+      "score": 6.174224853515625,
+      "ncand": 158,
+      "seconds": 0.8648413330083713,
+      "saturation": 0.0096435546875
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6402053339988925,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": false,
+      "mismatch": 709951.9889778049,
+      "score": 2.322584629058838,
+      "ncand": 22,
+      "seconds": 0.6540003749978496,
+      "saturation": 0.0013427734375
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6421023750008317,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": false,
+      "mismatch": 1654826.6963479759,
+      "score": 6.998097896575928,
+      "ncand": 3,
+      "seconds": 0.6499297920090612,
+      "saturation": 0.00018310546875
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": false,
+      "mismatch": 2904952.032416354,
+      "score": 6.588046073913574,
+      "ncand": 1,
+      "seconds": 0.7263085419981508,
+      "saturation": 6.103515625e-05
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": false,
+      "mismatch": 120278.94319081205,
+      "score": 5.598392009735107,
+      "ncand": 33,
+      "seconds": 0.6732070419966476,
+      "saturation": 0.00201416015625
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6040846660034731,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 11.460295677185059,
+      "ncand": 11069,
+      "seconds": 1.2381017919979058,
+      "saturation": 0.67559814453125
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6191478749969974,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0020.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 11.502578735351562,
+      "ncand": 14248,
+      "seconds": 1.1926083330035908,
+      "saturation": 0.86962890625
+     },
+     {
+      "file": "tim_0021.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6049964169942541,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0022.npz",
+      "recovered": false,
+      "mismatch": 257628.95810590536,
+      "score": 5.678342342376709,
+      "ncand": 91,
+      "seconds": 0.7280354999966221,
+      "saturation": 0.00555419921875
+     },
+     {
+      "file": "tim_0023.npz",
+      "recovered": false,
+      "mismatch": 511498.4684684171,
+      "score": 5.327198028564453,
+      "ncand": 6,
+      "seconds": 0.7079622910096077,
+      "saturation": 0.0003662109375
+     }
+    ],
+    "quadrature": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "mismatch": 235262.90455177164,
+      "score": 3.1908414363861084,
+      "ncand": 8125,
+      "seconds": 13.378493667012663,
+      "saturation": 0.49591064453125
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": false,
+      "mismatch": 375105.70434603625,
+      "score": 3.3339879512786865,
+      "ncand": 8313,
+      "seconds": 3.076805124990642,
+      "saturation": 0.50738525390625
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": false,
+      "mismatch": 129745.17917891713,
+      "score": 4.302818775177002,
+      "ncand": 8469,
+      "seconds": 3.1233175410015974,
+      "saturation": 0.51690673828125
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "mismatch": 800306.3687825011,
+      "score": 3.651538610458374,
+      "ncand": 12965,
+      "seconds": 3.142272540993872,
+      "saturation": 0.79132080078125
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": false,
+      "mismatch": 403848.4704729494,
+      "score": 3.326526165008545,
+      "ncand": 13667,
+      "seconds": 3.107632458995795,
+      "saturation": 0.83416748046875
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "mismatch": 4547.694027589678,
+      "score": 6.584264755249023,
+      "ncand": 10400,
+      "seconds": 3.050469374997192,
+      "saturation": 0.634765625
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": false,
+      "mismatch": 311463.1497842704,
+      "score": 2.7531938552856445,
+      "ncand": 8482,
+      "seconds": 3.434796166009619,
+      "saturation": 0.5177001953125
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": false,
+      "mismatch": 7332.190092402002,
+      "score": 6.786625385284424,
+      "ncand": 12461,
+      "seconds": 3.145394999999553,
+      "saturation": 0.76055908203125
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": false,
+      "mismatch": 43619.79862438859,
+      "score": 2.5210318565368652,
+      "ncand": 10470,
+      "seconds": 3.1873124169942457,
+      "saturation": 0.6390380859375
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "mismatch": 125420.06315517394,
+      "score": 2.775134801864624,
+      "ncand": 9511,
+      "seconds": 2.953757583993138,
+      "saturation": 0.58050537109375
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "mismatch": 65.13221462540568,
+      "score": 6.016250133514404,
+      "ncand": 6923,
+      "seconds": 3.2002134590002242,
+      "saturation": 0.42254638671875
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "mismatch": 167591.03249161385,
+      "score": 3.126220464706421,
+      "ncand": 8162,
+      "seconds": 2.9870272499974817,
+      "saturation": 0.4981689453125
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": false,
+      "mismatch": 228438.69496326367,
+      "score": 2.9089486598968506,
+      "ncand": 7273,
+      "seconds": 3.004468082988751,
+      "saturation": 0.44390869140625
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": 756140.7792512178,
+      "score": 2.825252056121826,
+      "ncand": 8510,
+      "seconds": 3.2322224590025144,
+      "saturation": 0.5194091796875
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": false,
+      "mismatch": 43657.088438693165,
+      "score": 3.968907594680786,
+      "ncand": 14423,
+      "seconds": 3.0476268749916926,
+      "saturation": 0.88031005859375
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "mismatch": 0.0004016988627619622,
+      "score": 11.388385772705078,
+      "ncand": 8694,
+      "seconds": 3.371434875007253,
+      "saturation": 0.5306396484375
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": false,
+      "mismatch": 541448.8480713146,
+      "score": 2.6553566455841064,
+      "ncand": 8945,
+      "seconds": 2.914178709004773,
+      "saturation": 0.54595947265625
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": false,
+      "mismatch": 247307.2670099109,
+      "score": 3.166126251220703,
+      "ncand": 11746,
+      "seconds": 2.986387291995925,
+      "saturation": 0.7169189453125
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.0027146933447028594,
+      "score": 11.324763298034668,
+      "ncand": 14421,
+      "seconds": 3.35075058399525,
+      "saturation": 0.88018798828125
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": false,
+      "mismatch": 428985.61519576435,
+      "score": 3.1561570167541504,
+      "ncand": 7451,
+      "seconds": 2.872654082995723,
+      "saturation": 0.45477294921875
+     },
+     {
+      "file": "tim_0020.npz",
+      "recovered": true,
+      "mismatch": 8.504095932885981e-05,
+      "score": 11.447880744934082,
+      "ncand": 11911,
+      "seconds": 2.895915207991493,
+      "saturation": 0.72698974609375
+     },
+     {
+      "file": "tim_0021.npz",
+      "recovered": false,
+      "mismatch": 153481.22689995507,
+      "score": 4.3387579917907715,
+      "ncand": 9382,
+      "seconds": 3.146640250008204,
+      "saturation": 0.5726318359375
+     },
+     {
+      "file": "tim_0022.npz",
+      "recovered": false,
+      "mismatch": 11935.648509809476,
+      "score": 5.409703731536865,
+      "ncand": 7322,
+      "seconds": 3.020302040997194,
+      "saturation": 0.4468994140625
+     },
+     {
+      "file": "tim_0023.npz",
+      "recovered": false,
+      "mismatch": 181953.66026370006,
+      "score": 2.887371063232422,
+      "ncand": 12952,
+      "seconds": 3.5034009170049103,
+      "saturation": 0.79052734375
+     }
+    ]
+   }
+  },
+  {
+   "snr": 14.0,
+   "max_sugg": 16384,
+   "pairs": 20,
+   "recovered_aggressive": 7,
+   "recovered_quadrature": 4,
+   "n01_quadrature_only": 1,
+   "n10_aggressive_only": 4,
+   "p_disc": 0.25,
+   "median_seconds_aggressive": 1.01,
+   "median_seconds_quadrature": 3.54,
+   "max_saturation": 0.9784,
+   "runs_saturation_above_0.9": 2,
+   "per_run": {
+    "aggressive": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "mismatch": 1575172.3122185098,
+      "score": 3.7490854263305664,
+      "ncand": 7,
+      "seconds": 11.880899708005018,
+      "saturation": 0.00042724609375
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": false,
+      "mismatch": 45.870957711905085,
+      "score": 8.697400093078613,
+      "ncand": 5781,
+      "seconds": 1.0070768750010757,
+      "saturation": 0.35284423828125
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.07793140411377,
+      "ncand": 12002,
+      "seconds": 1.3223767079907702,
+      "saturation": 0.7325439453125
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 10.560799598693848,
+      "ncand": 8869,
+      "seconds": 1.0949684170045657,
+      "saturation": 0.54132080078125
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": false,
+      "mismatch": 648076.8416742437,
+      "score": 7.004838943481445,
+      "ncand": 71,
+      "seconds": 0.7340380419918802,
+      "saturation": 0.00433349609375
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "mismatch": 1624351.8229886615,
+      "score": 3.0759849548339844,
+      "ncand": 9,
+      "seconds": 0.7371819999971194,
+      "saturation": 0.00054931640625
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.550758361816406,
+      "ncand": 10776,
+      "seconds": 1.333321625003009,
+      "saturation": 0.65771484375
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "mismatch": 0.0473517642110403,
+      "score": 11.800975799560547,
+      "ncand": 10009,
+      "seconds": 1.1493319170112954,
+      "saturation": 0.61090087890625
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 11.577512741088867,
+      "ncand": 9549,
+      "seconds": 1.041884125006618,
+      "saturation": 0.58282470703125
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "mismatch": 59.73584145889883,
+      "score": 5.86494779586792,
+      "ncand": 9751,
+      "seconds": 0.9904769160057185,
+      "saturation": 0.59515380859375
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "mismatch": 3672.80328718214,
+      "score": 6.435758590698242,
+      "ncand": 4655,
+      "seconds": 1.1607666670024628,
+      "saturation": 0.28411865234375
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "mismatch": 2705.8413098006745,
+      "score": 6.804464340209961,
+      "ncand": 3064,
+      "seconds": 0.8758031659963308,
+      "saturation": 0.18701171875
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6364377089921618,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": 1875683.8484686539,
+      "score": 6.879488945007324,
+      "ncand": 11,
+      "seconds": 0.6870267080084886,
+      "saturation": 0.00067138671875
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6478044160030549,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6997368750016904,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": false,
+      "mismatch": 48.244161893483955,
+      "score": 7.607007026672363,
+      "ncand": 12444,
+      "seconds": 1.3005110840022098,
+      "saturation": 0.759521484375
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": false,
+      "mismatch": 354.3429650691308,
+      "score": 7.356044769287109,
+      "ncand": 9967,
+      "seconds": 1.2091887919959845,
+      "saturation": 0.60833740234375
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 11.087034225463867,
+      "ncand": 6574,
+      "seconds": 0.9030637499963632,
+      "saturation": 0.4012451171875
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.08857250213623,
+      "ncand": 12715,
+      "seconds": 1.374299749993952,
+      "saturation": 0.77606201171875
+     }
+    ],
+    "quadrature": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "mismatch": 124625.86301144958,
+      "score": 3.7921078205108643,
+      "ncand": 9625,
+      "seconds": 14.506658875005087,
+      "saturation": 0.58746337890625
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": false,
+      "mismatch": 1309695.897485444,
+      "score": 4.78708028793335,
+      "ncand": 9018,
+      "seconds": 3.571066000004066,
+      "saturation": 0.5504150390625
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "mismatch": 0.00023156878582192785,
+      "score": 12.943711280822754,
+      "ncand": 8242,
+      "seconds": 4.181391416001134,
+      "saturation": 0.5030517578125
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "mismatch": 348854.01108058577,
+      "score": 2.9241294860839844,
+      "ncand": 16030,
+      "seconds": 4.3121750420104945,
+      "saturation": 0.9783935546875
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": false,
+      "mismatch": 250886.06133213983,
+      "score": 2.957103967666626,
+      "ncand": 9389,
+      "seconds": 3.543778374994872,
+      "saturation": 0.57305908203125
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "mismatch": 6245.953028649904,
+      "score": 4.584497451782227,
+      "ncand": 9285,
+      "seconds": 4.000392665999243,
+      "saturation": 0.56671142578125
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": false,
+      "mismatch": 2088.7410359319356,
+      "score": 3.4059815406799316,
+      "ncand": 8401,
+      "seconds": 3.7143395000020973,
+      "saturation": 0.51275634765625
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "mismatch": 0.00011153231110747615,
+      "score": 13.02457046508789,
+      "ncand": 12707,
+      "seconds": 3.2876644170028158,
+      "saturation": 0.77557373046875
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": false,
+      "mismatch": 49687.876176638696,
+      "score": 2.502330780029297,
+      "ncand": 8671,
+      "seconds": 3.3031990000017686,
+      "saturation": 0.52923583984375
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "mismatch": 13499.69975581999,
+      "score": 2.113701581954956,
+      "ncand": 9049,
+      "seconds": 4.292663084008382,
+      "saturation": 0.55230712890625
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "mismatch": 26652.15776577667,
+      "score": 5.878710746765137,
+      "ncand": 11150,
+      "seconds": 3.1353559999988647,
+      "saturation": 0.6805419921875
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "mismatch": 350765.7078702737,
+      "score": 3.1812875270843506,
+      "ncand": 8716,
+      "seconds": 3.114850917001604,
+      "saturation": 0.531982421875
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": false,
+      "mismatch": 1322442.7158685233,
+      "score": 4.571090221405029,
+      "ncand": 8026,
+      "seconds": 3.1585594579955796,
+      "saturation": 0.4898681640625
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": 92109.16217253235,
+      "score": 4.719380855560303,
+      "ncand": 8794,
+      "seconds": 3.7791697079956066,
+      "saturation": 0.5367431640625
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": false,
+      "mismatch": 10200.395269992126,
+      "score": 2.3033859729766846,
+      "ncand": 9738,
+      "seconds": 3.4950203750049695,
+      "saturation": 0.5943603515625
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": false,
+      "mismatch": 496964.7803415697,
+      "score": 4.4993157386779785,
+      "ncand": 7051,
+      "seconds": 3.700846541993087,
+      "saturation": 0.43035888671875
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": true,
+      "mismatch": 0.00014153304227993184,
+      "score": 13.583043098449707,
+      "ncand": 15145,
+      "seconds": 3.336112792007043,
+      "saturation": 0.92437744140625
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": false,
+      "mismatch": 292936.4198257444,
+      "score": 2.637275457382202,
+      "ncand": 8912,
+      "seconds": 3.5320280000014463,
+      "saturation": 0.5439453125
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": false,
+      "mismatch": 232985.15465125686,
+      "score": 6.5887250900268555,
+      "ncand": 480,
+      "seconds": 2.948123833994032,
+      "saturation": 0.029296875
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "mismatch": 0.00016600992738860374,
+      "score": 13.302485466003418,
+      "ncand": 13025,
+      "seconds": 4.227103083001566,
+      "saturation": 0.79498291015625
+     }
+    ]
+   }
+  },
+  {
+   "snr": 16.0,
+   "max_sugg": 16384,
+   "pairs": 20,
+   "recovered_aggressive": 16,
+   "recovered_quadrature": 17,
+   "n01_quadrature_only": 2,
+   "n10_aggressive_only": 1,
+   "p_disc": 0.15,
+   "median_seconds_aggressive": 1.38,
+   "median_seconds_quadrature": 3.54,
+   "max_saturation": 0.9863,
+   "runs_saturation_above_0.9": 3,
+   "per_run": {
+    "aggressive": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "mismatch": 66.69614380582819,
+      "score": 5.2991623878479,
+      "ncand": 12002,
+      "seconds": 11.571309332997771,
+      "saturation": 0.7325439453125
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "mismatch": 0.09705706326292982,
+      "score": 13.393802642822266,
+      "ncand": 12579,
+      "seconds": 1.381403917010175,
+      "saturation": 0.76776123046875
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": false,
+      "mismatch": 332.8182664167376,
+      "score": 6.593664646148682,
+      "ncand": 11232,
+      "seconds": 1.0906235419970471,
+      "saturation": 0.685546875
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.143678665161133,
+      "ncand": 15309,
+      "seconds": 1.3845056669961195,
+      "saturation": 0.93438720703125
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 14.780248641967773,
+      "ncand": 9279,
+      "seconds": 1.6212873750046128,
+      "saturation": 0.56634521484375
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 14.98328685760498,
+      "ncand": 8640,
+      "seconds": 1.3718687500077067,
+      "saturation": 0.52734375
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 12.761343955993652,
+      "ncand": 14360,
+      "seconds": 1.4659553750097984,
+      "saturation": 0.87646484375
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 14.937335968017578,
+      "ncand": 13238,
+      "seconds": 1.4875318749982398,
+      "saturation": 0.8079833984375
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 13.539928436279297,
+      "ncand": 14609,
+      "seconds": 1.3650623749999795,
+      "saturation": 0.89166259765625
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.362380027770996,
+      "ncand": 9740,
+      "seconds": 1.3959174589981558,
+      "saturation": 0.594482421875
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.256124496459961,
+      "ncand": 13800,
+      "seconds": 1.3589073750044918,
+      "saturation": 0.84228515625
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.70149040222168,
+      "ncand": 12211,
+      "seconds": 1.3878853749920381,
+      "saturation": 0.74530029296875
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 12.75562572479248,
+      "ncand": 8251,
+      "seconds": 1.2392735419998644,
+      "saturation": 0.50360107421875
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 0.6769264999893494,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.149904251098633,
+      "ncand": 9483,
+      "seconds": 1.3580227920028847,
+      "saturation": 0.57879638671875
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.586987495422363,
+      "ncand": 9408,
+      "seconds": 1.4084313749917783,
+      "saturation": 0.57421875
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": false,
+      "mismatch": 426.3926451317795,
+      "score": 6.830678462982178,
+      "ncand": 147,
+      "seconds": 0.8043781250016764,
+      "saturation": 0.00897216796875
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.376215934753418,
+      "ncand": 9650,
+      "seconds": 1.3333304999978282,
+      "saturation": 0.5889892578125
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.6035215716126882,
+      "score": 10.46127700805664,
+      "ncand": 8241,
+      "seconds": 1.597971499999403,
+      "saturation": 0.50299072265625
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 15.022004127502441,
+      "ncand": 12756,
+      "seconds": 1.414923667005496,
+      "saturation": 0.778564453125
+     }
+    ],
+    "quadrature": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "mismatch": 934111.4416829137,
+      "score": 4.390833377838135,
+      "ncand": 13182,
+      "seconds": 14.725312791997567,
+      "saturation": 0.8045654296875
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "mismatch": 0.00018335929769513123,
+      "score": 14.52744197845459,
+      "ncand": 11373,
+      "seconds": 3.204308583997772,
+      "saturation": 0.69415283203125
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "mismatch": 0.0002601832522797359,
+      "score": 15.19202709197998,
+      "ncand": 9934,
+      "seconds": 3.541292791996966,
+      "saturation": 0.6063232421875
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "mismatch": 522.9169716109043,
+      "score": 7.329370498657227,
+      "ncand": 9058,
+      "seconds": 3.9597420420031995,
+      "saturation": 0.5528564453125
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": true,
+      "mismatch": 0.00016406684192398106,
+      "score": 15.2936429977417,
+      "ncand": 9405,
+      "seconds": 3.5196281670068856,
+      "saturation": 0.57403564453125
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": true,
+      "mismatch": 0.0001283960189324772,
+      "score": 15.01530933380127,
+      "ncand": 12435,
+      "seconds": 3.6434188749990426,
+      "saturation": 0.75897216796875
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "mismatch": 0.0006468659259700898,
+      "score": 15.37653923034668,
+      "ncand": 9462,
+      "seconds": 3.483158666989766,
+      "saturation": 0.5775146484375
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "mismatch": 0.00026038796296979657,
+      "score": 14.93985652923584,
+      "ncand": 12418,
+      "seconds": 3.307469500010484,
+      "saturation": 0.7579345703125
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": true,
+      "mismatch": 0.0023163047516999414,
+      "score": 14.987436294555664,
+      "ncand": 11847,
+      "seconds": 3.5205569160025334,
+      "saturation": 0.72308349609375
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": true,
+      "mismatch": 0.00011599845965038497,
+      "score": 15.712135314941406,
+      "ncand": 12095,
+      "seconds": 3.2332596670021303,
+      "saturation": 0.73822021484375
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": true,
+      "mismatch": 0.00014601252248798826,
+      "score": 15.445839881896973,
+      "ncand": 14609,
+      "seconds": 3.2856372090027435,
+      "saturation": 0.89166259765625
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": true,
+      "mismatch": 0.00017979156402284874,
+      "score": 15.831872940063477,
+      "ncand": 9271,
+      "seconds": 4.404463917002431,
+      "saturation": 0.56585693359375
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": true,
+      "mismatch": 0.00015490888071702976,
+      "score": 14.239166259765625,
+      "ncand": 13899,
+      "seconds": 3.660237584001152,
+      "saturation": 0.84832763671875
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": 33936.75135628634,
+      "score": 4.459880352020264,
+      "ncand": 11002,
+      "seconds": 3.214265583999804,
+      "saturation": 0.6715087890625
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "mismatch": 0.00014365038260072435,
+      "score": 14.882755279541016,
+      "ncand": 12770,
+      "seconds": 3.5732827500032727,
+      "saturation": 0.7794189453125
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "mismatch": 0.0003100203592739863,
+      "score": 15.60273551940918,
+      "ncand": 13320,
+      "seconds": 3.9792454999987967,
+      "saturation": 0.81298828125
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": true,
+      "mismatch": 0.000137551391137572,
+      "score": 14.848417282104492,
+      "ncand": 10189,
+      "seconds": 3.7976366250077263,
+      "saturation": 0.62188720703125
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": true,
+      "mismatch": 0.00013448730036548555,
+      "score": 15.586647033691406,
+      "ncand": 16159,
+      "seconds": 3.595026000009966,
+      "saturation": 0.98626708984375
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.00019337696236341494,
+      "score": 15.815406799316406,
+      "ncand": 11947,
+      "seconds": 3.4606461670045974,
+      "saturation": 0.72918701171875
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "mismatch": 0.00031943539619850393,
+      "score": 15.215356826782227,
+      "ncand": 15097,
+      "seconds": 3.905027415996301,
+      "saturation": 0.92144775390625
+     }
+    ]
+   }
+  },
+  {
+   "snr": 14.0,
+   "max_sugg": 262144,
+   "pairs": 20,
+   "recovered_aggressive": 13,
+   "recovered_quadrature": 15,
+   "n01_quadrature_only": 4,
+   "n10_aggressive_only": 2,
+   "p_disc": 0.3,
+   "median_seconds_aggressive": 2.31,
+   "median_seconds_quadrature": 47.47,
+   "max_saturation": 0.9785,
+   "runs_saturation_above_0.9": 2,
+   "per_run": {
+    "aggressive": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.11367416381836,
+      "ncand": 32320,
+      "seconds": 12.579085834004218,
+      "saturation": 0.123291015625
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "mismatch": 0.024330140473951656,
+      "score": 11.967294692993164,
+      "ncand": 10596,
+      "seconds": 1.2910506670014001,
+      "saturation": 0.0404205322265625
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.43283462524414,
+      "ncand": 12304,
+      "seconds": 1.3823435829981463,
+      "saturation": 0.04693603515625
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.764135360717773,
+      "ncand": 219150,
+      "seconds": 5.718137542004115,
+      "saturation": 0.8359909057617188
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": false,
+      "mismatch": Infinity,
+      "score": NaN,
+      "ncand": 0,
+      "seconds": 1.1047386249992996,
+      "saturation": 0.0
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "mismatch": 812.8028328099381,
+      "score": 5.603943347930908,
+      "ncand": 10,
+      "seconds": 1.0837648329907097,
+      "saturation": 3.814697265625e-05
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.37612247467041,
+      "ncand": 80743,
+      "seconds": 2.7234061659983126,
+      "saturation": 0.3080101013183594
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.655804634094238,
+      "ncand": 251748,
+      "seconds": 11.114222083997447,
+      "saturation": 0.9603424072265625
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.349858283996582,
+      "ncand": 230978,
+      "seconds": 9.827104084004532,
+      "saturation": 0.8811111450195312
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": true,
+      "mismatch": 0.0473517642110403,
+      "score": 12.171615600585938,
+      "ncand": 51921,
+      "seconds": 2.309166124992771,
+      "saturation": 0.19806289672851562
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "mismatch": 1576.0480985394468,
+      "score": 5.911640644073486,
+      "ncand": 6751,
+      "seconds": 1.545436750006047,
+      "saturation": 0.025753021240234375
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 12.918035507202148,
+      "ncand": 119488,
+      "seconds": 4.226914875005605,
+      "saturation": 0.455810546875
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 11.990619659423828,
+      "ncand": 7192,
+      "seconds": 1.3154651660006493,
+      "saturation": 0.027435302734375
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "mismatch": 48.523150291209895,
+      "score": 9.041144371032715,
+      "ncand": 21438,
+      "seconds": 2.4792078329919605,
+      "saturation": 0.08177947998046875
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 13.694283485412598,
+      "ncand": 159269,
+      "seconds": 10.069758500001626,
+      "saturation": 0.6075630187988281
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": false,
+      "mismatch": 57.513607370566156,
+      "score": 7.765549182891846,
+      "ncand": 3217,
+      "seconds": 1.2240516659949208,
+      "saturation": 0.012271881103515625
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": false,
+      "mismatch": 61.159436093686736,
+      "score": 7.281990051269531,
+      "ncand": 1525,
+      "seconds": 1.2100890830042772,
+      "saturation": 0.005817413330078125
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": false,
+      "mismatch": 534081.1132170033,
+      "score": 7.1062188148498535,
+      "ncand": 78,
+      "seconds": 1.4695909580041189,
+      "saturation": 0.00029754638671875
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.0018548553685189214,
+      "score": 12.716075897216797,
+      "ncand": 61196,
+      "seconds": 2.5071001250034897,
+      "saturation": 0.2334442138671875
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "mismatch": 0.09094110870902723,
+      "score": 11.325455665588379,
+      "ncand": 44026,
+      "seconds": 2.8034359169978416,
+      "saturation": 0.16794586181640625
+     }
+    ],
+    "quadrature": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": true,
+      "mismatch": 0.00043353535669507693,
+      "score": 13.058972358703613,
+      "ncand": 202609,
+      "seconds": 54.70484549998946,
+      "saturation": 0.7728919982910156
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "mismatch": 0.0001388790730142008,
+      "score": 13.168675422668457,
+      "ncand": 174180,
+      "seconds": 42.34077479201369,
+      "saturation": 0.6644439697265625
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": false,
+      "mismatch": 47820.14723061216,
+      "score": 4.15450382232666,
+      "ncand": 124704,
+      "seconds": 40.33774925000034,
+      "saturation": 0.4757080078125
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": true,
+      "mismatch": 0.00012359900618720692,
+      "score": 13.810354232788086,
+      "ncand": 207932,
+      "seconds": 49.24690012499923,
+      "saturation": 0.7931976318359375
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": false,
+      "mismatch": 11080.031260031032,
+      "score": 3.4450316429138184,
+      "ncand": 189404,
+      "seconds": 43.54242375001195,
+      "saturation": 0.7225189208984375
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": true,
+      "mismatch": 0.00020900883818013335,
+      "score": 13.044244766235352,
+      "ncand": 202691,
+      "seconds": 51.516303791999235,
+      "saturation": 0.7732048034667969
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "mismatch": 8.75496724289821e-05,
+      "score": 13.697369575500488,
+      "ncand": 210916,
+      "seconds": 47.104097125004046,
+      "saturation": 0.8045806884765625
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "mismatch": 0.00011423552300176586,
+      "score": 13.541449546813965,
+      "ncand": 146174,
+      "seconds": 49.942743749998044,
+      "saturation": 0.5576095581054688
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": true,
+      "mismatch": 0.00013090313974065492,
+      "score": 13.447680473327637,
+      "ncand": 190330,
+      "seconds": 46.69038570798875,
+      "saturation": 0.7260513305664062
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "mismatch": 6034.411998074886,
+      "score": 2.66937518119812,
+      "ncand": 118420,
+      "seconds": 47.44268470800307,
+      "saturation": 0.4517364501953125
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "mismatch": 2490.7212984076364,
+      "score": 4.389974594116211,
+      "ncand": 156780,
+      "seconds": 51.09117879200494,
+      "saturation": 0.5980682373046875
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": true,
+      "mismatch": 0.00011147516022469827,
+      "score": 12.919137001037598,
+      "ncand": 188609,
+      "seconds": 44.58391608399688,
+      "saturation": 0.7194862365722656
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": true,
+      "mismatch": 0.00012316895100574773,
+      "score": 12.804510116577148,
+      "ncand": 199941,
+      "seconds": 49.40855537500465,
+      "saturation": 0.7627143859863281
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": true,
+      "mismatch": 0.0001427666494302461,
+      "score": 13.364067077636719,
+      "ncand": 225552,
+      "seconds": 49.00761129098828,
+      "saturation": 0.86041259765625
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "mismatch": 5.5611114071555336e-05,
+      "score": 13.56732177734375,
+      "ncand": 256518,
+      "seconds": 48.47711145799258,
+      "saturation": 0.9785385131835938
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "mismatch": 0.00013954289952786435,
+      "score": 12.85111141204834,
+      "ncand": 202702,
+      "seconds": 43.80284845799906,
+      "saturation": 0.7732467651367188
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": true,
+      "mismatch": 0.00014159641399766524,
+      "score": 13.381465911865234,
+      "ncand": 192602,
+      "seconds": 48.43267662500148,
+      "saturation": 0.7347183227539062
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": false,
+      "mismatch": 8616.177893627557,
+      "score": 4.776779651641846,
+      "ncand": 171222,
+      "seconds": 42.17280324999592,
+      "saturation": 0.6531600952148438
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "mismatch": 0.00011434422195225604,
+      "score": 13.306184768676758,
+      "ncand": 175650,
+      "seconds": 48.65852920799807,
+      "saturation": 0.6700515747070312
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "mismatch": 0.00013817480190835577,
+      "score": 14.102607727050781,
+      "ncand": 201357,
+      "seconds": 47.47200029200758,
+      "saturation": 0.7681159973144531
+     }
+    ]
+   }
+  }
+ ],
+ "paired_max_sugg_test": {
+  "note": "SAME 20 noise realisations run at two max_sugg values, S/N 14. INCOMPLETE: aggressive finished at both buffers, quadrature only at 2^14 (the 2^18 quadrature arm was killed at hand-off). The aggressive-vs-aggressive within-realisation contrast is therefore the only complete part.",
+  "arms": {
+   "arm_aggressive_16384": {
+    "n": 20,
+    "recovered": 11,
+    "median_seconds": 1.1,
+    "max_saturation": 0.9718,
+    "per_run": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "ncand": 10075,
+      "saturation": 0.6149,
+      "seconds": 12.04
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "ncand": 12702,
+      "saturation": 0.7753,
+      "seconds": 1.33
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "ncand": 14223,
+      "saturation": 0.8681,
+      "seconds": 1.5
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "ncand": 0,
+      "saturation": 0.0,
+      "seconds": 0.71
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": true,
+      "ncand": 12727,
+      "saturation": 0.7768,
+      "seconds": 1.27
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "ncand": 0,
+      "saturation": 0.0,
+      "seconds": 0.67
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "ncand": 14198,
+      "saturation": 0.8666,
+      "seconds": 1.17
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "ncand": 15922,
+      "saturation": 0.9718,
+      "seconds": 1.41
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": false,
+      "ncand": 0,
+      "saturation": 0.0,
+      "seconds": 0.72
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "ncand": 9,
+      "saturation": 0.0005,
+      "seconds": 0.8
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "ncand": 5,
+      "saturation": 0.0003,
+      "seconds": 0.67
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "ncand": 1540,
+      "saturation": 0.094,
+      "seconds": 1.01
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": false,
+      "ncand": 1326,
+      "saturation": 0.0809,
+      "seconds": 0.86
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": false,
+      "ncand": 14,
+      "saturation": 0.0009,
+      "seconds": 0.74
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "ncand": 13216,
+      "saturation": 0.8066,
+      "seconds": 1.42
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "ncand": 7493,
+      "saturation": 0.4573,
+      "seconds": 1.01
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": true,
+      "ncand": 12098,
+      "saturation": 0.7384,
+      "seconds": 1.1
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": true,
+      "ncand": 15877,
+      "saturation": 0.9691,
+      "seconds": 1.57
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "ncand": 12485,
+      "saturation": 0.762,
+      "seconds": 1.31
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "ncand": 8773,
+      "saturation": 0.5355,
+      "seconds": 1.48
+     }
+    ]
+   },
+   "arm_aggressive_262144": {
+    "n": 20,
+    "recovered": 13,
+    "median_seconds": 2.29,
+    "max_saturation": 0.9398,
+    "per_run": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": false,
+      "ncand": 15841,
+      "saturation": 0.0604,
+      "seconds": 13.02
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "ncand": 236474,
+      "saturation": 0.9021,
+      "seconds": 8.47
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "ncand": 241295,
+      "saturation": 0.9205,
+      "seconds": 11.23
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "ncand": 1587,
+      "saturation": 0.0061,
+      "seconds": 1.71
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": true,
+      "ncand": 121879,
+      "saturation": 0.4649,
+      "seconds": 3.66
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "ncand": 27,
+      "saturation": 0.0001,
+      "seconds": 1.11
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": true,
+      "ncand": 57264,
+      "saturation": 0.2184,
+      "seconds": 2.65
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "ncand": 145650,
+      "saturation": 0.5556,
+      "seconds": 5.94
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": false,
+      "ncand": 7726,
+      "saturation": 0.0295,
+      "seconds": 1.69
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "ncand": 28,
+      "saturation": 0.0001,
+      "seconds": 1.03
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "ncand": 981,
+      "saturation": 0.0037,
+      "seconds": 1.38
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "ncand": 4268,
+      "saturation": 0.0163,
+      "seconds": 1.97
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": true,
+      "ncand": 175292,
+      "saturation": 0.6687,
+      "seconds": 5.67
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": true,
+      "ncand": 1155,
+      "saturation": 0.0044,
+      "seconds": 1.0
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "ncand": 140118,
+      "saturation": 0.5345,
+      "seconds": 6.07
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "ncand": 13939,
+      "saturation": 0.0532,
+      "seconds": 1.36
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": true,
+      "ncand": 68306,
+      "saturation": 0.2606,
+      "seconds": 2.07
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": true,
+      "ncand": 236552,
+      "saturation": 0.9024,
+      "seconds": 9.08
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "ncand": 35124,
+      "saturation": 0.134,
+      "seconds": 2.29
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "ncand": 246363,
+      "saturation": 0.9398,
+      "seconds": 7.72
+     }
+    ]
+   },
+   "arm_quadrature_16384": {
+    "n": 20,
+    "recovered": 11,
+    "median_seconds": 3.95,
+    "max_saturation": 0.9502,
+    "per_run": [
+     {
+      "file": "tim_0000.npz",
+      "recovered": true,
+      "ncand": 14208,
+      "saturation": 0.8672,
+      "seconds": 14.48
+     },
+     {
+      "file": "tim_0001.npz",
+      "recovered": true,
+      "ncand": 15568,
+      "saturation": 0.9502,
+      "seconds": 4.51
+     },
+     {
+      "file": "tim_0002.npz",
+      "recovered": true,
+      "ncand": 15507,
+      "saturation": 0.9465,
+      "seconds": 3.82
+     },
+     {
+      "file": "tim_0003.npz",
+      "recovered": false,
+      "ncand": 10085,
+      "saturation": 0.6155,
+      "seconds": 3.4
+     },
+     {
+      "file": "tim_0004.npz",
+      "recovered": true,
+      "ncand": 14950,
+      "saturation": 0.9125,
+      "seconds": 4.27
+     },
+     {
+      "file": "tim_0005.npz",
+      "recovered": false,
+      "ncand": 9891,
+      "saturation": 0.6037,
+      "seconds": 3.95
+     },
+     {
+      "file": "tim_0006.npz",
+      "recovered": false,
+      "ncand": 10475,
+      "saturation": 0.6393,
+      "seconds": 3.46
+     },
+     {
+      "file": "tim_0007.npz",
+      "recovered": true,
+      "ncand": 13480,
+      "saturation": 0.8228,
+      "seconds": 4.18
+     },
+     {
+      "file": "tim_0008.npz",
+      "recovered": false,
+      "ncand": 7319,
+      "saturation": 0.4467,
+      "seconds": 3.32
+     },
+     {
+      "file": "tim_0009.npz",
+      "recovered": false,
+      "ncand": 6145,
+      "saturation": 0.3751,
+      "seconds": 3.58
+     },
+     {
+      "file": "tim_0010.npz",
+      "recovered": false,
+      "ncand": 9864,
+      "saturation": 0.6021,
+      "seconds": 4.08
+     },
+     {
+      "file": "tim_0011.npz",
+      "recovered": false,
+      "ncand": 8977,
+      "saturation": 0.5479,
+      "seconds": 3.7
+     },
+     {
+      "file": "tim_0012.npz",
+      "recovered": false,
+      "ncand": 9782,
+      "saturation": 0.597,
+      "seconds": 3.79
+     },
+     {
+      "file": "tim_0013.npz",
+      "recovered": true,
+      "ncand": 14730,
+      "saturation": 0.899,
+      "seconds": 4.14
+     },
+     {
+      "file": "tim_0014.npz",
+      "recovered": true,
+      "ncand": 13515,
+      "saturation": 0.8249,
+      "seconds": 3.82
+     },
+     {
+      "file": "tim_0015.npz",
+      "recovered": true,
+      "ncand": 15266,
+      "saturation": 0.9318,
+      "seconds": 4.19
+     },
+     {
+      "file": "tim_0016.npz",
+      "recovered": false,
+      "ncand": 15091,
+      "saturation": 0.9211,
+      "seconds": 4.44
+     },
+     {
+      "file": "tim_0017.npz",
+      "recovered": true,
+      "ncand": 14868,
+      "saturation": 0.9075,
+      "seconds": 4.28
+     },
+     {
+      "file": "tim_0018.npz",
+      "recovered": true,
+      "ncand": 11357,
+      "saturation": 0.6932,
+      "seconds": 4.01
+     },
+     {
+      "file": "tim_0019.npz",
+      "recovered": true,
+      "ncand": 15458,
+      "saturation": 0.9435,
+      "seconds": 3.62
+     }
+    ]
+   }
+  },
+  "aggressive_within_realisation_flips": [
+   [
+    "tim_0012.npz",
+    false,
+    true
+   ],
+   [
+    "tim_0013.npz",
+    false,
+    true
+   ]
+  ]
+ }
+}
