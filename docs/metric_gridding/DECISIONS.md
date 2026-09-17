@@ -2436,4 +2436,56 @@ Caveats: `aggressive` arm only, one injection parameter set, N = 40, and the ali
   threshold is calibrated from the same runs (robust across 5-100, but not independent).
   A `quadrature` profile is the obvious next measurement and is blocked by the same
   buffer non-convergence that blocked the campaign (302 s/run at 2^21).
+
+## 2026-09-17 (ai) — the profile hardened: independent criterion, second parameter set
+Done:
+  - **D104 — the threshold circularity is removed.** The campaign session's first caution
+    on D101 was that the alive threshold was calibrated from the same runs. Re-derived the
+    profile under an **independent** criterion instead: the metric mismatch `m <= 1.0`
+    that Phase 3's recovery test already used (`m_recover`), evaluated in each level's own
+    accumulated baseline. Nothing calibrated from the data.
+  - **D105 — and the second caution, one parameter set, is addressed.** Two injections,
+    N = 30 each: set A `(accel 1.0, jerk 0.05, snap 0.001)`, set B
+    `(accel -3.2, jerk 0.18, snap -0.004)`.
+
+    | | set A | set B | pooled |
+    |---|---|---|---|
+    | alive at final level | 15/30 | 17/30 | — |
+    | losses **by level 10** | **0/15** | **0/13** | **0/28** |
+    | losses by level 20 | 9/15 | 11/13 | 20/28 |
+    | median loss level | 17 | 15 | 15 |
+    | earliest loss | 13 | 13 | 13 |
+
+    **Zero losses before level 13 under both criteria and both parameter sets.** So D101's
+    decisive claim -- 0% by level 10 against the model's 99% -- is robust to the criterion
+    and to the signal. What does move is the *centre* of the window: median loss level 15
+    under the metric criterion against 27 under the excursion one, because `m <= 1.0` is
+    stricter than end-to-end recovery (final alive 0.50-0.57 against the 0.725 that
+    matched their 38/50). So the excursion threshold was better calibrated to recovery,
+    and the metric criterion is better anchored; both are reported.
+  - **D106 — the gain survives every decision-window definition, and the 100% does too.**
+    Re-measured on windows drawn from the metric criterion's losses:
+
+    | window | Taylor | Chebyshev |
+    |---|---|---|
+    | 13-47 (excursion crit.) | 2.47x (54/54) | 1.57x (54/54) |
+    | 13-37 (metric crit.) | 2.09x (60/60) | 1.50x (60/60) |
+    | 13-16 (earliest quartile) | 1.74x (24/24) | 1.54x (24/24) |
+    | 1-10 (the falsified premise) | 1.71x (47/60) | 1.15x (47/60) |
+
+    `quadrature` is closer in **100% of cells in every decision window**, against 78% in
+    the falsified early window. Taylor's gain is window-dependent (1.74-2.47x) so it must
+    be quoted as a range; Chebyshev's is stable at ~1.5x. D102's conclusion stands under
+    all of them.
+  - **Deliberately NOT done: recomputing their `DECISION_STAGES`.** Their window
+    `[2, 6, 10, 14, 20, 28]` comes from the premise my profile reverses, and four of six
+    stages sit at or below 14 while none exceeds 28 -- so their stratification and strata
+    boundaries are built over stages where little is being decided. That is their model
+    and their doc, and recomputing it here would put a new headline on someone else's
+    unverified inputs, which is the failure mode this branch has repeated. Their decision
+    to leave it recorded-but-not-recomputed is the right one and I am matching it.
+Conventions fixed: when an inherited measurement blocks someone else's work, harden the
+  measurement rather than applying it for them.
+Open questions: a `quadrature` profile, still blocked by the buffer non-convergence
+  (302 s/run at 2^21); their strata, if the configuration question is reopened.
 ```

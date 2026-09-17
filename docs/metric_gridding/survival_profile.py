@@ -35,6 +35,7 @@ sys.path.insert(0, str(HERE))
 
 from injection_recovery import Injection  # noqa: E402
 
+from pyloki.core import metric  # noqa: E402
 from pyloki.ffa import DynamicProgramming  # noqa: E402
 from pyloki.prune import Pruning  # noqa: E402
 from pyloki.simulation.pulse import PulseSignalConfig  # noqa: E402
@@ -54,6 +55,7 @@ class LevelRecord:
     n_within_3: int
     score_max: float
     t_half: float
+    min_mismatch: float = float("inf")   # in the level's own metric, m = d^T g d
 
 
 @dataclass
@@ -116,7 +118,8 @@ def profile_one(
             leaves = np.asarray(prn.world_tree.leaves)
             n = int(prn.world_tree.size)
             if n == 0 or leaves.shape[0] == 0:
-                out.levels.append(LevelRecord(lvl, 0, np.inf, 0, 0, 0.0, t_half))
+                out.levels.append(LevelRecord(lvl, 0, np.inf, 0, 0, 0.0, t_half,
+                                              float("inf")))
                 continue
             leaves = leaves[:n]
 
@@ -127,6 +130,13 @@ def profile_one(
             tau = np.linspace(-t_half, t_half, 256)
             delta = leaves[:, :-2, 0] - truth_l[:po]
             exc = phase_excursion(delta, tau, f0, po) / tol
+            # Independent criterion: the metric mismatch used by Phase 3's recovery
+            # test, evaluated in this level's own accumulated baseline. This anchors
+            # "alive" to an external definition rather than to a threshold calibrated
+            # from the excursion distribution itself.
+            g = metric.poly_phase_metric(
+                0.0, -t_half, t_half, po, f0, cfg.nbins, cfg.ducy_max)
+            mism = np.einsum("ni,ij,nj->n", delta, g, delta)
             scores = np.asarray(prn.world_tree.scores)[:n]
             out.levels.append(LevelRecord(
                 level=lvl, n_leaves=n,
@@ -135,5 +145,6 @@ def profile_one(
                 n_within_3=int((exc <= 3.0).sum()),
                 score_max=float(scores.max()) if len(scores) else 0.0,
                 t_half=float(t_half),
+                min_mismatch=float(mism.min()),
             ))
     return out

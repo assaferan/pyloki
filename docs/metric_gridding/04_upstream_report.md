@@ -125,9 +125,25 @@ In the decision window `quadrature` is closer in **every one of 54 cells**, and 
 is essentially the headline figure of (2). So the advantage is not concentrated where
 nothing is at stake — it sits where the decision is made.
 
-Caveats: `aggressive` arm only, one injected parameter set, N = 40, and the
-covering-leaf threshold is calibrated from the bimodal gap in the same runs (robust for
-any threshold from 5 to 100 tolerances, but not independent of the data).
+Checked under an independent criterion and a second signal, since the threshold above is
+calibrated from the same runs: re-deriving "alive" as the metric mismatch `m <= 1.0` that
+this project's recovery test already uses — nothing calibrated from the data — over two
+injected parameter sets, N = 30 each, gives **0 of 28 losses by level 10** and an
+earliest loss at level 13 in both. The centre of the window moves (median loss level 15
+under the metric criterion, 27 under the excursion one, the former being the stricter
+test) but the decisive claim does not.
+
+The gain likewise survives every window definition, and so does the 100%:
+
+| window | Taylor | Chebyshev |
+|---|---|---|
+| 13-47 (excursion criterion) | 2.47x (54/54 cells) | 1.57x (54/54) |
+| 13-37 (metric criterion) | 2.09x (60/60) | 1.50x (60/60) |
+| 13-16 (earliest quartile) | 1.74x (24/24) | 1.54x (24/24) |
+
+Taylor's figure is window-dependent and should be read as **2.1-2.5x**; Chebyshev's is
+stable at **~1.5x**. Remaining caveats: `aggressive` arm only (a `quadrature` profile is
+blocked by the buffer non-convergence above), and N = 40 / 2x30.
 
 ## The Chebyshev basis
 
