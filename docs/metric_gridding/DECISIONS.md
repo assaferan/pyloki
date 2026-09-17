@@ -2053,6 +2053,12 @@ Done:
     it matters (D70/D71, ~290 -> ~770 on my model), the `rho` correction raised the
     stochastic term 0.133 -> 0.230 (D75, ~5x the deterministic difference), the ~1 S/N
     optimism shifts the operating point (D77/D78), and now the effect stratum vanishes.
+    **CORRECTED (D81): that chain double-counts.** The `rho` correction and the empty
+    effect stratum are not independent -- they are the *same* shift in the *same*
+    quantity, seen once per cell (the stochastic term) and once per position (`pi` going
+    0.645 -> 0.593, and 0.697 -> 0.628 in aggregate). Listing them as two multiplicative
+    factors inflates the chain. There are **two** distinct corrections here, not four:
+    the stage weighting, and the `rho` correction with its two manifestations.
     I am deliberately **not** multiplying these into a single `n`: mine omits the
     stochastic term and theirs includes it, so the factors are not composable, and
     manufacturing a combined figure is exactly the kind of move that produced D64.
@@ -2071,4 +2077,54 @@ Open questions: the campaign's `n` under the two-stratum design (theirs); whethe
   differently shaped.
 Next session starts at: assaferan on ownership, and on whether the campaign is still
   affordable given D80.
+
+## 2026-09-17 (ab) — affordability computed: the campaign is viable
+Done:
+  - **D81 — my "chain of four corrections" double-counted, and I had put it to
+    assaferan in that form.** Caught by the Injection Campaign session: the `rho`
+    correction (D75) and the empty effect stratum (D79) are the same shift in the same
+    quantity, observed once per cell as the stochastic term and once per position as
+    `pi` (0.645 -> 0.593; 0.697 -> 0.628 aggregate). Counting both as multiplicative
+    pushes inflates the picture. The distinct corrections are **two**: the stage
+    weighting (D70/D71) and the `rho` correction with its two manifestations. In their
+    numbers it appears once, correctly. My chain table overstated the erosion, and I
+    escalated "is this still affordable?" partly on the strength of it.
+  - **D82 — inherited, unverified by me: the campaign is affordable at the operating
+    point the design actually picks.** 954 pairs, 13.2 core-hours at 50 s/run, against
+    the 28 core-hours the original verdict quoted:
+
+    | `p_disc` | mid-stratum pairs | total pairs | core-hours |
+    |---|---|---|---|
+    | **0.30** (measured at the operating point) | **755** | **954** | **13.2** |
+    | 0.20 | 1132 | 1430 | 19.9 |
+    | 0.15 | 1509 | 1906 | 26.5 |
+    | 0.10 | 2263 | 2859 | 39.7 |
+    | 0.08 (batch A, S/N 12) | 2828 | 3572 | 49.6 |
+
+  - **D83 — and my `pi` was right by luck, with a term missing.** I used 0.590, the
+    median over all 24 positions; the primary test runs on the mid stratum, which
+    excludes the 5 positions below 0.55, so the correct value is **0.5927** -- dropping 5
+    of 24 low values barely moves the median, so my factor of ~2 survived. What I missed
+    is that the null stratum's 21% of screened positions never enter the primary test, so
+    the pair count inflates by **1/0.79** on top. Right answer, wrong route, and one term
+    short.
+  - **D84 — powering against `p_disc = 0.08` would have been a category error**, and it
+    is the one I was drifting toward by quoting the chain's worst end. That figure comes
+    from batch A at S/N 12, where both arms recovered 3/24 -- far below the operating
+    point, in a regime the design deliberately avoids. Discordance is maximised at the
+    steepest part of the recovery curve, which is why the design fixes the operating
+    point at on-grid `P_d ~ 0.5` in both arms, and there the pilot measured 0.30.
+    Requiring power at 0.08 is requiring power in a configuration the design excludes by
+    construction.
+  - What *has* changed: `n = 2000` is no longer comfortable across the whole measured
+    range (it covers `p_disc >= 0.145`), so their section 9 now makes the 3-point
+    operating-point pilot at the final `max_sugg` a **precondition** rather than a
+    formality -- if it returns `p_disc < 0.145`, `n` goes to ~3600 (50 core-hours) or the
+    design is re-scoped. Theirs, as of their `db2a543`.
+Conventions fixed: before presenting corrections as a chain, check they are
+  *independent*; two manifestations of one shift are one correction. And power against
+  the operating point the design selects, not against the worst value observed anywhere.
+Open questions: the 3-point pilot result, which now gates `n`; power-calculation
+  ownership (still assaferan's).
+Next session starts at: their paired `max_sugg` result and the operating-point pilot.
 ```

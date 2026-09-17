@@ -160,6 +160,18 @@ underestimated and `n` overestimated. And the numbers above use the Taylor ladde
 Taylor losses; Chebyshev's loss ratio is nearer 0.7, so **Arm A needs ~600 pairs, not
 ~290**.
 
+## Affordability (inherited, unverified here)
+
+At the operating point the design selects -- on-grid `P_d ~ 0.5` in both arms, where
+discordance is maximal and the pilot measured `p_disc = 0.30` -- the campaign needs
+**954 pairs and about 13 core-hours**, against the 28 quoted in the original verdict.
+Powering instead against the `p_disc = 0.08` seen at S/N 12 would demand ~3600 pairs,
+but that is a regime the design avoids by construction, so it is not the requirement.
+
+`n = 2000` covers `p_disc >= 0.145`, which is no longer the whole measured range, so the
+3-point operating-point pilot at the final `max_sugg` is a **precondition**: below 0.145,
+`n` rises to ~3600 or the design is re-scoped.
+
 ## Pre-committed analysis
 
 - **Test**: McNemar (exact binomial on discordant pairs), two-sided, alpha = 0.05.
