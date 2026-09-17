@@ -181,13 +181,21 @@ def nearest_template(basis: str) -> dict:
 
 
 def amplitude(basis: str) -> dict:
+    """Median loss per strategy, and the paired advantage.
+
+    Both statistics are recorded because they are not interchangeable and the report
+    previously quoted one alongside the other two as though they combined: the median of
+    the per-cell ratio is not the ratio of the two medians. The per-cell median is the
+    one to lead with (it is paired, so cell-to-cell scatter cancels), but a reader who
+    divides the quoted medians must be told why they get a different number.
+    """
     bs, me, bf = BASES[basis]
     truths = _truths()
-    out = {}
+    per_cell = {st: {(d, f): [] for d in DUCY for f in ("boxcar", "matched")}
+                for st in ("aggressive", "quadrature")}
     for st in ("aggressive", "quadrature"):
         cfg = P.make_config(st)
         tol = cfg.eta / cfg.nbins
-        acc = {(d, f): [] for d in DUCY for f in ("boxcar", "matched")}
         for tr in truths:
             for S in STAGES_AMP:
                 sets, tau, sc = bs(cfg, st, PO, F0, tr, S, n_seed=1)
@@ -195,11 +203,26 @@ def amplitude(basis: str) -> dict:
                                   max_nodes=300_000, keep=30)
                 for d in DUCY:
                     for f in ("boxcar", "matched"):
-                        acc[(d, f)].append(
+                        per_cell[st][(d, f)].append(
                             loss_for_leaves(top, tau, F0, PO, NBINS, d,
                                             filt=f, basis_fn=bf))
-        out[st] = {f"ducy_{d:.2f}": {f: round(float(np.median(acc[(d, f)])), 6)
-                                     for f in ("boxcar", "matched")} for d in DUCY}
+    out = {"cells": len(truths) * len(STAGES_AMP)}
+    for st in ("aggressive", "quadrature"):
+        out[st] = {f"ducy_{d:.2f}": {
+            f: round(float(np.median(per_cell[st][(d, f)])), 6)
+            for f in ("boxcar", "matched")} for d in DUCY}
+    adv = {}
+    for d in DUCY:
+        adv[f"ducy_{d:.2f}"] = {}
+        for f in ("boxcar", "matched"):
+            la = np.array(per_cell["aggressive"][(d, f)])
+            lq = np.array(per_cell["quadrature"][(d, f)])
+            paired = np.median((1 - lq) / (1 - la)) - 1.0
+            of_medians = (1 - np.median(lq)) / (1 - np.median(la)) - 1.0
+            adv[f"ducy_{d:.2f}"][f] = {
+                "per_cell_median": round(float(paired), 6),
+                "ratio_of_medians": round(float(of_medians), 6)}
+    out["quadrature_advantage"] = adv
     return out
 
 
@@ -207,6 +230,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--full", action="store_true",
                     help="recompute the 90-cell comparisons too (~12 min)")
+    ap.add_argument("--only", choices=["amplitude", "nearest"], default=None,
+                    help="with --full, recompute just one expensive group")
     args = ap.parse_args()
 
     data = {
@@ -219,9 +244,16 @@ def main() -> None:
         "branch_max": branch_max_counts(),
     }
     if args.full:
+        prev = json.loads(JSON_PATH.read_text()) if JSON_PATH.exists() else {}
         for basis in BASES:
-            data[f"nearest_template_{basis}"] = nearest_template(basis)
-            data[f"amplitude_{basis}"] = amplitude(basis)
+            if args.only in (None, "nearest"):
+                data[f"nearest_template_{basis}"] = nearest_template(basis)
+            else:
+                data[f"nearest_template_{basis}"] = prev[f"nearest_template_{basis}"]
+            if args.only in (None, "amplitude"):
+                data[f"amplitude_{basis}"] = amplitude(basis)
+            else:
+                data[f"amplitude_{basis}"] = prev[f"amplitude_{basis}"]
     else:
         if JSON_PATH.exists():
             prev = json.loads(JSON_PATH.read_text())

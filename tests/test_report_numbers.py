@@ -33,8 +33,13 @@ LIVE = REPORT.split("# ⚠ EVERYTHING BELOW THIS LINE")[0]
 
 
 def _dig(path: str):
+    """Walk DATA by a `/`-separated path.
+
+    `/` rather than `.` because several keys contain a dot (`ducy_0.10`), which a
+    dot-separated walk silently splits into two missing keys.
+    """
     node = DATA
-    for part in path.split("."):
+    for part in path.split("/"):
         node = node[part]
     return node
 
@@ -69,16 +74,16 @@ def test_branch_max_counts_reproduce():
 # --- 2. the report quotes the computed values -----------------------------------
 
 QUOTED = [
-    ("nearest_template_taylor.aggressive.median", "{:.3f}"),
-    ("nearest_template_taylor.quadrature.closer", "{:d}"),
-    ("nearest_template_taylor.quadrature.median_proven_gain", "{:.2f}"),
-    ("nearest_template_taylor.conservative.closer", "{:d}"),
-    ("nearest_template_taylor.conservative.unresolved", "{:d}"),
-    ("nearest_template_chebyshev.aggressive.median", "{:.3f}"),
-    ("nearest_template_chebyshev.quadrature.closer", "{:d}"),
-    ("nearest_template_chebyshev.quadrature.median_proven_gain", "{:.2f}"),
-    ("corner_forms.taylor.4", "{:.1f}"),
-    ("corner_forms.chebyshev.4", "{:.1f}"),
+    ("nearest_template_taylor/aggressive/median", "{:.3f}"),
+    ("nearest_template_taylor/quadrature/closer", "{:d}"),
+    ("nearest_template_taylor/quadrature/median_proven_gain", "{:.2f}"),
+    ("nearest_template_taylor/conservative/closer", "{:d}"),
+    ("nearest_template_taylor/conservative/unresolved", "{:d}"),
+    ("nearest_template_chebyshev/aggressive/median", "{:.3f}"),
+    ("nearest_template_chebyshev/quadrature/closer", "{:d}"),
+    ("nearest_template_chebyshev/quadrature/median_proven_gain", "{:.2f}"),
+    ("corner_forms/taylor/4", "{:.1f}"),
+    ("corner_forms/chebyshev/4", "{:.1f}"),
 ]
 
 
@@ -92,8 +97,27 @@ def test_report_quotes_computed_value(path, fmt):
 @pytest.mark.parametrize("strategy", ["aggressive", "quadrature"])
 def test_report_quotes_amplitude_loss(basis, strategy):
     """The report prints these as percentages to 2 dp."""
-    value = _dig(f"amplitude_{basis}.{strategy}.ducy_0.10.boxcar")
+    value = _dig(f"amplitude_{basis}/{strategy}/ducy_0.10/boxcar")
     assert f"{100 * value:.2f}" in LIVE
+
+
+@pytest.mark.parametrize("basis", ["taylor", "chebyshev"])
+def test_report_quotes_the_paired_advantage(basis):
+    """And quotes the PAIRED statistic, not the ratio of the two medians.
+
+    They differ by about a factor of two (+0.47% against +1.00% at 10% duty in the
+    Taylor basis), and an earlier draft printed the paired figure beside the two
+    medians as though dividing them would reproduce it.
+    """
+    adv = _dig(f"amplitude_{basis}/quadrature_advantage/ducy_0.10/boxcar")
+    assert f"{100 * adv['per_cell_median']:.2f}" in LIVE
+    assert adv["per_cell_median"] < adv["ratio_of_medians"]
+
+
+def test_taylor_advantage_statistics_really_do_differ():
+    """Guards the caveat above: if they ever coincide, the warning is noise."""
+    adv = _dig("amplitude_taylor/quadrature_advantage/ducy_0.10/boxcar")
+    assert adv["ratio_of_medians"] > 1.5 * adv["per_cell_median"]
 
 
 # --- 3. the branch_max claim, as booleans ---------------------------------------
@@ -107,7 +131,7 @@ def test_report_wording_matches_build_verdict(basis, strategy):
     backwards for Chebyshev+quadrature (16 of 16, which builds) denied the only
     configuration with a proven gain that needs no config change.
     """
-    entry = _dig(f"branch_max.{basis}.{strategy}")
+    entry = _dig(f"branch_max/{basis}/{strategy}")
     # Guard the match against a digit to its left: a bare substring test makes
     # "7 — raises" match inside "27 — raises".
     marker = rf"(?<!\d){entry['max_per_axis']} — raises"

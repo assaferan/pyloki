@@ -1,4 +1,130 @@
 {
+  "amplitude_chebyshev": {
+    "aggressive": {
+      "ducy_0.05": {
+        "boxcar": 0.063728,
+        "matched": 0.071326
+      },
+      "ducy_0.10": {
+        "boxcar": 0.020321,
+        "matched": 0.018774
+      },
+      "ducy_0.20": {
+        "boxcar": 0.004728,
+        "matched": 0.004753
+      }
+    },
+    "cells": 48,
+    "quadrature": {
+      "ducy_0.05": {
+        "boxcar": 0.037364,
+        "matched": 0.039277
+      },
+      "ducy_0.10": {
+        "boxcar": 0.011403,
+        "matched": 0.010124
+      },
+      "ducy_0.20": {
+        "boxcar": 0.002627,
+        "matched": 0.002549
+      }
+    },
+    "quadrature_advantage": {
+      "ducy_0.05": {
+        "boxcar": {
+          "per_cell_median": 0.013772,
+          "ratio_of_medians": 0.028158
+        },
+        "matched": {
+          "per_cell_median": 0.025749,
+          "ratio_of_medians": 0.03451
+        }
+      },
+      "ducy_0.10": {
+        "boxcar": {
+          "per_cell_median": 0.005246,
+          "ratio_of_medians": 0.009103
+        },
+        "matched": {
+          "per_cell_median": 0.007042,
+          "ratio_of_medians": 0.008815
+        }
+      },
+      "ducy_0.20": {
+        "boxcar": {
+          "per_cell_median": 0.001256,
+          "ratio_of_medians": 0.002111
+        },
+        "matched": {
+          "per_cell_median": 0.001794,
+          "ratio_of_medians": 0.002214
+        }
+      }
+    }
+  },
+  "amplitude_taylor": {
+    "aggressive": {
+      "ducy_0.05": {
+        "boxcar": 0.053348,
+        "matched": 0.080007
+      },
+      "ducy_0.10": {
+        "boxcar": 0.017256,
+        "matched": 0.022047
+      },
+      "ducy_0.20": {
+        "boxcar": 0.004023,
+        "matched": 0.005658
+      }
+    },
+    "cells": 48,
+    "quadrature": {
+      "ducy_0.05": {
+        "boxcar": 0.022627,
+        "matched": 0.040319
+      },
+      "ducy_0.10": {
+        "boxcar": 0.007472,
+        "matched": 0.010538
+      },
+      "ducy_0.20": {
+        "boxcar": 0.001717,
+        "matched": 0.002663
+      }
+    },
+    "quadrature_advantage": {
+      "ducy_0.05": {
+        "boxcar": {
+          "per_cell_median": 0.015591,
+          "ratio_of_medians": 0.032452
+        },
+        "matched": {
+          "per_cell_median": 0.013837,
+          "ratio_of_medians": 0.04314
+        }
+      },
+      "ducy_0.10": {
+        "boxcar": {
+          "per_cell_median": 0.004691,
+          "ratio_of_medians": 0.009956
+        },
+        "matched": {
+          "per_cell_median": 0.004042,
+          "ratio_of_medians": 0.011769
+        }
+      },
+      "ducy_0.20": {
+        "boxcar": {
+          "per_cell_median": 0.001105,
+          "ratio_of_medians": 0.002314
+        },
+        "matched": {
+          "per_cell_median": 0.001097,
+          "ratio_of_medians": 0.003012
+        }
+      }
+    }
+  },
   "branch_max": {
     "chebyshev": {
       "aggressive": {
@@ -127,5 +253,47 @@
     "best_wide_lattice": 0.5,
     "lattice_span": 2,
     "own_cell": 7.5
+  },
+  "nearest_template_chebyshev": {
+    "aggressive": {
+      "exact_cells": 90,
+      "max": 1.75349,
+      "median": 0.904452,
+      "min": 0.083394
+    },
+    "cells": 90,
+    "conservative": {
+      "closer": 29,
+      "median_proven_gain": 1.571768,
+      "not_closer": 2,
+      "unresolved": 59
+    },
+    "quadrature": {
+      "closer": 87,
+      "median_proven_gain": 1.563983,
+      "not_closer": 3,
+      "unresolved": 0
+    }
+  },
+  "nearest_template_taylor": {
+    "aggressive": {
+      "exact_cells": 90,
+      "max": 2.114554,
+      "median": 1.06888,
+      "min": 0.2399
+    },
+    "cells": 90,
+    "conservative": {
+      "closer": 28,
+      "median_proven_gain": 2.046782,
+      "not_closer": 0,
+      "unresolved": 62
+    },
+    "quadrature": {
+      "closer": 89,
+      "median_proven_gain": 2.302674,
+      "not_closer": 1,
+      "unresolved": 0
+    }
   }
 }
