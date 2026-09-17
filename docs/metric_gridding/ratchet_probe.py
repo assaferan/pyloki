@@ -148,6 +148,12 @@ def probe(outdir: Path, arm: str, max_sugg: int, scheme: Path, tag: str) -> None
             "file": f.name, "levels": len(pairs), "levels_ratcheted": len(ratcheted),
             "max_excess": max((e - t for t, e in ratcheted), default=0.0),
             "first_ratchet_level": (pairs.index(ratcheted[0]) + 1) if ratcheted else None,
+            # Per-level (nominal, effective) so the MECHANISM can be checked, not just
+            # the count: if the effective cut is set by top-K rather than by the
+            # scheme, `eff` should be near-identical between two ladders on the same
+            # realisation while `thresh` differs.
+            "levels_detail": [{"level": i + 1, "thresh": t, "eff": e}
+                              for i, (t, e) in enumerate(pairs)],
             "ncand": len(df), "saturation": len(df) / max_sugg,
             "recovered": rec, "mismatch": mism,
             "seconds": time.perf_counter() - t0,
