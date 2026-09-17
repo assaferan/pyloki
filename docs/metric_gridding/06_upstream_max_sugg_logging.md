@@ -75,6 +75,35 @@ This is a reporting defect, not a correctness defect. Ratcheting on overflow is 
 reasonable way to stay inside a fixed buffer; the argument is only that it should be
 visible.
 
+### For a high-branching configuration the ratchet is not occasional — it is permanent
+
+The case above would be weak if raising `max_sugg` reliably escaped the ratchet: a user
+who noticed could just raise it. Measured on one fixed set of 10 realisations, sweeping
+the buffer at a 64-segment, `poly_order = 4`, `branch_max = 16` Chebyshev search:
+
+| branching-pattern product | `max_sugg` | median `ncand` | median saturation |
+|---|---|---|---|
+| 1.5 × 10¹² (low) | 2^18 | 16 778 | 0.064 |
+| | 2^19 | **16 778** | 0.032 |
+| | 2^20 | **16 778** | 0.016 |
+| 5.4 × 10²⁰ (high) | 2^18 | 152 007 | 0.580 |
+| | 2^19 | 390 575 | 0.745 |
+| | 2^20 | 808 116 | **0.771** |
+
+The low-branching configuration converges: identical candidate counts at three buffers,
+saturation falling, the ratchet gone. The high-branching one **never** converges —
+`d log2(ncand) / d log2(max_sugg)` is 0.95, 1.36 and 1.05 across three successive
+increases, and saturation *rises*. Doubling the buffer doubles the count, because the
+ratchet relaxes the cut to keep the buffer full at whatever size it is given.
+
+**So a user running a high-branching search is running against the ratchet at every
+buffer they can afford, permanently, and the log tells them their threshold scheme is
+being applied when it is not.** There is no value of `max_sugg` at which they would find
+out, and no field in the output that would tell them. That is the case for this patch,
+independent of anything about tiling strategies: it is what makes the difference between
+an occasional tightening a careful user could detect and a silent, permanent
+substitution of a different cut for the one they configured.
+
 ## Patch
 
 Three lines. `current_threshold` is already a float, so adding it to the stats dict does
