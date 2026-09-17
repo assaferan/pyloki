@@ -666,8 +666,16 @@ same data):
 buffer. Zero means the candidate set has converged and the buffer is irrelevant; one
 means the buffer is the only thing setting the answer.
 
-**`aggressive` converges at 2^18 and stays there — 16 778 candidates at 2^18, 2^19 and
+**`aggressive` converges and stays converged — 16 778 candidates at 2^18, 2^19 and
 2^20, identical to the unit.** That is what a non-binding buffer looks like.
+
+*With one caveat that the subset hides.* These 10 realisations are converged at 2^18,
+but over all 50 of §6.5's, **one** (`tim_0045`) still saturates at 2^18 — p99 = 0.915,
+which fails §7.1's < 0.9 — and it is not among the 10 swept here. So `aggressive` is
+converged for 49/50 at 2^18 and the sweep happens to have missed the exception; the
+buffer at which it clears the criterion on the full set is 2^19, not 2^18. This does not
+affect the conclusion below, which turns entirely on `quadrature`, but the sweep on its
+own would have put `aggressive`'s clearing point one buffer too low.
 
 **`quadrature` never converges.** Its exponent is 0.95, 1.36, 1.05 across three
 successive increases, and its median saturation does not fall — it *rises*, 0.580 →
