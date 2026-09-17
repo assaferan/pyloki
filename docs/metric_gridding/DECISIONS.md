@@ -2638,4 +2638,43 @@ Done:
     know.
 Conventions fixed: when asked whether a result depends on X, grep for X rather than
   reasoning about whether it should.
+
+## 2026-09-17 (am) — wind-down; and one incidental upstream defect
+Done:
+  - `docs/metric_gridding/README.md`: entry point for the branch. The result it ended on,
+    the live claims each tagged with the decision that carries it, an explicit
+    **withdrawn-and-what-replaced-it** table, what is not established and why, and the
+    methodological conclusions stated as conclusions rather than left implicit. Written
+    because `DECISIONS.md` interleaves live and retracted claims in session order, so a
+    reader entering cold will cite something withdrawn.
+  - Worktree left clean: 0 dirty files, in sync with `origin/metric-gridding`, 60 commits
+    on top of `upstream/main`, no half-finished measurement.
+  - **D117 — incidental, and reportable upstream on its own: `tests/test_maths.py` is
+    flaky, about 1.4% per run.** Found while verifying the final state; the full suite
+    failed once at `TestMaths::test_norm_isf_func` and then passed three times.
+    Cause: `tests/test_maths.py:10` uses an **unseeded** `np.random.default_rng()`, so
+    the test draws a fresh `minus_logsf = uniform(0, 10)` every run, while
+    `maths.norm_isf_func`'s accuracy is not uniform over that range. Measured against
+    `scipy.stats.norm.isf` on a 20 001-point grid, it exceeds the test's `decimal=2`
+    tolerance on:
+
+    | interval in `minus_logsf` | max abs error |
+    |---|---|
+    | [0.1065, 0.1905] | **0.0269** |
+    | [0.2225, 0.2730] | 0.0101 |
+
+    which is **1.35% of the sampled range** — so roughly 1 CI run in 70 fails
+    spuriously. Also worth noting: `norm_isf_func(0)` returns NaN.
+    This matters more now than it did: PR #4 added the notebook-derived CI suite and #12
+    asks for it to become a proper pytest suite, so an intermittent failure in
+    `test_maths.py` will be attributed to whatever change happens to be in flight. The
+    fix is a seed, or a tolerance that holds over the sampled range, or restricting the
+    draw away from the two intervals — but the first is a test fix and the second and
+    third would paper over an approximation error that may be worth knowing about.
+    **Not reported upstream**: not my call to post, and the injection session owns the
+    upstream note currently in flight. Recorded here so it is not lost.
+Note on what remains open, for whoever reads this next: the campaign cancellation was
+  relayed to me by a peer session as assaferan's decision, and I have not treated it as
+  confirmed — `04_upstream_report.md` stays unposted and this branch is not archived
+  until assaferan says so directly.
 ```

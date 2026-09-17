@@ -132,6 +132,17 @@ and it does so with no headroom. (D62, amended)
 8. **When asked whether a result depends on X, grep for X** rather than reasoning about
    whether it should. (D114)
 
+## Incidental finding, not about tiling
+
+`tests/test_maths.py` is **flaky at about 1.4% per run**, and it is upstream's test rather
+than this branch's. `tests/test_maths.py:10` uses an unseeded `np.random.default_rng()`,
+so `test_norm_isf_func` draws a fresh `minus_logsf = uniform(0, 10)` each run, while
+`maths.norm_isf_func` exceeds the test's `decimal=2` tolerance on `[0.1065, 0.1905]`
+(max error 0.0269) and `[0.2225, 0.2730]` (0.0101) — 1.35% of the sampled range, so
+roughly 1 CI run in 70 fails spuriously. `norm_isf_func(0)` also returns NaN. Relevant
+because PR #4 added a CI suite and #12 proposes extending it, so the failure will be
+attributed to whatever change is in flight. Not reported upstream. (D117)
+
 ## Files
 
     nearest_template.py       exact search, Taylor            tests/test_nearest_template.py
