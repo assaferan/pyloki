@@ -706,9 +706,22 @@ committed, Viterbi at `P_d = 0.1`, never re-derived.
 
 **Operating point.** Injected S/N chosen so on-grid `P_d ≈ 0.5` in *both* arms, since
 discordance is maximised at the steepest part of the recovery curve. At `max_sugg =
-2^18` that is near S/N 14 (13/20 and 15/20, §6.3), but the curve moves with the buffer —
-the same S/N gave 7/20 and 4/20 at 2^14 — so fix it by a 3-point pilot **at the final
-`max_sugg`** and then do not change it.
+2^18` that is **below** S/N 14 — §6.5 measures `P_d` = 0.76 and 0.80 there on 50
+realisations — and the curve moves with the buffer (the same S/N gave 7/20 and 4/20 at
+2^14), so fix it by a 3-point pilot **at the final `max_sugg`** and then do not change
+it.
+
+*Why this criterion is stated in `P_d` and not in S/N, which turns out to matter.* The
+`metric-gridding` session initially recommended S/N 15–17 from its own discordance-peak
+model, the opposite direction from the measurement above. It withdrew that (D78) on
+finding that its model's discordance peaks at model `P_d` = 0.567 — i.e. at this
+criterion. The two criteria were the same criterion in different variables, and the
+disagreement was entirely in its `S/N ↔ P_d` mapping, which is ~2x too shallow: it
+misplaces *which S/N* gives `P_d ≈ 0.5` while getting the `P_d` at the optimum right.
+**A rule parameterised in the observable is immune to an error in the mapping from the
+input; one parameterised in S/N is not.** That is the general reason to state it this
+way, and it is worth more than the specific disagreement it resolved. (Reported by that
+session; not re-derived here.)
 
 **`max_sugg`.** Raised until the 99th percentile of `ncand / max_sugg` over a 50-pair
 pilot is below 0.9 in both arms. Recorded per run. Runs above 0.9 are excluded and the
