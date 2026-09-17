@@ -279,9 +279,38 @@ same reason — few segments have been accumulated.
 > This propagates: `DECISION_STAGES = [2, 6, 10, 14, 20, 28]` in `injection_power.py`
 > is chosen from this premise, so §5.1's stratification and §9's strata are conditioned
 > on it, and §9's `n` moves by a factor of 8 across plausible reweightings (§10 row 8b).
-> Settling it needs the real per-stage survival profile — a count of realisations with a
-> covering leaf still alive at each prune level. Nothing here measures it; it is one
-> predicate per level per run, not a new experiment.
+>
+> ### ⚑ Now measured, and the premise is not merely wrong — it is backwards
+>
+> The `metric-gridding` session measured the real profile at assaferan's request
+> (its `1f8a7e8`): 40 runs, `aggressive`, S/N 14, 2^18, recording the minimum phase
+> excursion from the signal to any survivor at each prune level. **Inherited and not
+> re-run here**; §11.1's rule applies.
+>
+> | level | 1 | 10 | 20 | 30 | 40 | 50 | 63 |
+> |---|---|---|---|---|---|---|---|
+> | fraction alive | 1.000 | 1.000 | 0.900 | 0.850 | 0.825 | 0.725 | 0.725 |
+>
+> First-loss levels are 13, 13, 17, 19, 24, 27, 36, 41, 41, 44, 47 — median 27, **none
+> before 13**. So **0% of losses occur by stage 10**, where the modelled curve put 99%.
+> Its own check against my data holds: 29/40 = 0.725 alive at the final level against my
+> independently measured 38/50 = 0.760 recovery, Fisher exact two-sided `p` = 0.81.
+>
+> **The decision is late, not early — so §4.3's title is not just unsupported, it is
+> the wrong way round**, and the "structural reason the effect is small" is withdrawn.
+> The stages where `pi` is 0.87–0.93 are inside the window where leaves are actually
+> lost, not outside it. The consequences are favourable in every direction: `n` falls
+> (below), and the `metric-gridding` gain measured in the real decision window 13–47 is
+> 2.47x (Taylor) and 1.57x (Chebyshev) with `quadrature` closer in **54 of 54** cells,
+> against the 1.71x / 1.15x its early window gave.
+>
+> **`DECISION_STAGES` is therefore misplaced**: [2, 6, 10, 14, 20, 28] sits almost
+> entirely *before* the measured decision window, so §5.1's stratification and §9's
+> strata are built over stages where nothing is being decided. Recomputing them over
+> 13–47 has **not** been done — it would put a new headline number on an inherited,
+> unverified N = 40 measurement from one arm and one parameter set, which is the exact
+> failure mode this branch has repeated. It is the first thing to do if the
+> configuration question is ever reopened.
 
 ---
 
@@ -957,6 +986,7 @@ stage weightings, changing nothing else:
 | `sqrt(succ_h1)` — decay halved in log | 0.642 | 319 | 404 |
 | late stages only (> 10) | 0.680 | 194 | 246 |
 | **early stages only (≤ 10)** | **0.554** | 2 245 | **2 842** |
+| **measured profile** (§4.3 ⚑, inherited) | **0.648** | **291** | **368** |
 
 **So `n` spans roughly 340 to 2 840 — a factor of 8 — on an assumption that has never
 been checked, which is larger than the `rho` correction of §5.2.** The direction the
@@ -966,7 +996,17 @@ up and `n` down toward 340. But §4.3's claim that the decision is made early, w
 `pi` is only 0.554, is the pessimistic corner and rests on the same modelled profile.
 Both cannot be read off a model that is wrong by 4.5 S/N.
 
-**`n = 954` should therefore be quoted as a point in that range, not as the answer.**
+**`n = 954` should therefore be quoted as a point in that range, not as the answer** —
+and it is a point under the weighting now known to be backwards. Under the *measured*
+profile the aggregate gives **368 total pairs**, and the expensive 2 842 corner is
+excluded outright, because it assumed the early decision the measurement rules out.
+
+Two cautions against promoting 368 in 954's place. It rests on an inherited N = 40
+measurement from one arm at one parameter set. And it is the *aggregate* `pi`; the
+operative figure is the mid-stratum one, which cannot be recomputed without also moving
+`DECISION_STAGES` into the measured window (§4.3 ⚑) and re-running the stratification.
+What can be said without either: **`n` sits at the cheap end of the range, not the
+expensive one.**
 
 **The campaign remains affordable — 13 to 50 core-hours — but `n = 2 000` no longer
 covers the whole measured `p_disc` range.** It covers `p_disc` ≥ **0.145**. Two honest
