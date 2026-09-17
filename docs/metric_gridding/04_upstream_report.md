@@ -201,6 +201,35 @@ That said, 16 of 16 is *at* the limit with no headroom. `num_points` is
 segment count, so a nearby configuration turns it into a raised `ValueError` rather than
 a slower search. It fits for this configuration; it is not robust.
 
+## Why the advantage is not realisable
+
+The geometry above is threshold-independent: no threshold, score or buffer quantity
+enters it, and the set it enumerates is the full branching tree rather than the surviving
+set. So the gains hold under any cut — and equally, they say nothing about which templates
+survive one.
+
+That distinction is decisive here, because `quadrature` cannot be run at its own
+threshold scheme. `prune_on_overload` raises the effective cut to
+`max(configured, top-K, median)` and never lowers it, and `quadrature`'s candidate count
+is proportional to `max_sugg` over a factor of 8 in buffer size (no convergence), so the
+ratchet is always active for it. Putting the two on the same scale, at the ladder
+thresholds spanning the measured decision window:
+
+| | score units |
+|---|---|
+| `quadrature`'s signal-template advantage (from the ~1% amplitude edge) | **+0.05 to +0.07** |
+| cut elevation observed from the ratchet | **+3.4** (nominal 3.90 → effective 7.34) |
+
+The advantage is real, exactly quantified, and about two orders of magnitude smaller than
+the elevation it would have to overcome. Retention under the ratchet *is* score-ordered,
+so a closer template is genuinely more likely to be kept — the sign favours `quadrature`
+— but `K` is the buffer capacity and is the same for both arms while `quadrature` presents
+9.1x more candidates at 2^18, so it meets the same rank cut over a far larger pool.
+
+(The +3.4 figure is from a shipped-example configuration at `max_sugg = 2^10`, not from
+the configuration above, so this is an order-of-magnitude comparison rather than a
+measurement.)
+
 So `tiling_strategy` is a real but small sensitivity knob, and `quadrature`'s ~1e5x
 extra branching (and its higher recalibrated threshold ladder, 9.10 against 7.70 at
 equal `P_d`) buys about half a percent of amplitude. That does not look like a trade

@@ -2591,4 +2591,51 @@ Conventions fixed: when comparing against someone else's measured rate, test two
   -- their number has an interval too. And check whether the trials are exchangeable
   before using any binomial test on this pipeline; `calibrate_scale_on_folds` means they
   are not.
+
+## 2026-09-17 (al) — the ratchet hypothesis: outcome 1, and the hypothesis holds anyway
+Done:
+  - **D114 — my geometry is threshold-independent by construction, so their outcome 1 is
+    correct and the numbers stand untouched.** Verified rather than asserted: no
+    threshold, score, survivor or buffer quantity appears anywhere in
+    `nearest_template.py` or `nearest_template_cheby.py`. What the leaf set depends on is
+    `cfg.eta`, `cfg.nbins`, the criterion step, the `shift >= eta` branch guard, the
+    offsets from `branch_param_padded`, and the transport matrix. **The set enumerated is
+    the full branching tree, not the surviving set** -- so D52/D60's `>= 2.30x` and
+    `>= 1.56x` cannot move under any cut, ratcheted or calibrated. The corollary is the
+    limitation already recorded: because no cut enters, the result says nothing about
+    which templates survive, which is exactly why conversion is untestable (D93).
+  - **D115 — their outcome 3 has the right sign and the wrong magnitude.** Confirmed in
+    `world_tree.py:527-551`: retention is score-ordered (`topk_threshold` is the score of
+    the K-th best, `K = self.size`), so a closer template scores higher and *is* more
+    likely to be retained. The ratchet does not discriminate against `quadrature`'s signal
+    template as such. But the magnitudes are two orders of magnitude apart:
+
+    | | score units |
+    |---|---|
+    | `quadrature` signal-template advantage (Taylor, ducy 0.10, ladder levels 13-47) | **+0.050 to +0.068** |
+    | `quadrature` signal-template advantage (Chebyshev) | +0.046 to +0.062 |
+    | cut elevation from the ratchet, measured example | **+3.44** (nominal 3.90 -> effective 7.34) |
+
+    So the ~1% amplitude edge buys ~0.05 in score while the ratchet moves the cut by
+    ~1-3. `K` is the buffer capacity and is the same for both arms, while `quadrature`
+    presents 9.1x more candidates at 2^18, so it faces the same rank cut over a far larger
+    pool. **The hypothesis holds, but not for the reason given**: the geometry was not
+    measured against the wrong cut -- it was measured against no cut -- and the advantage
+    is simply negligible against the elevation.
+  - **D116 — so the branch's negative result can be stated exactly, and it is stronger
+    than the campaign would have been.** `quadrature`'s geometric advantage is exactly
+    established (89/90 cells, `>= 2.30x` Taylor / `>= 1.56x` Chebyshev, 100% of cells in
+    the measured decision window) and is worth ~0.05 in score, against a configuration
+    that cannot run at its own threshold scheme at any affordable buffer and whose
+    effective cut is raised by ~1-3. The advantage is real, exactly quantified, and
+    swamped.
+    Caveat that must travel with it: the +3.44 elevation is from the logging patch's
+    example at `max_sugg = 2^10` on the shipped notebook config, **not** measured at the
+    campaign configuration, and it is the injection session's number rather than mine.
+    The comparison is an order-of-magnitude argument until they measure the elevation at
+    the campaign config with the `threshold_eff` field -- which is the empirical half they
+    are running. If it comes back at ~0.05 rather than ~1-3, D116 is wrong and I want to
+    know.
+Conventions fixed: when asked whether a result depends on X, grep for X rather than
+  reasoning about whether it should.
 ```
