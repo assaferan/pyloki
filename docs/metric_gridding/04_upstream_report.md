@@ -45,7 +45,10 @@ x 15 stages = 90 cells.
    formula. That is 7.5x at `poly_order=4`. But it measures the distance to the
    *containing cell's* centre, and a search enumerates every grid point: minimising over
    neighbouring centres gives ~0.5. The `2^(k-1)` coarsening is economization working,
-   not a defect, and `eta` is not optimistic by 7.5x.
+   not a defect, and `eta` is not optimistic by 7.5x. Nor is the corner a good proxy for
+   sensitivity: the Chebyshev grid's corner is `k_max/2` (2.0 at `poly_order=4`, 3.75x
+   better than Taylor's 7.5) and it still costs slightly *more* in S/N — see the basis
+   section. Quote these closed forms as grid geometry, not as a sensitivity ordering.
 
 4. **The amplitude cost is small.** Converting the phase geometry into S/N *without* a
    metric -- the folded profile is `P(k) * S(k)` with `S(k)` the characteristic function
@@ -99,12 +102,19 @@ Max per-axis child count, against the shipped `branch_max = 16`:
 
 | | `aggressive` | `quadrature` | `conservative` |
 |---|---|---|---|
-| Taylor | 7 | **28** | **27** |
-| Chebyshev | 9 | 16 | **20** |
+| Taylor | 7 | **28 — raises** | **27 — raises** |
+| Chebyshev | 9 | 16 — at the limit | **20 — raises** |
 
-`aggressive` is the only strategy that fits in both bases. The others describe trees
-`branch_param_padded` would refuse to build, so their advantage above is conditional on
-raising that limit, and is not available at the shipped default.
+The guard is strict (`num_points > branch_max`, `psr_utils.branch_param_padded:363`), so
+16 builds and 17 does not. Three of the four non-`aggressive` configurations are
+therefore unreachable at the default, and the Taylor gain above needs `branch_max`
+raised. **Chebyshev + `quadrature` is the exception: it builds as shipped**, which makes
+it the only configuration here with a proven gain that costs no config change.
+
+That said, 16 of 16 is *at* the limit with no headroom. `num_points` is
+`ceil(dparam_cur/dparam_new)`, which moves with `poly_order`, `tobs`, `eta` and the
+segment count, so a nearby configuration turns it into a raised `ValueError` rather than
+a slower search. It fits for this configuration; it is not robust.
 
 So `tiling_strategy` is a real but small sensitivity knob, and `quadrature`'s ~1e5x
 extra branching (and its higher recalibrated threshold ladder, 9.10 against 7.70 at

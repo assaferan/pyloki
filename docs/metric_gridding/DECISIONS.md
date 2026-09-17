@@ -1773,13 +1773,29 @@ Done:
     a conclusion; the nominal corner (D59: 2.0 vs 7.5, a 3.75x advantage to Chebyshev)
     predicts the amplitude ordering **wrongly**.
   - **D62 — `aggressive` is the only strategy that fits the shipped `branch_max`.**
-    Max per-axis child count against `branch_max = 16`: Taylor 7 / 28 / 27 and Chebyshev
-    9 / 16 / 20 for aggressive / quadrature / conservative. So `quadrature` and
-    `conservative` describe trees the shipped code would **refuse to build**
-    (`branch_param_padded` raises), independently corroborating the relayed report that
-    Chebyshev+quadrature fails that guard at `branch_max=16`. Their proven advantage is
-    therefore conditional on raising a config limit, and every D52/D60 gain figure must
-    carry that.
+    **AMENDED — the original wording was wrong in the one cell that matters, and it
+    contradicted my own table.** The guard at `psr_utils.branch_param_padded:363` is
+    strict (`num_points > branch_max`), and `branch_max` defaults to 16, so 16 builds and
+    17 raises (verified directly). Max per-axis child count:
+
+    | basis | `aggressive` | `quadrature` | `conservative` |
+    |---|---|---|---|
+    | Taylor | 7 ok | **28 raises** | **27 raises** |
+    | Chebyshev | 9 ok | **16 ok, exactly at the limit** | **20 raises** |
+
+    So three of the four non-`aggressive` configurations are unreachable at the default,
+    and the D52 Taylor gain does require raising `branch_max`. But **Chebyshev +
+    `quadrature` builds at the shipped default**, which makes it the only configuration
+    with a proven gain (D60's >= 1.56x in 87/90 cells) that needs no config change. That
+    is the actionable cell, and my first wording ("the others describe trees the code
+    would refuse to build") denied it.
+    The caveat attaches to the configuration, not the claim: 16 of 16 is *at* the limit
+    with no headroom, and `num_points = ceil(dparam_cur/dparam_new)` moves with
+    `poly_order`, `tobs`, `eta` and the segment count, so a nearby configuration turns it
+    into a raised `ValueError`. It also reconciles the relayed report that
+    Chebyshev+quadrature failed the guard: that run was `branch_max=128`, `ref_seg=3`, a
+    different configuration, so a count above 16 there is consistent with exactly 16
+    here. The boundary is configuration-dependent, which is the real point.
 Conventions fixed: `min_excursion` now takes `basis_fn`, so one search serves both bases;
   `amplitude_loss` likewise. No monkeypatching.
 Open questions: the pruning interaction, now the prime suspect for the Chebyshev score
