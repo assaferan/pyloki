@@ -127,7 +127,8 @@ def min_excursion(
     tol: float,
     max_nodes: int = 4_000_000,
     init_best: float = np.inf,
-) -> tuple[float, bool, int]:
+    keep: int = 0,
+) -> tuple[float, bool, int] | tuple[float, bool, int, list]:
     """Min over the Minkowski sum of `sets` of max_t |dPhi| / tol.
 
     Returns `(value, exact, nodes)`. When `exact` is True the search completed and
@@ -139,9 +140,11 @@ def min_excursion(
     """
     basis = _basis(tau, poly_order) * (scale / tol)
     proj = [s @ basis.T for s in sets]                    # (m_i, n_time) each
-    # Branch on the most decisive sets first.
+    # Branch on the most decisive sets first. `sets` is permuted identically so that a
+    # delta can be reconstructed from the choices.
     order = np.argsort([-p.__abs__().max() for p in proj])
     proj = [proj[i] for i in order]
+    offs = [sets[i] for i in order]
     radii = [np.abs(p).max(axis=0) for p in proj]         # r_i(t)
     suffix = [np.zeros_like(radii[0]) for _ in range(len(proj) + 1)]
     for i in range(len(proj) - 1, -1, -1):
@@ -153,13 +156,20 @@ def min_excursion(
     # not). Both verdicts are sound, and both are far cheaper than the true min.
     best = float(init_best)
     nodes = 0
+    found: list = []
 
-    def descend(idx: int, partial: np.ndarray) -> None:
+    def descend(idx: int, partial: np.ndarray, delta: np.ndarray) -> None:
         nonlocal best, nodes
         if nodes > max_nodes:
             return
         if idx == len(proj):
-            best = min(best, float(np.abs(partial).max()))
+            val = float(np.abs(partial).max())
+            if keep:
+                found.append((val, delta.copy()))
+                if len(found) > 4 * keep:
+                    found.sort(key=lambda z: z[0])
+                    del found[keep:]
+            best = min(best, val)
             return
         cand = partial[None, :] + proj[idx]
         acand = np.abs(cand)
@@ -174,7 +184,10 @@ def min_excursion(
                 return
             if lo[k] >= best:
                 break          # sorted, so every later child is pruned too
-            descend(idx + 1, cand[k])
+            descend(idx + 1, cand[k], delta + offs[idx][k])
 
-    descend(0, np.zeros(len(tau)))
+    descend(0, np.zeros(len(tau)), np.zeros(sets[0].shape[1]))
+    if keep:
+        found.sort(key=lambda z: z[0])
+        return best, nodes <= max_nodes, nodes, found[:keep]
     return best, nodes <= max_nodes, nodes
