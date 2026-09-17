@@ -1,0 +1,131 @@
+{
+  "branch_max": {
+    "chebyshev": {
+      "aggressive": {
+        "branch_max": 16,
+        "builds": true,
+        "max_per_axis": 9
+      },
+      "conservative": {
+        "branch_max": 16,
+        "builds": false,
+        "max_per_axis": 20
+      },
+      "quadrature": {
+        "branch_max": 16,
+        "builds": true,
+        "max_per_axis": 16
+      }
+    },
+    "taylor": {
+      "aggressive": {
+        "branch_max": 16,
+        "builds": true,
+        "max_per_axis": 7
+      },
+      "conservative": {
+        "branch_max": 16,
+        "builds": false,
+        "max_per_axis": 27
+      },
+      "quadrature": {
+        "branch_max": 16,
+        "builds": false,
+        "max_per_axis": 28
+      }
+    }
+  },
+  "config": {
+    "eta": 1.0,
+    "nbins": 64,
+    "nsegments": 64,
+    "period_s": 0.007,
+    "poly_order": 4,
+    "seed": 20260917,
+    "signals": 6,
+    "stages_amplitude": [
+      6,
+      14,
+      22,
+      30,
+      38,
+      46,
+      54,
+      62
+    ],
+    "stages_comparison": [
+      4,
+      8,
+      12,
+      16,
+      20,
+      24,
+      28,
+      32,
+      36,
+      40,
+      44,
+      48,
+      52,
+      56,
+      60
+    ],
+    "tobs_s": 268.4355
+  },
+  "corner_forms": {
+    "chebyshev": {
+      "2": 1.0,
+      "3": 1.5,
+      "4": 2.0,
+      "5": 2.5,
+      "6": 3.0,
+      "7": 3.5,
+      "8": 4.0
+    },
+    "closed_form": {
+      "2": {
+        "chebyshev": 1.0,
+        "taylor": 1.5
+      },
+      "3": {
+        "chebyshev": 1.5,
+        "taylor": 3.5
+      },
+      "4": {
+        "chebyshev": 2.0,
+        "taylor": 7.5
+      },
+      "5": {
+        "chebyshev": 2.5,
+        "taylor": 15.5
+      },
+      "6": {
+        "chebyshev": 3.0,
+        "taylor": 31.5
+      },
+      "7": {
+        "chebyshev": 3.5,
+        "taylor": 63.5
+      },
+      "8": {
+        "chebyshev": 4.0,
+        "taylor": 127.5
+      }
+    },
+    "taylor": {
+      "2": 1.5,
+      "3": 3.5,
+      "4": 7.5,
+      "5": 15.5,
+      "6": 31.5,
+      "7": 63.5,
+      "8": 127.5
+    }
+  },
+  "covering_radius": {
+    "best_half_step": 0.582893,
+    "best_wide_lattice": 0.5,
+    "lattice_span": 2,
+    "own_cell": 7.5
+  }
+}
