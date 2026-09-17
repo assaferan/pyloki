@@ -110,6 +110,45 @@ one at all.
 
 ## Verification
 
-To be filled in once the patch is applied and a saturating run is logged. Deliberately
-not done while the paired experiment is in flight: editing `prune.py` would change the
-library under a running measurement.
+**Done.** The patch is implemented and verified on branch `upstream-max-sugg-logging`,
+off `upstream/main` at `18d04b3` — a separate worktree, deliberately not this one, so
+`src/` here was never touched while a measurement was running.
+
+Measured with the shipped scaled-down Extreme-Pruning pipeline
+(`tests/test_example_ep_accel.py`'s configuration) on **one fixed time series**, run at
+two buffers:
+
+| `max_sugg` | levels logged | levels with `eff > thresh` |
+|---|---|---|
+| 2^20 (non-binding) | 8 | **0** — every level logged `eff == thresh` |
+| 2^10 (binding) | 8 | **4** |
+
+and in the binding case the tightening is large:
+
+    thresh  3.00  ->  eff  3.96   (+0.96)
+    thresh  3.63  ->  eff  5.41   (+1.78)
+    thresh  3.42  ->  eff  6.24   (+2.82)
+    thresh  3.90  ->  eff  7.34   (+3.44)
+
+**Nearly a factor of two on the realised cut at the last stage, and before this patch
+none of it appeared anywhere in the output.**
+
+The final implementation is slightly larger than the three lines sketched above: the
+stats dict gains `threshold_eff`, `PruneStats` gains the field (defaulting to `NaN` so
+existing direct constructions keep working) and prints it beside the nominal value, and
+the initial pre-pruning record reports 0 rather than `NaN`.
+
+*Checks run:* `src/` is ruff-clean; the upstream suite passes (79 tests, everything bar
+the long `test_example_ep_circular.py`); and
+`tests/test_prune_threshold_eff.py` asserts **both** directions — the log must show the
+ratchet when the buffer binds and must not when it does not. The second half matters:
+a patch that always reported a raised threshold would pass a one-sided test and be
+useless.
+
+## Provenance of the motivating numbers
+
+The saturation figures quoted above under "Why it is worth fixing" come from this
+branch's own campaign work (`05_injection_design.md` §6.5) and are reproduced there with
+all 200 runs. They are what prompted the patch; they are not needed to justify it. The
+verification above stands on the shipped example alone and depends on nothing from the
+`metric-gridding` or `injection-design` branches.
