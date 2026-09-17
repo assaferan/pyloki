@@ -97,10 +97,30 @@ Pairs for 80% power at alpha = 0.05, against the loss ratio `r = loss_quad / los
 | 16 | 0.567 | 282 | 336 | 410 | 713 |
 | 20 | 0.848 | 610 | 725 | 867 | 1 588 |
 
-**So the campaign is affordable: ~290 paired injections at S/N 14**, and under 600 even
-at `r = 0.70`, far weaker than measured. The effect at `r = 0.34` is `dP_d = +1.3` points
-with a discordance rate of 1.3%, peaking at S/N 14 — inject there, not at the extremes,
-where the ladder is either never or always cleared.
+**REVISED — the affordable figure was wrong, for the same reason the report's headline
+gain was.** `r = 0.34` is a median over all stages, but 99% of first threshold failures
+happen in **stages 1-10**, and there `r = 0.675`: the advantage is much weaker where
+detection is actually decided, and `aggressive`'s own loss there is 1.03% rather than
+2.05%. Applying the measured ratio only in the window that matters:
+
+| S/N | `dP_d` | discordance | pairs for 80% power |
+|---|---|---|---|
+| 10 | +0.08 pt | 0.08% | 5 011 |
+| 12 | +0.27 pt | 0.27% | 1 430 |
+| **14** | **+0.50 pt** | **0.50%** | **772** |
+| 16 | +0.53 pt | 0.53% | 723 |
+
+So **~770 pairs for Arm B**, not 290, at S/N 14-16. Arm A (Chebyshev) is weaker again —
+its early gain is 1.15x against Taylor's 1.71x — so it needs materially more than that,
+and the figure should be recomputed on the Chebyshev ladder before committing.
+
+And ~770 is a **floor**, not an estimate: this model treats the arms as differing only by
+a deterministic `loss_s`. They also score *different templates*, which adds a stochastic
+term that a peer session measures at sd 0.133 against a deterministic amplitude
+difference of 0.044 — noise roughly 3x the signal. Pairing on the noise realisation does
+not remove it. Carried into McNemar that shrinks the discordance asymmetry and raises `n`,
+plausibly by an order of magnitude. **That term must be in the model before any n is
+committed to.**
 
 Two caveats, both one-sided in the safe direction. `quadrature`'s per-stage losses are
 *upper* bounds from a budget-limited search, so `r` is overestimated, the effect

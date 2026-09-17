@@ -295,5 +295,53 @@
       "not_closer": 1,
       "unresolved": 0
     }
+  },
+  "stage_split_chebyshev": {
+    "early": {
+      "aggressive_median": 0.581644,
+      "closer": 47,
+      "median_proven_gain": 1.145191,
+      "not_closer": 13,
+      "stages": [
+        1,
+        10
+      ],
+      "unresolved": 0
+    },
+    "late": {
+      "aggressive_median": 0.910102,
+      "closer": 48,
+      "median_proven_gain": 1.721515,
+      "not_closer": 0,
+      "stages": [
+        32,
+        60
+      ],
+      "unresolved": 0
+    }
+  },
+  "stage_split_taylor": {
+    "early": {
+      "aggressive_median": 0.731225,
+      "closer": 47,
+      "median_proven_gain": 1.712092,
+      "not_closer": 13,
+      "stages": [
+        1,
+        10
+      ],
+      "unresolved": 0
+    },
+    "late": {
+      "aggressive_median": 1.029934,
+      "closer": 48,
+      "median_proven_gain": 2.609096,
+      "not_closer": 0,
+      "stages": [
+        32,
+        60
+      ],
+      "unresolved": 0
+    }
   }
 }

@@ -86,6 +86,31 @@ x 15 stages = 90 cells.
   transform is not.
 - `conservative`'s 62 unresolved cells are absence of proof, not evidence against it.
 
+## Where the gain sits, and why it matters less than (2) suggests
+
+The gains in (2) are medians over stages 4 to 60. A survival model on the calibrated
+ladder puts **99% of first threshold failures in stages 1-10** — detection is decided
+early, while the accumulated score is still climbing towards a ladder that starts at 2.4
+and ends at 7.7. Only 2 of those 15 stages are in that window, so the aggregate is
+mostly measured where nothing is at stake. Splitting it:
+
+| basis | window | `aggressive` nearest | `quadrature` closer | proven gain |
+|---|---|---|---|---|
+| Taylor | stages 1-10 (99% of losses) | 0.731 | 47/60 | **1.71x** |
+| Taylor | stages 32-60 (~0%) | 1.030 | 48/48 | 2.61x |
+| Chebyshev | stages 1-10 (99% of losses) | 0.582 | 47/60 | **1.15x** |
+| Chebyshev | stages 32-60 (~0%) | 0.910 | 48/48 | 1.72x |
+
+Two things follow. The advantage is **smaller and less consistent where it can affect
+detection** — 1.71x rather than 2.61x in Taylor, 1.15x rather than 1.72x in Chebyshev,
+and `quadrature` fails to beat `aggressive` in 13 of 60 early cells against 0 of 48 late
+ones. And `aggressive` is *already* inside one tolerance early (0.731 Taylor, 0.582
+Chebyshev), so there is less to win there in the first place.
+
+None of (2) is retracted: those medians are correct over the cells they average. But the
+detection-relevant figure is the early one, and it is roughly half the headline. Read (2)
+as grid geometry, and this section as what the geometry is worth.
+
 ## The Chebyshev basis
 
 The same search ports to `poly_basis="chebyshev"` -- the branch there also goes through

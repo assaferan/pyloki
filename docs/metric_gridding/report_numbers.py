@@ -51,6 +51,8 @@ F0 = 1.0 / P.PERIOD
 PO = P.POLY_ORDER
 NBINS = P.NBINS
 STAGES_CMP = list(range(4, 63, 4))
+STAGES_EARLY = list(range(1, 11))     # where 99% of detection losses occur
+STAGES_LATE = list(range(32, 63, 4))  # where ~0% do
 STAGES_AMP = list(range(6, 63, 8))
 N_SIGNALS = 6
 SEED = 20260917
@@ -180,6 +182,47 @@ def nearest_template(basis: str) -> dict:
     return out
 
 
+def stage_split(basis: str) -> dict:
+    """The same comparison, split by whether the stage decides detection.
+
+    A survival model on the calibrated ladder puts 99% of first failures in stages 1-10,
+    so a gain averaged over stages 4-60 is mostly measured where nothing is at stake.
+    This records both windows so the report cannot quote the aggregate as though it were
+    the detection-relevant number.
+    """
+    bs, me, _ = BASES[basis]
+    truths = _truths()
+    cfg_a, cfg_q = P.make_config("aggressive"), P.make_config("quadrature")
+    tol = cfg_a.eta / cfg_a.nbins
+    out = {}
+    for label, stages in (("early", STAGES_EARLY), ("late", STAGES_LATE)):
+        better = worse = unres = 0
+        ratios, aggv = [], []
+        for tr in truths:
+            for S in stages:
+                sets, tau, sc = bs(cfg_a, "aggressive", PO, F0, tr, S, n_seed=1)
+                v, ex, _ = me(sets, tau, sc, PO, tol, max_nodes=2_000_000)
+                if not ex:
+                    unres += 1
+                    continue
+                aggv.append(v)
+                s2, t2, c2 = bs(cfg_q, "quadrature", PO, F0, tr, S, n_seed=1)
+                v2, ex2, _ = me(s2, t2, c2, PO, tol, max_nodes=2_000_000, init_best=v)
+                if v2 < v - 1e-12:
+                    better += 1
+                    ratios.append(v / max(v2, 1e-12))
+                elif ex2:
+                    worse += 1
+                else:
+                    unres += 1
+        out[label] = {"stages": [stages[0], stages[-1]],
+                      "aggressive_median": round(float(np.median(aggv)), 6),
+                      "closer": better, "not_closer": worse, "unresolved": unres,
+                      "median_proven_gain": (round(float(np.median(ratios)), 6)
+                                             if ratios else None)}
+    return out
+
+
 def amplitude(basis: str) -> dict:
     """Median loss per strategy, and the paired advantage.
 
@@ -230,7 +273,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--full", action="store_true",
                     help="recompute the 90-cell comparisons too (~12 min)")
-    ap.add_argument("--only", choices=["amplitude", "nearest"], default=None,
+    ap.add_argument("--only", choices=["amplitude", "nearest", "split"], default=None,
                     help="with --full, recompute just one expensive group")
     args = ap.parse_args()
 
@@ -243,6 +286,15 @@ def main() -> None:
         "covering_radius": covering_radius(),
         "branch_max": branch_max_counts(),
     }
+    if args.full and args.only == "split":
+        prev = json.loads(JSON_PATH.read_text()) if JSON_PATH.exists() else {}
+        data.update({k: v for k, v in prev.items() if k not in data})
+        for basis in BASES:
+            data[f"stage_split_{basis}"] = stage_split(basis)
+        JSON_PATH.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+        print(json.dumps(data["stage_split_taylor"], indent=2))
+        print(json.dumps(data["stage_split_chebyshev"], indent=2))
+        return
     if args.full:
         prev = json.loads(JSON_PATH.read_text()) if JSON_PATH.exists() else {}
         for basis in BASES:
@@ -250,6 +302,10 @@ def main() -> None:
                 data[f"nearest_template_{basis}"] = nearest_template(basis)
             else:
                 data[f"nearest_template_{basis}"] = prev[f"nearest_template_{basis}"]
+            if args.only in (None, "nearest"):
+                data[f"stage_split_{basis}"] = stage_split(basis)
+            elif f"stage_split_{basis}" in prev:
+                data[f"stage_split_{basis}"] = prev[f"stage_split_{basis}"]
             if args.only in (None, "amplitude"):
                 data[f"amplitude_{basis}"] = amplitude(basis)
             else:

@@ -1886,4 +1886,58 @@ Blocked on: `quadrature` and both Chebyshev threshold ladders are not calibrated
 Open questions: unchanged, plus whether the noise realisation is reproducible across arms.
 Next session starts at: the two prerequisites above -- threshold calibration for the
   chosen arm, and verifying paired noise -- then the run.
+
+## 2026-09-17 (x) — stage weighting: the gain sits where detection is not decided
+Done:
+  - **D70 — the headline gain is not the detection-relevant gain.** Raised by the
+    Overview session from the Injection Campaign session's per-stage `P_d` curve, and
+    confirmed independently inside my own survival model: at S/N 14, **99% of first
+    threshold failures occur in stages 1-10** (1% in 11-20, 0% beyond). My D52/D60 cells
+    were `range(4, 63, 4)`, so only **2 of 15** sit in that window. Splitting the exact
+    comparison:
+
+    | basis | window | `aggressive` nearest | closer | proven gain |
+    |---|---|---|---|---|
+    | Taylor | 1-10 (99% of losses) | 0.731 | 47/60 | **1.71x** |
+    | Taylor | 32-60 (~0%) | 1.030 | 48/48 | 2.61x |
+    | Chebyshev | 1-10 | 0.582 | 47/60 | **1.15x** |
+    | Chebyshev | 32-60 | 0.910 | 48/48 | 1.72x |
+
+    So the advantage is roughly **half** the headline where it can matter, and less
+    consistent: `quadrature` fails to beat `aggressive` in 13 of 60 early cells against
+    0 of 48 late. `aggressive` is also already inside one tolerance early (0.731 / 0.582),
+    so there is less to win. **Nothing in D52/D60 is retracted** -- those medians are
+    correct over the cells they average -- but the framing was wrong, and the report now
+    carries the split with the early figure marked as the detection-relevant one.
+    Recorded in `report_numbers.json` as `stage_split_*` so it stays bound to the report.
+  - **D71 — my own power numbers (D68/D69) were optimistic for the same reason, and are
+    revised.** `r = 0.34` is an all-stage median; on stages 1-10 the measured ratio is
+    **0.675** and `aggressive`'s loss there is 1.03% rather than 2.05%. Applying the
+    ratio only where it matters: `dP_d = +0.50` points at S/N 14 with 0.50% discordance,
+    needing **~770 pairs** rather than ~290. Arm A (Chebyshev) is weaker again (early
+    gain 1.15x) and needs more still.
+  - **D72 — and ~770 is a floor.** A peer session measures a stochastic term from the two
+    arms scoring *different templates*, sd 0.133 against a deterministic amplitude
+    difference of 0.044 -- noise ~3x signal -- which pairing on the noise realisation
+    does **not** remove. My model omits it entirely, treating the arms as differing only
+    by a deterministic `loss_s`. Carried into McNemar it shrinks the asymmetry and could
+    raise `n` by an order of magnitude. It must be in the model before any `n` is
+    committed.
+  - Also worth having, from the same session and not mine to duplicate: the cached
+    ladders here are Taylor and have no `quadrature` entry; regenerated on
+    `poly_chebyshev_moving` both arms reach `P_d = 0.1031` with top thresholds **7.10 and
+    7.00**, far closer than the Taylor 7.70/9.10 this log has been citing as the gap that
+    would swamp a coverage effect. In Chebyshev that objection is much weaker. And
+    `prune_on_overload_func` (`world_tree.py:527-551`) ratchets the threshold via
+    `max(current, topk, median)` where `topk` depends on buffer size, silently -- a
+    `max_sugg` confound that session found and owns.
+Pattern worth naming: this is the fourth time a quantity has been right and its *framing*
+  wrong -- peak vs distribution (D56, D61), prose vs table (D64, D65), and now aggregate
+  vs stage-weighted. The measurements keep surviving review; what they *mean* keeps not.
+  Every future headline needs "and where does this quantity matter?" answered in the same
+  breath as the number.
+Open questions: the template-noise term (D72) before any campaign `n`; Chebyshev ladder
+  power; the `max_sugg` confound (owned elsewhere).
+Next session starts at: folding D72 into `injection_power.py`, which decides whether the
+  campaign is affordable at all.
 ```
