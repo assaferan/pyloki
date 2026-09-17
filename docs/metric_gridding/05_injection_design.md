@@ -100,6 +100,14 @@ stage. `loss_s` is the measured per-stage S/N loss of the nearest template. Sani
 the model gives `P_d` 0.05 / 0.18 / ~0.45 at S/N 10 / 12 / 15, against the Phase 3
 injections' 0/3, 1/3, 3/3 — consistent within small-sample noise.
 
+> **The table below is retired.** Its `P_d` column comes from `injection_power.survival`,
+> which has since been falsified against a converged measurement: at S/N 14 and 2^18
+> (where `aggressive` converges, saturation 0.064) the real search recovers 38/50 = 0.760
+> against the model's 0.368, `P(X >= 38 | 0.368) = 1.8e-08`. The model is ~4.5 S/N
+> **pessimistic**, so its absolute `P_d`, its operating point and its pair counts are all
+> unreliable. Use the 954 pairs computed against a *measured* `p_disc` instead. Kept for
+> the record, and because the `r`-parameterised structure is still the right shape.
+
 Pairs for 80% power at alpha = 0.05, against the loss ratio `r = loss_quad / loss_agg`
 (`r = 1` is no effect; measured `r ~ 0.34`, IQR 0.21-0.45):
 

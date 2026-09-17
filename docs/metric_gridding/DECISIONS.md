@@ -2273,4 +2273,53 @@ Open question for assaferan, not for either session: a third path neither of us 
   still the search anyone cares about is a judgement call rather than a measurement.
 Next session starts at: assaferan on the shrink-the-configuration option, and on the
   report, which is unaffected by all of this but should now carry D93's framing.
+
+## 2026-09-17 (af) — a valid check exists after all, and it falsifies my survival model
+Done:
+  - **D94 — their caution was right in principle, wrong about D85, and led to a better
+    check that kills the model.** They warned I had over-withdrawn: `aggressive`
+    converges at 2^18 (D91), so anything resting on `aggressive`-at-2^18 still constrains
+    the ladder and the ratchet explanation is unavailable for it. Checked how D85 was
+    actually computed: **both** its measured points were at 2^14 (batch A's 3/24 at S/N
+    12, and 30/50 at S/N 14), which saturates for both arms, so D85 as computed really is
+    fully voided and their caution does not rescue it.
+    But applying their principle properly surfaces a point I never used -- and it is the
+    one that matters:
+
+    | | value |
+    |---|---|
+    | `aggressive`, S/N 14, **2^18** (converged, sat 0.064) | **38/50 = 0.760** |
+    | my survival model at S/N 14 | 0.368 |
+    | `P(X >= 38 | p = 0.368)` | **1.8e-08** |
+
+    So the model is **not merely undescriptive, it is decisively falsified** -- and in the
+    *pessimistic* direction, by +0.392 in `P_d`. It would need **S/N 18.5** to reach the
+    recovery the real search achieves at 14, i.e. it is about **4.5 S/N pessimistic** at
+    the converged buffer. The measured 95% interval [0.640, 0.880] excludes it by a wide
+    margin.
+  - **D95 — so `injection_power.survival` is retired as a quantitative instrument.** Its
+    absolute `P_d` values, its operating point and its pair counts all depend on the
+    `S/N -> P_d` mapping that D94 falsifies, so D68's ~290, D71's ~770 and the `P_d`
+    column of the power table are all unreliable. Their 954 pairs, computed on their own
+    model against a *measured* `p_disc`, is the number to use. What survives of mine is
+    the part brute force validated: the exact nearest-template search and the
+    smearing-based amplitude conversion. The survival wrapper was always the weakest link
+    -- a single-leaf Gaussian proxy with no beam and no competing candidates -- and it is
+    now measured to be so.
+  - Worth naming, because the sequence is instructive: I described this model as
+    "optimistic by ~1 S/N" (D77), then as "differently shaped" (D85), and it is in fact
+    **pessimistic by ~4.5 S/N**. Every one of those framings was derived from comparisons
+    against buffer-saturated data. The lesson is not that I mis-estimated a bias three
+    times -- it is that **three successive characterisations of an error were all computed
+    against data that could not measure it**, and one valid datum settled it immediately.
+    Check what the comparison datum is measuring before interpreting the residual.
+  - **D96 — and over-withdrawing has a cost, which they were right to flag.** Had I left
+    D85 as "no claim about why", the `aggressive`-at-2^18 constraint would have stayed
+    unused and this falsification would not have been found. Retracting to the safe
+    minimum is not free: it throws away real constraints along with the bad ones.
+Conventions fixed: when voiding a result, void it at the granularity of the *datum*, not
+  the result -- ask which measurements are still valid rather than discarding the whole
+  comparison. And prefer one datum known to measure the modelled quantity over three that
+  do not.
+Open questions: unchanged. Nothing here touches the geometry (D93 stands).
 ```
