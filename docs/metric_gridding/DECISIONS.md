@@ -1841,4 +1841,49 @@ Open questions: unchanged -- the pruning interaction and the circular basis.
 Next session starts at: the human's decision on the injection campaign (relayed as
   approved in another session; not acted on, since it was not approved to me) and, if it
   goes ahead, the design doc and the power calculation before any production run.
+
+## 2026-09-17 (w) — injection campaign: power calculation and pre-registered design
+Done:
+  - Campaign approved by assaferan directly (2026-09-17). Started with the power
+    calculation rather than a run, since it could have cancelled the campaign.
+  - **D66 — the first power calculation was wrong, and its own absurdity caught it.** It
+    said `quadrature` recovers *nothing* (`P_d` 0.0000 against `aggressive`'s 0.0497 at
+    S/N 10) despite having lower loss. Cause: the per-stage losses feeding it came from a
+    budget-limited search, which returns an **upper bound**, and at 16 of 64 stages the
+    bound was loose -- spiking to 44-60%. Survival takes a min over 64 stages, so one
+    loose stage annihilated the arm. Raising the budget collapsed the spikes
+    (200k -> 4M nodes: 44.75 -> 0.74, 60.74 -> 0.45, 47.68 -> 0.66), and a 16M check held
+    two of three stages exactly with the third still drifting *down*.
+    **The lesson generalises: a one-sided bound is harmless when comparing two numbers
+    and fatal when fed into a model that takes an extremum over many of them.** Inputs to
+    a model need the same convergence discipline as published measurements.
+  - **D67 — inverted the calculation to report a detectable effect size**, instead of
+    chasing per-stage convergence at all 63 stages (19 were still unresolved at 4M nodes
+    after ~16 min). Power is computed against the loss ratio `r = loss_quad/loss_agg`,
+    with `r` measured at **0.34 (IQR 0.21-0.45)** on the 41 converged stages. This is
+    both cheaper and more robust, and it shows the conclusion holds across the whole
+    plausible `r` range.
+  - **D68 — the campaign is affordable, and pairing is what makes it so.** At the
+    measured `r`, `dP_d = +1.3` points with a 1.3% discordance rate, peaking at
+    **S/N 14**, needing **~290 paired injections for 80% power** (McNemar, alpha=0.05),
+    and under 600 even at `r = 0.70`. My earlier guess of tens of thousands was for an
+    unpaired design. Sanity check: the model reproduces `P_d` 0.05/0.18/0.45 at S/N
+    10/12/15 against the Phase 3 injections' 0/3, 1/3, 3/3.
+  - **D69 — Arm A, the only shipped-defaults pair, is the harder test and needs ~600.**
+    Chebyshev `aggressive` vs `quadrature` is the sole pair that builds at
+    `branch_max=16` (D62), but its loss ratio is nearer 0.7, so it needs roughly twice
+    Arm B's injections. Worth knowing before choosing the arm rather than after.
+  - `docs/metric_gridding/05_injection_design.md`: the pre-registered design --
+    hypothesis, arms, pairing, stratification with a **null stratum**, positive and
+    negative controls, threshold recalibration, the power table, and a pre-committed
+    analysis with a fixed-n stopping rule. Written before any outcome was looked at.
+Conventions fixed: any model input derived from a bounded search must carry a
+  convergence check; report the detectable effect size, not just a single n.
+Blocked on: `quadrature` and both Chebyshev threshold ladders are not calibrated (only
+  `aggressive`, `conservative`, `metric` are cached), and the pipeline must be able to
+  reproduce a noise realisation across arms for the pairing to work. Both are
+  prerequisites for the first production run.
+Open questions: unchanged, plus whether the noise realisation is reproducible across arms.
+Next session starts at: the two prerequisites above -- threshold calibration for the
+  chosen arm, and verifying paired noise -- then the run.
 ```
