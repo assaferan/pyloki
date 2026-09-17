@@ -898,10 +898,37 @@ roughly **double** what the scheme asked for, and it is `top-K` that is setting 
 a function of the buffer size and the score distribution, **not of the ladder**. Raising
 the nominal threshold by 1.0 changes nothing when top-K already exceeds it by 5.
 
-The signature is visible in the numbers: matched-baseline minus strict max excess is
-**0.74 / 0.64 / 0.80** across the three realisations (mean 0.73, spread 0.16), which is
-what a *fixed* `eff` and a *shifted* `thresh` produce. On `tim_0000` the max excess is
-4.19 under both the shipped and the matched-baseline ladder despite different thresholds.
+**Measured directly, per level, on one realisation under both ladders.** Recording the
+nominal and effective cut at every level (`ratchet_probe.py` stores `levels_detail`):
+
+| level | `thresh` base | `thresh` strict | Δ nominal | `eff` base | `eff` strict | **Δ effective** |
+|---|---|---|---|---|---|---|
+| 4 | 1.80 | 3.30 | +1.50 | 2.93 | 3.30 | +0.37 |
+| 5 | 2.30 | 3.50 | +1.20 | 4.35 | 4.40 | +0.05 |
+| 7 | 2.90 | 4.20 | +1.30 | 5.39 | 5.38 | −0.01 |
+| 10 | 3.90 | 5.00 | +1.10 | 5.92 | 5.92 | **0.00** |
+| 13 | 4.60 | 5.80 | +1.20 | 6.36 | 6.37 | +0.01 |
+| 19 | 6.00 | 6.70 | +0.70 | 7.29 | 7.31 | +0.02 |
+
+Over all 20 ratcheted levels:
+
+    mean change in NOMINAL threshold (strict - baseline):  +0.870   sd 0.344
+    mean change in EFFECTIVE cut                        :  -0.063   sd 0.175
+    |d eff| / |d thresh| = 0.07
+
+**Raising the ladder by 0.87 moved the cut that actually ran by −0.06.** The effective
+cut is independent of the scheme to within 7%, and at level 10 it is identical to two
+decimal places while the nominal rose by 1.10. This is not a weak effect that a stricter
+ladder might overcome; the ladder is simply not the operative term.
+
+**Level 4 is the exception, and it explains the one level the strict ladder gained.**
+There the strict nominal (3.30) rises *above* the baseline's effective cut (2.93), so
+the nominal becomes binding again and `eff = thresh` exactly. That is `max(nominal,
+top-K, median)` behaving as written, and it is why the ratcheted count went 20 → 19: the
+single level recovered is precisely the one where the nominal crossed above top-K. To
+recover all of them the ladder would need nominal > top-K at *every* level — thresholds
+of 6–8 from the first stage — which is not a stricter operating point but no search at
+all.
 
 #### Verdict on §6.6's options
 

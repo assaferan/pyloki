@@ -1,5 +1,5 @@
 {
- "note": "Section 6.7: does the overflow ratchet fire, and can a stricter ladder stop it. 'levels_ratcheted' counts levels where the effective cut exceeded the scheme's nominal threshold, measured with the threshold_eff field added by PR #14. max_sugg = 2^20, three fixed realisations, 64 prune levels each.",
+ "note": "Section 6.7: does the overflow ratchet fire, and can a stricter ladder stop it. 'levels_ratcheted' counts levels where the effective cut exceeded the scheme's nominal threshold, measured with the threshold_eff field added by PR #14. max_sugg = 2^20, three fixed realisations, 64 prune levels each. The two mech_* cells are one realisation under both matched ladders with per-level detail, for the mechanism check in \u00a76.7.",
  "cells": {
   "agg_2p20_baseline": [
    {
@@ -151,6 +151,678 @@
     "recovered": true,
     "mismatch": 0.0001124005839747208,
     "seconds": 164.43579158300417
+   }
+  ],
+  "mech_pd0.1031_tim0000": [
+   {
+    "file": "tim_0000.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 4.1899999999999995,
+    "first_ratchet_level": 4,
+    "levels_detail": [
+     {
+      "level": 1,
+      "thresh": 0.0,
+      "eff": 0.0
+     },
+     {
+      "level": 2,
+      "thresh": 1.7,
+      "eff": 1.7
+     },
+     {
+      "level": 3,
+      "thresh": 1.4,
+      "eff": 1.4
+     },
+     {
+      "level": 4,
+      "thresh": 1.8,
+      "eff": 2.93
+     },
+     {
+      "level": 5,
+      "thresh": 2.3,
+      "eff": 4.35
+     },
+     {
+      "level": 6,
+      "thresh": 2.8,
+      "eff": 2.8
+     },
+     {
+      "level": 7,
+      "thresh": 2.9,
+      "eff": 5.39
+     },
+     {
+      "level": 8,
+      "thresh": 3.0,
+      "eff": 3.0
+     },
+     {
+      "level": 9,
+      "thresh": 3.5,
+      "eff": 3.5
+     },
+     {
+      "level": 10,
+      "thresh": 3.9,
+      "eff": 5.92
+     },
+     {
+      "level": 11,
+      "thresh": 3.8,
+      "eff": 3.8
+     },
+     {
+      "level": 12,
+      "thresh": 4.3,
+      "eff": 4.3
+     },
+     {
+      "level": 13,
+      "thresh": 4.6,
+      "eff": 6.36
+     },
+     {
+      "level": 14,
+      "thresh": 5.1,
+      "eff": 5.1
+     },
+     {
+      "level": 15,
+      "thresh": 5.3,
+      "eff": 6.87
+     },
+     {
+      "level": 16,
+      "thresh": 5.2,
+      "eff": 5.2
+     },
+     {
+      "level": 17,
+      "thresh": 5.6,
+      "eff": 5.6
+     },
+     {
+      "level": 18,
+      "thresh": 5.8,
+      "eff": 5.8
+     },
+     {
+      "level": 19,
+      "thresh": 6.0,
+      "eff": 7.29
+     },
+     {
+      "level": 20,
+      "thresh": 6.0,
+      "eff": 6.0
+     },
+     {
+      "level": 21,
+      "thresh": 6.1,
+      "eff": 6.1
+     },
+     {
+      "level": 22,
+      "thresh": 6.1,
+      "eff": 6.1
+     },
+     {
+      "level": 23,
+      "thresh": 6.5,
+      "eff": 6.5
+     },
+     {
+      "level": 24,
+      "thresh": 6.4,
+      "eff": 7.36
+     },
+     {
+      "level": 25,
+      "thresh": 6.4,
+      "eff": 7.68
+     },
+     {
+      "level": 26,
+      "thresh": 6.5,
+      "eff": 7.84
+     },
+     {
+      "level": 27,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 28,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 29,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 30,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 31,
+      "thresh": 6.8,
+      "eff": 8.12
+     },
+     {
+      "level": 32,
+      "thresh": 6.8,
+      "eff": 6.8
+     },
+     {
+      "level": 33,
+      "thresh": 6.4,
+      "eff": 8.4
+     },
+     {
+      "level": 34,
+      "thresh": 6.8,
+      "eff": 6.8
+     },
+     {
+      "level": 35,
+      "thresh": 6.7,
+      "eff": 6.7
+     },
+     {
+      "level": 36,
+      "thresh": 6.8,
+      "eff": 8.58
+     },
+     {
+      "level": 37,
+      "thresh": 6.5,
+      "eff": 6.5
+     },
+     {
+      "level": 38,
+      "thresh": 6.8,
+      "eff": 6.8
+     },
+     {
+      "level": 39,
+      "thresh": 6.6,
+      "eff": 8.69
+     },
+     {
+      "level": 40,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 41,
+      "thresh": 6.7,
+      "eff": 9.05
+     },
+     {
+      "level": 42,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 43,
+      "thresh": 6.9,
+      "eff": 9.44
+     },
+     {
+      "level": 44,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 45,
+      "thresh": 7.0,
+      "eff": 7.0
+     },
+     {
+      "level": 46,
+      "thresh": 6.7,
+      "eff": 6.7
+     },
+     {
+      "level": 47,
+      "thresh": 7.0,
+      "eff": 7.0
+     },
+     {
+      "level": 48,
+      "thresh": 7.2,
+      "eff": 7.2
+     },
+     {
+      "level": 49,
+      "thresh": 7.2,
+      "eff": 7.2
+     },
+     {
+      "level": 50,
+      "thresh": 7.2,
+      "eff": 7.2
+     },
+     {
+      "level": 51,
+      "thresh": 7.2,
+      "eff": 10.04
+     },
+     {
+      "level": 52,
+      "thresh": 7.3,
+      "eff": 7.3
+     },
+     {
+      "level": 53,
+      "thresh": 7.3,
+      "eff": 10.94
+     },
+     {
+      "level": 54,
+      "thresh": 7.5,
+      "eff": 7.5
+     },
+     {
+      "level": 55,
+      "thresh": 7.2,
+      "eff": 7.2
+     },
+     {
+      "level": 56,
+      "thresh": 7.5,
+      "eff": 11.18
+     },
+     {
+      "level": 57,
+      "thresh": 7.6,
+      "eff": 11.79
+     },
+     {
+      "level": 58,
+      "thresh": 7.8,
+      "eff": 7.8
+     },
+     {
+      "level": 59,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 60,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 61,
+      "thresh": 7.9,
+      "eff": 7.9
+     },
+     {
+      "level": 62,
+      "thresh": 7.9,
+      "eff": 7.9
+     },
+     {
+      "level": 63,
+      "thresh": 8.1,
+      "eff": 8.1
+     },
+     {
+      "level": 64,
+      "thresh": 7.6,
+      "eff": 7.6
+     }
+    ],
+    "ncand": 589103,
+    "saturation": 0.5618124008178711,
+    "recovered": true,
+    "mismatch": 5.0679372625648714e-05,
+    "seconds": 174.08035995799582
+   }
+  ],
+  "mech_pd0.01_tim0000": [
+   {
+    "file": "tim_0000.npz",
+    "levels": 64,
+    "levels_ratcheted": 19,
+    "max_excess": 3.450000000000001,
+    "first_ratchet_level": 5,
+    "levels_detail": [
+     {
+      "level": 1,
+      "thresh": 0.0,
+      "eff": 0.0
+     },
+     {
+      "level": 2,
+      "thresh": 2.4,
+      "eff": 2.4
+     },
+     {
+      "level": 3,
+      "thresh": 2.8,
+      "eff": 2.8
+     },
+     {
+      "level": 4,
+      "thresh": 3.3,
+      "eff": 3.3
+     },
+     {
+      "level": 5,
+      "thresh": 3.5,
+      "eff": 4.4
+     },
+     {
+      "level": 6,
+      "thresh": 4.0,
+      "eff": 4.0
+     },
+     {
+      "level": 7,
+      "thresh": 4.2,
+      "eff": 5.38
+     },
+     {
+      "level": 8,
+      "thresh": 4.5,
+      "eff": 4.5
+     },
+     {
+      "level": 9,
+      "thresh": 4.9,
+      "eff": 4.9
+     },
+     {
+      "level": 10,
+      "thresh": 5.0,
+      "eff": 5.92
+     },
+     {
+      "level": 11,
+      "thresh": 5.1,
+      "eff": 5.1
+     },
+     {
+      "level": 12,
+      "thresh": 5.5,
+      "eff": 5.5
+     },
+     {
+      "level": 13,
+      "thresh": 5.8,
+      "eff": 6.37
+     },
+     {
+      "level": 14,
+      "thresh": 6.0,
+      "eff": 6.0
+     },
+     {
+      "level": 15,
+      "thresh": 6.1,
+      "eff": 6.88
+     },
+     {
+      "level": 16,
+      "thresh": 6.1,
+      "eff": 6.1
+     },
+     {
+      "level": 17,
+      "thresh": 6.4,
+      "eff": 6.4
+     },
+     {
+      "level": 18,
+      "thresh": 6.6,
+      "eff": 6.6
+     },
+     {
+      "level": 19,
+      "thresh": 6.7,
+      "eff": 7.31
+     },
+     {
+      "level": 20,
+      "thresh": 6.7,
+      "eff": 6.7
+     },
+     {
+      "level": 21,
+      "thresh": 6.6,
+      "eff": 6.6
+     },
+     {
+      "level": 22,
+      "thresh": 6.6,
+      "eff": 6.6
+     },
+     {
+      "level": 23,
+      "thresh": 7.1,
+      "eff": 7.1
+     },
+     {
+      "level": 24,
+      "thresh": 6.9,
+      "eff": 7.26
+     },
+     {
+      "level": 25,
+      "thresh": 7.3,
+      "eff": 7.57
+     },
+     {
+      "level": 26,
+      "thresh": 7.3,
+      "eff": 7.74
+     },
+     {
+      "level": 27,
+      "thresh": 7.2,
+      "eff": 7.2
+     },
+     {
+      "level": 28,
+      "thresh": 7.3,
+      "eff": 7.3
+     },
+     {
+      "level": 29,
+      "thresh": 7.3,
+      "eff": 7.3
+     },
+     {
+      "level": 30,
+      "thresh": 6.9,
+      "eff": 6.9
+     },
+     {
+      "level": 31,
+      "thresh": 7.2,
+      "eff": 8.16
+     },
+     {
+      "level": 32,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 33,
+      "thresh": 7.9,
+      "eff": 8.25
+     },
+     {
+      "level": 34,
+      "thresh": 7.8,
+      "eff": 7.8
+     },
+     {
+      "level": 35,
+      "thresh": 7.8,
+      "eff": 7.8
+     },
+     {
+      "level": 36,
+      "thresh": 7.9,
+      "eff": 8.51
+     },
+     {
+      "level": 37,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 38,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 39,
+      "thresh": 7.6,
+      "eff": 8.62
+     },
+     {
+      "level": 40,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 41,
+      "thresh": 7.4,
+      "eff": 8.98
+     },
+     {
+      "level": 42,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 43,
+      "thresh": 7.3,
+      "eff": 9.61
+     },
+     {
+      "level": 44,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 45,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 46,
+      "thresh": 7.9,
+      "eff": 7.9
+     },
+     {
+      "level": 47,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 48,
+      "thresh": 7.8,
+      "eff": 7.8
+     },
+     {
+      "level": 49,
+      "thresh": 7.6,
+      "eff": 7.6
+     },
+     {
+      "level": 50,
+      "thresh": 7.8,
+      "eff": 7.8
+     },
+     {
+      "level": 51,
+      "thresh": 7.6,
+      "eff": 9.57
+     },
+     {
+      "level": 52,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 53,
+      "thresh": 8.0,
+      "eff": 10.58
+     },
+     {
+      "level": 54,
+      "thresh": 7.7,
+      "eff": 7.7
+     },
+     {
+      "level": 55,
+      "thresh": 8.1,
+      "eff": 8.1
+     },
+     {
+      "level": 56,
+      "thresh": 8.1,
+      "eff": 10.9
+     },
+     {
+      "level": 57,
+      "thresh": 8.2,
+      "eff": 11.65
+     },
+     {
+      "level": 58,
+      "thresh": 8.2,
+      "eff": 8.2
+     },
+     {
+      "level": 59,
+      "thresh": 8.2,
+      "eff": 8.2
+     },
+     {
+      "level": 60,
+      "thresh": 8.3,
+      "eff": 8.3
+     },
+     {
+      "level": 61,
+      "thresh": 8.3,
+      "eff": 8.3
+     },
+     {
+      "level": 62,
+      "thresh": 8.4,
+      "eff": 8.4
+     },
+     {
+      "level": 63,
+      "thresh": 8.5,
+      "eff": 8.5
+     },
+     {
+      "level": 64,
+      "thresh": 8.0,
+      "eff": 8.0
+     }
+    ],
+    "ncand": 707320,
+    "saturation": 0.6745529174804688,
+    "recovered": true,
+    "mismatch": 6.12141767011367e-05,
+    "seconds": 110.96003712499805
    }
   ]
  }
