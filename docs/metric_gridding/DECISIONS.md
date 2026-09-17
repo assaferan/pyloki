@@ -2322,4 +2322,61 @@ Conventions fixed: when voiding a result, void it at the granularity of the *dat
   comparison. And prefer one datum known to measure the modelled quantity over three that
   do not.
 Open questions: unchanged. Nothing here touches the geometry (D93 stands).
+
+## 2026-09-17 (ag) — why the model was pessimistic, and 954 is a range not a number
+Done:
+  - **D97 — their M6 diagnosis is confirmed, and it is the dominant term.** Their reading
+    of D94: a single-leaf model being *pessimistic* is what you expect if real survival is
+    a **max over many near-covering leaves** rather than one draw. Tested directly. The
+    inconsistency in my model is now nameable: it applies thresholds **calibrated for the
+    whole branching pattern** while giving the signal **exactly one leaf**, so false
+    alarms get `N` leaves and the signal gets 1. Giving the signal `K` partially
+    decorrelated leaves (shared data component plus a per-leaf part, since templates at
+    different offsets fold differently) at S/N 14:
+
+    | K | rho=0.99 | rho=0.95 | rho=0.90 |
+    |---|---|---|---|
+    | 1 | 0.363 | 0.366 | 0.366 |
+    | 5 | 0.412 | 0.479 | 0.521 |
+    | 20 | 0.444 | 0.546 | 0.617 |
+    | 100 | 0.472 | 0.608 | **0.703** |
+
+    against the measured **0.760** and the single-leaf **0.368**. So plausible `K` and
+    `rho` recover most of the 4.5 S/N gap: M6 is not mildly conservative, it is the
+    leading error. Note this is *not* the tiling multiplicity of D43 -- it counts
+    near-covering leaves whose loss is slightly worse, which exist in both arms, and
+    `aggressive` had 16 778 candidates alive at 2^18.
+  - **D98 — and their 954 must not be promoted to authoritative; I did promote it and am
+    correcting that.** They re-ran their aggregation under different stage weightings,
+    changing nothing else:
+
+    | stage weighting | pi | total pairs |
+    |---|---|---|
+    | ladder `succ_h1` (the quoted one) | 0.628 | 954 |
+    | flat | 0.654 | 339 |
+    | `sqrt(succ_h1)` | 0.642 | 404 |
+    | late stages only | 0.680 | 246 |
+    | early stages only | 0.554 | **2 842** |
+
+    **A factor of 8**, larger than the `rho` correction, and the weighting rests on a
+    modelled per-stage survival curve from the same single-leaf Gaussian family as the
+    model D94 falsified. So `n` is 340-2 840 and 954 is one point in it. I told assaferan
+    954 was "the number to use" on the strength of it being measured-`p_disc`-based; the
+    `p_disc` is measured, the *weighting* is not, and I conflated the two.
+  - **D99 — and my own result cannot break the tie, though it leans one way.** If the real
+    search survives far better than modelled (D94), the true stage weights decay *less*
+    steeply than `succ_h1`, which moves toward the flat/late rows and `n` down toward 340.
+    But the claim that the decision is made early (D70, and their §4.3) comes off the same
+    modelled profile and is the 2 842 corner. **Both readings derive from a curve now
+    known to be wrong**, so neither can be asserted -- including my own stage-split
+    framing, whose *weighting* by "where detection is decided" inherits this. D70's
+    measured early/late gain split stands as geometry; what is now unsupported is the
+    claim that the early window is where it matters, since that came from the falsified
+    survival profile.
+Conventions fixed: "computed from a measured quantity" does not make a result measured --
+  check every input, not the headline one. That is what D98 got wrong.
+Open questions: the real per-stage survival profile, which nothing on either branch
+  measures and which would settle both `n` and D99. In principle instrumentable (record
+  how many realisations still have a covering leaf alive at each prune level, not just
+  end-to-end recovery), but that instrumentation does not exist and is not mine to start.
 ```

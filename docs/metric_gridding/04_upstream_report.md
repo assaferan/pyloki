@@ -109,8 +109,11 @@ mostly measured where nothing is at stake. Splitting it:
 | Chebyshev | stages 1-10 (99% of losses) | 0.582 | 47/60 | **1.15x** |
 | Chebyshev | stages 32-60 (~0%) | 0.910 | 48/48 | 1.72x |
 
-Two things follow. The advantage is **smaller and less consistent where it can affect
-detection** — 1.71x rather than 2.61x in Taylor, 1.15x rather than 1.72x in Chebyshev,
+One caveat on the weighting before the numbers: which window "can affect detection" is
+itself taken from a modelled per-stage survival curve that has since been contradicted by
+a converged measurement (0.760 recovered against 0.368 modelled). The **split below is
+measured geometry**; the claim that the early window is the decisive one is not, and is
+held open. With that said -- the advantage is **smaller and less consistent early** — 1.71x rather than 2.61x in Taylor, 1.15x rather than 1.72x in Chebyshev,
 and `quadrature` fails to beat `aggressive` in 13 of 60 early cells against 0 of 48 late
 ones. And `aggressive` is *already* inside one tolerance early (0.731 Taylor, 0.582
 Chebyshev), so there is less to win there in the first place.

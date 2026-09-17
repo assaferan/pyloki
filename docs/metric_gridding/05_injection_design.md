@@ -175,7 +175,11 @@ Taylor losses; Chebyshev's loss ratio is nearer 0.7, so **Arm A needs ~600 pairs
 
 At the operating point the design selects -- on-grid `P_d ~ 0.5` in both arms, where
 discordance is maximal and the pilot measured `p_disc = 0.30` -- the campaign needs
-**954 pairs and about 13 core-hours**, against the 28 quoted in the original verdict.
+**340 to 2 840 pairs**, quoted as 954 under one stage weighting. The `p_disc` is measured;
+the **stage weighting is not**, and it rests on a modelled per-stage survival curve from
+the same family as the model falsified in section "Power". Re-running the aggregation
+under flat / `sqrt` / late-only / early-only weightings spans a factor of 8 in `n`. Treat
+954 as a point in that range, not the requirement.
 Powering instead against the `p_disc = 0.08` seen at S/N 12 would demand ~3600 pairs,
 but that is a regime the design avoids by construction, so it is not the requirement.
 
