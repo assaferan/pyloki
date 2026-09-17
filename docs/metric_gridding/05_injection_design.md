@@ -238,11 +238,17 @@ threshold), and taking `pi = E[w·D⁺] / E[w·|D|]`:
 | ducy | `pi` | `p_disc` (modelled, M5 upper bound) | discordant pairs needed | **pairs needed** | core-hours at 50 s/pair |
 |---|---|---|---|---|---|
 | 0.05 | 0.787 | 0.699 | 22 | **31** | 0.4 |
-| 0.10 | **0.697** | 0.370 | 49 | **131** | 1.8 |
+| 0.10 | ~~0.697~~ **0.628** | 0.370 | 49 | ~~131~~ | 1.8 |
 | 0.20 | 0.607 | 0.168 | 168 | **997** | 13.8 |
 
 At the pilot's *measured* `p_disc = 0.30` (§6.3) rather than the modelled one, the same
 three rows are n = 74 / 163 / 560, i.e. 1.0 / 2.3 / 7.8 core-hours.
+
+> **The ducy 0.10 row of both tables above is superseded by §5.2**, which corrects
+> `rho_AB`: `pi` = 0.628 and n = 391 at `p_disc` = 0.30, not 0.697 and 163. The 0.05 and
+> 0.20 rows have not been recomputed. They are left in place because the *shape* of the
+> argument — that `p_disc` enters linearly and `pi` quadratically — is what §5 is for,
+> and that is unchanged.
 
 `m = (z_{α/2}·√¼ + z_β·√(pi(1−pi)))² / (pi − ½)²`, `n = m / p_disc`, 80% power,
 two-sided α = 0.05.
@@ -523,7 +529,9 @@ every batch. The buffer has to go higher, and `quadrature`'s cost goes with it.
    question, but a different one, and it would have to be reported as such rather than
    as a statement about tiling.
 2. **Pre-screen the null stratum** with `nearest_template_cheby.py` (§5.1) rather than
-   assuming random positions give one. Only ~1 in 8 does.
+   assuming random positions give one. About **1 in 5** does, after the §5.2 correction
+   (it was 1 in 8 before it). Screen against the *corrected* `pi`, not the cached one —
+   `rho_check.py --strata` is the version that does.
 3. **Stream the realisations** instead of persisting them (§6.1), or budget 160 GB.
 4. Keep the ladders frozen and committed. Do not re-derive `DynamicThresholdScheme` per
    run; it is unseeded.
