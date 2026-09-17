@@ -959,7 +959,14 @@ is no `quadrature` entry at all. They are not valid for the Chebyshev arm and us
 would silently compare the wrong ladders. `cheby_aggressive.npz` and
 `cheby_quadrature.npz` are the correct ones and are new in this commit.
 
-### 11.6 The single most useful thing to do first
+### 11.6 The single most useful thing to do first — **DONE, see §6.5**
+
+> **Closed.** Run as specified: 50 realisations, all four cells, pre-registered analysis
+> committed before the first cell. The answer is split — the buffer *pressure* is
+> arm-dependent (p = 0.012) but the *outcome* bias is unresolved with a point estimate
+> (+0.080) above the campaign's effect of interest (0.06). **§6.4 is not closed**, the
+> campaign must not run at 2^18, and closing it needs n ≈ 211 per cell. The original
+> text follows.
 
 **Finish the paired `max_sugg` experiment** — both arms, both buffers, on one fixed set
 of ~50 realisations at S/N 14 — and answer the one question §6.4 left open: does the
@@ -976,3 +983,25 @@ both buffers (11/20 → 13/20), `quadrature` only at 2^14 (11/20).
 
 Second: the `rho_AB` check in §11.4 (1). It is cheap, it has never been done, and `pi`
 — hence `n` — depends on it more than on anything else.
+
+> **Also done — §5.2.** It had never been checked and it was wrong: the code used the
+> profile overlap where the model needs the score correlation. `pi` 0.697 → 0.628, and
+> through the stratification it deleted one of the three strata (§5.1, §9).
+
+### 11.7 What the second session left open
+
+1. **The buffer.** Raise `max_sugg` past 2^18 until the 99th percentile of saturation is
+   below 0.9 **in both arms** — `quadrature` is at 0.975 at 2^18 — then re-measure the
+   per-pair cost there, and re-run §6.5's four cells at n ≈ 211 to bound the interaction
+   below 0.06. Nothing downstream is safe until this is done.
+2. **The operating point.** §6.5 measures `P_d` = 0.76/0.80 at S/N 14 and 2^18, well
+   above the 0.5 §9 wants, so the 3-point pilot should bracket *below* S/N 14. This
+   contradicts the `metric-gridding` session's D78 (S/N 15–17) in direction; that
+   disagreement is unresolved and is called out in §6.5 item 6.
+3. **ducy 0.05 and 0.20** are still on the uncorrected `rho_AB` (§5.2). The
+   leading-order factor says 0.05 barely moves and 0.20 moves more than 0.10 did.
+4. **Row 2 of §10** is retired for stages 1–10 *on the `metric-gridding` session's
+   measurement, not mine.* If it has to carry weight, re-run it here.
+5. **The upstream logging patch** (`06_upstream_max_sugg_logging.md`) is written but not
+   applied or verified — deliberately, since editing `prune.py` would have changed the
+   library under §6.5's run. Applying and verifying it is now unblocked.
