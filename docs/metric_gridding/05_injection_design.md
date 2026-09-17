@@ -256,6 +256,33 @@ transport, and `Delta` there is 0.000–0.044 against an `eps` of 0.158. The eff
 suppressed twice at the same time: `mu` is small *and* `L_A − L_B` is small, and for the
 same reason — few segments have been accumulated.
 
+> ⚠ **The `reach` row — and therefore the whole "where the decision is made" claim — is
+> a MODELLED survival curve, and the model family is now measured to be badly wrong.**
+> `reach` is the ladder's own cumulative H1 success. The `metric-gridding` session's
+> survival model, of the same single-leaf Gaussian family, predicts `P_d` = 0.368 at
+> S/N 14 where §6.5 measures **0.760** in the converged `aggressive` arm — pessimistic
+> by ~4.5 S/N, `p` = 1.8 × 10⁻⁸ — and it has traced the gap to M6: thresholds
+> calibrated for the whole branching pattern applied to a signal given exactly one leaf,
+> when `aggressive` had 16 778 candidates alive. If survival is really a max over many
+> near-covering leaves, `reach` decays far more slowly than the row above, and the
+> flat-after-stage-30 premise fails.
+>
+> What survives and what does not:
+> - **The per-stage `pi` row survives.** It is geometry plus §5.2's corrected `rho`, and
+>   `reach` does not enter it. `pi` really is 0.515–0.558 early and 0.87–0.93 late.
+> - **The claim that the early stages are the ones that matter does not survive.** That
+>   is `reach`, and `reach` is the modelled quantity.
+> - So the section's title is not established. The effect may be small for the reason
+>   given, or the decision may extend into the stages where `pi` is large — which would
+>   make it *bigger*, not smaller.
+>
+> This propagates: `DECISION_STAGES = [2, 6, 10, 14, 20, 28]` in `injection_power.py`
+> is chosen from this premise, so §5.1's stratification and §9's strata are conditioned
+> on it, and §9's `n` moves by a factor of 8 across plausible reweightings (§10 row 8b).
+> Settling it needs the real per-stage survival profile — a count of realisations with a
+> covering leaf still alive at each prune level. Nothing here measures it; it is one
+> predicate per level per run, not a new experiment.
+
 ---
 
 ## 5. The power calculation
