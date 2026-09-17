@@ -858,34 +858,53 @@ exponents 1.022 and 0.994. **No longer provisional.**
 
 ## 8. What can be concluded without running it
 
-- The equal-`P_d` recalibration works on real data: both arms recovered 3/24 at S/N 12
-  against a nominal 0.1031. The threshold ladder is not the confound it was in Taylor
-  (7.10 vs 7.00 here, against 7.70 vs 9.10 there).
-- The discordance rate is 8–30% at plausible operating points, so a paired design is
-  the right one and an unpaired one would be hopeless.
-- **`max_sugg` changes search outcomes silently, and that is worth reporting upstream on
-  its own.** On one fixed time series, `aggressive` returns 0 candidates at
-  `max_sugg = 2^14` and 110 at 2^18 (§6.4). The overflow ratchet at
-  `world_tree.py:527-551` raises the effective cut, `PruneStats` records only the nominal
-  threshold (`prune.py:685`), and the final-stage cut stays nominal so nothing in the
-  output betrays it. Logging the effective threshold when `prune_on_overload` fires would
-  be a three-line fix. Whether it biases one `tiling_strategy` more than another is a
-  separate question and is open (§6.4).
+> ⚠ **Three of the original six bullets are withdrawn.** This is the section most likely
+> to be lifted into a summary, so what is gone is kept visible rather than deleted.
+
+**Withdrawn:**
+
+- ~~The equal-`P_d` recalibration works on real data: both arms recovered 3/24 at S/N 12.~~
+  **Batch A ran at `max_sugg` = 2^14, where both arms saturate (§6.6), so the realised
+  cut in each was the ratchet and not the ladder.** The agreement is real but cannot be
+  credited to the recalibration. §10 row 8.
+- ~~The tiling geometry is largest where nothing is being decided.~~ **Backwards.** The
+  measured per-stage survival profile (§4.3 ⚑) puts the first loss at level 13 and the
+  median at 27, with **0%** of losses by stage 10 where the modelled curve put 99%. The
+  stages where `pi` is 0.87–0.93 are *inside* the decision window, not outside it. This
+  was the structural reason the whole effort expected a small effect, and it does not
+  hold.
+- ~~A defensible upstream sentence, without any campaign: at equal `P_d` the tiling
+  choice moves the decision by ~0.04 against a 0.13 stochastic difference…~~ **Rests on
+  both of the above plus a superseded number** — the stochastic term is 0.230, not 0.133
+  (§5.2), so it is ~5x the deterministic term rather than 3x, and "the stages where the
+  decision is made" are the wrong stages. **Nothing in this document currently supports
+  an upstream sentence about tiling.**
+
+**Stands:**
+
+- **`max_sugg` changes search outcomes silently.** On one fixed time series, `aggressive`
+  returns 0 candidates at 2^14 and 110 at 2^18 (§6.4); over 50 fixed realisations,
+  raising the buffer produced 20 recovery flips, all toward recovery and none away
+  (§6.5). The overflow ratchet at `utils/world_tree.py:547` raises the effective cut and
+  `PruneStats` records only the nominal threshold (`prune.py:685`). **Patched and
+  verified** — `06_upstream_max_sugg_logging.md`.
+- **For a high-branching configuration the ratchet is permanent, not occasional.**
+  `aggressive` converges at 16 778 candidates and stays there across 2^18–2^21;
+  `quadrature`'s count is proportional to the buffer over the same factor of 8 (span
+  exponents 1.135 / 1.022 / 0.994) with saturation pinned near 0.77 (§6.6). So a
+  high-branching user runs against the ratchet at every buffer they can afford, with the
+  log asserting their scheme is applied. **This is the strongest result on the branch
+  and it needs no campaign.**
 - **Pairing on the noise realisation does not make the comparison deterministic.** The
-  template-to-template noise difference (sd 0.133 at ducy 0.10) is ~3x the amplitude
-  difference it is meant to reveal. Any future design on this branch that treats a
-  paired run as a clean A/B should be checked against this number first.
-- **The tiling geometry is largest where nothing is being decided.** `pi` per stage runs
-  0.52–0.56 over stages 2–10, where 90% of the `P_d` is lost, and 0.87–0.93 over stages
-  40–50, where the cumulative survival is already flat. Any mechanism that only bites
-  late in the tree cannot move the final `P_d` much, whatever its size. This is a
-  structural statement about the moving-grid ladder and it does not need an injection
-  campaign to support it.
-- A defensible upstream sentence, without any campaign: *at equal `P_d`, the tiling
-  choice moves the survival decision by ~0.04 in score at the stages where the decision
-  is made, against a 0.13 stochastic difference from the change of template — so its
-  effect on end-to-end sensitivity is smaller than the geometric gain (≥1.56x in phase)
-  suggests, and is not where `quadrature`'s 2^17.9 cost is going.*
+  template-to-template noise difference is sd **0.230** at ducy 0.10 (§5.2), ~5x the
+  amplitude difference it is meant to reveal. Any future design that treats a paired run
+  as a clean A/B should be checked against this number first.
+- **The discordance rate is 8–30% at plausible operating points**, so a paired design is
+  the right one and an unpaired one would be hopeless. Measured, and unaffected by the
+  above.
+- **The per-stage `pi` profile itself stands** — 0.515–0.558 early, 0.87–0.93 late
+  (§4.3). It is geometry plus §5.2's corrected `rho` and contains no survival model. It
+  is the *weighting* over those stages that was wrong, not the profile.
 
 ---
 
