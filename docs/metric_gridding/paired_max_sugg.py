@@ -300,8 +300,63 @@ def _print(res: dict) -> None:
               f"n10(agg-only)={d['n10_agg_only']}")
 
 
+def selftest() -> None:
+    """The p-value against brute force, and `analyse` against a PLANTED bias.
+
+    An analysis that cannot detect an effect it was handed is worth nothing, and this
+    one decides whether a 28-core-hour campaign is meaningful. So it is checked on
+    synthetic cells with a known arm-dependent buffer effect before it is trusted on
+    real ones.
+    """
+    import tempfile
+    from math import comb
+
+    def ref(k: int, n: int) -> float:
+        pr = [comb(n, i) / 2**n for i in range(n + 1)]
+        return min(1.0, sum(x for x in pr if x <= pr[k] + 1e-15))
+
+    for n in range(1, 16):
+        for k in range(n + 1):
+            assert abs(_binom_two_sided(k, n) - ref(k, n)) < 1e-12, (n, k)
+    print("exact two-sided binomial matches brute force for n <= 15")
+
+    d = Path(tempfile.mkdtemp())
+    n = 50
+
+    def cell(rec):
+        return [{"file": f"tim_{i:04d}.npz", "recovered": bool(rec[i]),
+                 "mismatch": 0.1, "score": 9.0, "ncand": 1000,
+                 "seconds": 1.0, "saturation": 0.5} for i in range(n)]
+
+    agg = [i % 2 == 0 for i in range(n)]
+    q_lo = [i % 3 == 0 for i in range(n)]
+    q_hi = [(i % 3 == 0) or (i < 10) for i in range(n)]   # quadrature-only gain
+    for (arm, buf), rec in ((("aggressive", BUFFERS[0]), agg),
+                            (("aggressive", BUFFERS[1]), agg),
+                            (("quadrature", BUFFERS[0]), q_lo),
+                            (("quadrature", BUFFERS[1]), q_hi)):
+        out_path(d, arm, buf).write_text(json.dumps(cell(rec)))
+    r = analyse(d)
+    assert r["primary"]["reject_at_0.05"], "planted arm-dependent bias not detected"
+    print(f"planted bias detected: m={r['primary']['m_nonzero']} "
+          f"k={r['primary']['k_positive']} p={r['primary']['p_value']:.4f}")
+
+    # and the converse: a buffer effect that hits BOTH arms equally must NOT reject
+    both = [(i % 2 == 0) or (i < 10) for i in range(n)]
+    for (arm, buf), rec in ((("aggressive", BUFFERS[0]), agg),
+                            (("aggressive", BUFFERS[1]), both),
+                            (("quadrature", BUFFERS[0]), agg),
+                            (("quadrature", BUFFERS[1]), both)):
+        out_path(d, arm, buf).write_text(json.dumps(cell(rec)))
+    r2 = analyse(d)
+    assert not r2["primary"]["reject_at_0.05"], "symmetric buffer effect must not reject"
+    print(f"symmetric buffer effect correctly not rejected: "
+          f"m={r2['primary']['m_nonzero']}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--dir", type=Path, required=True)
     ap.add_argument("--plan", action="store_true")
     ap.add_argument("--make", action="store_true")
@@ -311,7 +366,9 @@ def main() -> None:
     ap.add_argument("--snr", type=float, default=14.0)
     args = ap.parse_args()
 
-    if args.plan:
+    if args.selftest:
+        selftest()
+    elif args.plan:
         pl = plan(args.n)
         args.dir.mkdir(parents=True, exist_ok=True)
         (args.dir / "preregistration.json").write_text(json.dumps(pl, indent=1))
