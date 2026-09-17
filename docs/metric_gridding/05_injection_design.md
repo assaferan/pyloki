@@ -626,6 +626,36 @@ once `max_sugg` is settled, since the cost rises with it. **No optional
 stopping** — this branch has retracted three results, and a stopping rule that looks at
 the data is how a fourth would happen.
 
+**What the corrections do to `n`, computed rather than asserted.** Two of the
+corrections above stack onto the primary test: `pi` is now the **mid stratum's**
+(median 0.593 over the 19 of 24 positions at `pi` ≥ 0.55), not the all-cell aggregate
+0.628, and the null stratum's 21% of screened positions do not enter the primary test,
+so the pair count has to be inflated by 1/0.79.
+
+| `p_disc` | mid-stratum pairs | **total pairs** | core-hours at 50 s/pair |
+|---|---|---|---|
+| **0.30** (measured at the operating point) | 755 | **954** | 13.2 |
+| 0.20 | 1 132 | 1 430 | 19.9 |
+| 0.15 | 1 509 | 1 906 | 26.5 |
+| 0.10 | 2 263 | 2 859 | 39.7 |
+| 0.08 (pilot's worst, batch A at S/N 12) | 2 828 | 3 572 | 49.6 |
+
+**The campaign remains affordable — 13 to 50 core-hours — but `n = 2 000` no longer
+covers the whole measured `p_disc` range.** It covers `p_disc` ≥ **0.145**. Two honest
+readings, and they differ:
+
+- *The design's own operating point is chosen to maximise discordance* (on-grid
+  `P_d ≈ 0.5` in both arms), and there the pilot measured `p_disc` = 0.30, where 954
+  pairs suffice and `n = 2 000` has real headroom. This is the relevant number.
+- *The 0.08 corner is batch A at S/N 12*, where both arms recovered 3/24 — far from the
+  operating point, and a regime the design explicitly avoids. Quoting it as the
+  requirement would be powering against a configuration the campaign will not run in.
+
+So `n = 2 000` stands, on the condition §9 already imposes: the operating point is fixed
+by a 3-point pilot at the final `max_sugg` and `p_disc` is re-measured there. If that
+pilot returns `p_disc` < 0.145, `n` must be raised to ~3 600 (50 core-hours) or the
+design re-scoped — and that check is now a precondition, not a formality.
+
 **Pre-committed analysis.** Primary: two-sided McNemar (exact binomial on the discordant
 pairs) of `pi = 1/2`, over the **mid** stratum (the effect stratum is deleted above;
 what was "pooled over mid and effect" is now just mid), α = 0.05. Secondary,
