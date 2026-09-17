@@ -94,33 +94,40 @@ x 15 stages = 90 cells.
   transform is not.
 - `conservative`'s 62 unresolved cells are absence of proof, not evidence against it.
 
-## Where the gain sits, and why it matters less than (2) suggests
+## Where the gain sits — measured, not modelled
 
-The gains in (2) are medians over stages 4 to 60. A survival model on the calibrated
-ladder puts **99% of first threshold failures in stages 1-10** — detection is decided
-early, while the accumulated score is still climbing towards a ladder that starts at 2.4
-and ends at 7.7. Only 2 of those 15 stages are in that window, so the aggregate is
-mostly measured where nothing is at stake. Splitting it:
+The gains in (2) are medians over stages 4 to 60. Which stages actually decide detection
+is a question that was first answered with a model and then measured, and the two
+disagree completely.
 
-| basis | window | `aggressive` nearest | `quadrature` closer | proven gain |
-|---|---|---|---|---|
-| Taylor | stages 1-10 (99% of losses) | 0.731 | 47/60 | **1.71x** |
-| Taylor | stages 32-60 (~0%) | 1.030 | 48/48 | 2.61x |
-| Chebyshev | stages 1-10 (99% of losses) | 0.582 | 47/60 | **1.15x** |
-| Chebyshev | stages 32-60 (~0%) | 0.910 | 48/48 | 1.72x |
+`survival_profile.py` drives the real pruning loop and records, at every prune level, the
+minimum phase excursion from the injected signal to any surviving candidate — so
+"is a covering leaf still alive?" is observed rather than inferred. Over 40 real runs
+(`aggressive`, S/N 14, `max_sugg` = 2^18), validated against an independently measured
+recovery rate of 38/50 (this method gives 29/40; two-sided binomial `p` = 0.72):
 
-One caveat on the weighting before the numbers: which window "can affect detection" is
-itself taken from a modelled per-stage survival curve that has since been contradicted by
-a converged measurement (0.760 recovered against 0.368 modelled). The **split below is
-measured geometry**; the claim that the early window is the decisive one is not, and is
-held open. With that said -- the advantage is **smaller and less consistent early** — 1.71x rather than 2.61x in Taylor, 1.15x rather than 1.72x in Chebyshev,
-and `quadrature` fails to beat `aggressive` in 13 of 60 early cells against 0 of 48 late
-ones. And `aggressive` is *already* inside one tolerance early (0.731 Taylor, 0.582
-Chebyshev), so there is less to win there in the first place.
+| level | 1 | 10 | 20 | 30 | 40 | 50 | 63 |
+|---|---|---|---|---|---|---|---|
+| fraction with a covering leaf alive | 1.000 | **1.000** | 0.900 | 0.850 | 0.825 | 0.725 | 0.725 |
 
-None of (2) is retracted: those medians are correct over the cells they average. But the
-detection-relevant figure is the early one, and it is roughly half the headline. Read (2)
-as grid geometry, and this section as what the geometry is worth.
+First-loss levels are 13, 13, 17, 19, 24, 27, 36, 41, 41, 44, 47 — **none before level
+13**. A single-leaf survival model had put 99% of first losses in stages 1-10; the
+measurement puts 0% there. The decision is made in the middle and late stages.
+
+Measuring the gain in that window:
+
+| basis | stages 1-10 | **stages 13-47 (where leaves are lost)** | stages 32-60 |
+|---|---|---|---|
+| Taylor | 1.71x (47/60 cells) | **2.47x (54/54)** | 2.61x (48/48) |
+| Chebyshev | 1.15x (47/60) | **1.57x (54/54)** | 1.72x (48/48) |
+
+In the decision window `quadrature` is closer in **every one of 54 cells**, and the gain
+is essentially the headline figure of (2). So the advantage is not concentrated where
+nothing is at stake — it sits where the decision is made.
+
+Caveats: `aggressive` arm only, one injected parameter set, N = 40, and the
+covering-leaf threshold is calibrated from the bimodal gap in the same runs (robust for
+any threshold from 5 to 100 tolerances, but not independent of the data).
 
 ## The Chebyshev basis
 

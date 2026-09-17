@@ -297,6 +297,17 @@
     }
   },
   "stage_split_chebyshev": {
+    "decision": {
+      "aggressive_median": 1.00156,
+      "closer": 54,
+      "median_proven_gain": 1.570723,
+      "not_closer": 0,
+      "stages": [
+        13,
+        47
+      ],
+      "unresolved": 0
+    },
     "early": {
       "aggressive_median": 0.581644,
       "closer": 47,
@@ -321,6 +332,17 @@
     }
   },
   "stage_split_taylor": {
+    "decision": {
+      "aggressive_median": 1.162411,
+      "closer": 54,
+      "median_proven_gain": 2.471675,
+      "not_closer": 0,
+      "stages": [
+        13,
+        47
+      ],
+      "unresolved": 0
+    },
     "early": {
       "aggressive_median": 0.731225,
       "closer": 47,

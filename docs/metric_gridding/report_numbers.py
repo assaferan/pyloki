@@ -53,6 +53,9 @@ NBINS = P.NBINS
 STAGES_CMP = list(range(4, 63, 4))
 STAGES_EARLY = list(range(1, 11))     # where 99% of detection losses occur
 STAGES_LATE = list(range(32, 63, 4))  # where ~0% do
+# The window where covering leaves are ACTUALLY lost, from survival_profile.py on 40
+# real pruning runs: first-loss levels 13,13,17,19,24,27,36,41,41,44,47. None before 13.
+STAGES_DECISION = [13, 17, 19, 24, 27, 36, 41, 44, 47]
 STAGES_AMP = list(range(6, 63, 8))
 N_SIGNALS = 6
 SEED = 20260917
@@ -195,7 +198,8 @@ def stage_split(basis: str) -> dict:
     cfg_a, cfg_q = P.make_config("aggressive"), P.make_config("quadrature")
     tol = cfg_a.eta / cfg_a.nbins
     out = {}
-    for label, stages in (("early", STAGES_EARLY), ("late", STAGES_LATE)):
+    for label, stages in (("early", STAGES_EARLY), ("late", STAGES_LATE),
+                          ("decision", STAGES_DECISION)):
         better = worse = unres = 0
         ratios, aggv = [], []
         for tr in truths:

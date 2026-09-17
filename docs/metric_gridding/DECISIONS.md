@@ -2379,4 +2379,61 @@ Open questions: the real per-stage survival profile, which nothing on either bra
   measures and which would settle both `n` and D99. In principle instrumentable (record
   how many realisations still have a covering leaf alive at each prune level, not just
   end-to-end recovery), but that instrumentation does not exist and is not mine to start.
+
+## 2026-09-17 (ah) — the per-stage survival profile, MEASURED: the decision is late
+Done:
+  - **D100 — `docs/metric_gridding/survival_profile.py`, and it is validated against an
+    external rate.** `Pruning.execute()` is a loop over `execute_iter()` with survivors
+    in `world_tree`, so the loop is driven directly and the survivor set inspected between
+    levels. Nothing in `src/` is touched. Per level, leaves and truth are both expressed
+    in that level's frame (`ref_cur`, `t_half`) and the residual is evaluated over the
+    accumulated data; the recorded quantity is the **minimum phase excursion to the truth
+    over all survivors**, not a binary.
+    Validation: final-level "alive" fraction **29/40 = 0.725** against their independently
+    measured recovery of **38/50 = 0.760** (`aggressive`, S/N 14, 2^18), two-sided
+    binomial `p = 0.72`. The alive threshold is not assumed -- the final excursions are
+    cleanly **bimodal** (12.01 against 66.89, a 5.6x gap) and `T = 28.3` is the geometric
+    mean of the gap. Checked for robustness: at every `T` from 5 to 100 the earliest loss
+    is at level >= 11, and at the calibrated `T` it is >= 13.
+  - **D101 — the modelled survival curve is not merely miscalibrated, it is backwards.**
+    Measured, 40 real pruning runs:
+
+    | level | 1 | 10 | 20 | 30 | 40 | 50 | 63 |
+    |---|---|---|---|---|---|---|---|
+    | fraction alive | 1.000 | **1.000** | 0.900 | 0.850 | 0.825 | 0.725 | 0.725 |
+    | median min excursion | 1.67 | 1.27 | 2.23 | 3.19 | 4.61 | 5.61 | 6.49 |
+
+    First-loss levels: **13, 13, 17, 19, 24, 27, 36, 41, 41, 44, 47** — median 27, none
+    before 13. So **0% of losses occur by level 10**, where the falsified model put
+    **99%**, and 36% by level 20, 55% by 30, 100% by 50. The decision is made in the
+    middle and late stages, not early.
+  - **D102 — so D70's framing is reversed, and the original headline was right.** The gain
+    measured in the window where covering leaves are *actually* lost (levels 13-47):
+
+    | basis | early 1-10 | **decision 13-47** | late 32-60 | headline 4-60 |
+    |---|---|---|---|---|
+    | Taylor | 1.71x (47/60) | **2.47x (54/54)** | 2.61x (48/48) | >= 2.30x |
+    | Chebyshev | 1.15x (47/60) | **1.57x (54/54)** | 1.72x (48/48) | >= 1.56x |
+
+    In the decision window `quadrature` is closer in **54 of 54 cells** -- every one --
+    and the gain is essentially the headline figure. So "the gain sits where detection is
+    not decided" (D70, and what I told assaferan and both peer sessions) is **false**: it
+    sits almost exactly where the decision is made. The headline `>= 2.30x` / `>= 1.56x`
+    was approximately right all along, because stages 4-60 happens to cover the decision
+    window better than my "early" window did.
+  - **D103 — consequence for the campaign's `n`: the expensive corner is excluded.** The
+    340-2 840 range (D98) was driven by the stage weighting; the early-only weighting
+    (`pi = 0.554`, **2 842 pairs**) assumed the decision is early and is now falsified,
+    while the flat (339) and late-only (246) weightings are the ones the measurement
+    supports. So `n` sits at the **cheap** end, not the expensive one. Their per-stage
+    `pi` row survives untouched (geometry plus corrected `rho`, no `reach` term); it is
+    only the weighting that moves, and it moves favourably.
+Corrections to my own record, in one place: D70's framing reversed (D102); D99's "neither
+  reading can be asserted" is resolved in favour of the late reading; the caveat I added
+  to the report -- that the early window's primacy was unsupported -- is replaced by a
+  measurement showing it is wrong.
+Caveats: `aggressive` arm only, one injection parameter set, N = 40, and the alive
+  threshold is calibrated from the same runs (robust across 5-100, but not independent).
+  A `quadrature` profile is the obvious next measurement and is blocked by the same
+  buffer non-convergence that blocked the campaign (302 s/run at 2^21).
 ```
