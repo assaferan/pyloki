@@ -87,7 +87,18 @@ shown to do so symmetrically between the arms.**
   Also established: raising the buffer produced **20 flips, all toward recovery, none
   away**, in both arms.
 
-**Recommendation: do not run the campaign, and specifically do not run it at 2^18.**
+**Recommendation: the campaign in §9 cannot be run as designed, at any buffer (§6.6).**
+Stage 1 of the remedy — raise `max_sugg` until it stops binding in both arms — **fails**.
+`aggressive` converges at 2^18 (16 778 candidates, identical at 2^18, 2^19 and 2^20);
+`quadrature` never does, its candidate count tracking the buffer with growth exponent
+0.95 / 1.36 / 1.05 across three successive increases while its saturation *rises*. So in
+the `quadrature` arm the scheme's thresholds have never been the operative cut, at any
+buffer used on this branch, and the idealised question §9 asks is not answerable in this
+configuration. What remains answerable is the *user-facing* question at the shipped
+default — a different claim, and it has to be reported as one. The earlier
+recommendation, now superseded but still true as far as it went:
+
+**Do not run the campaign, and specifically do not run it at 2^18.**
 §6.4 is **not closed**. The systematic large enough to reverse the answer is now
 measured at the mechanism level (arm-dependent buffer pressure, p = 0.012) and
 unresolved at the outcome level, with a point estimate above the effect of interest.
@@ -634,9 +645,86 @@ advisory: `quadrature`'s 99th-percentile saturation at 2^18 is **0.975**, agains
 buffer must go higher — and the measured asymmetry says the *reason* to raise it is
 specifically that `quadrature` is still inside it when `aggressive` has left.
 
+### 6.6 Stage 1 of the remedy fails: `quadrature`'s candidate set never converges
+
+§7.1 requires the buffer to stop binding in **both** arms. Swept over four buffers on
+**one fixed set of 10 realisations** (the first 10 of §6.5's, so every row below is the
+same data):
+
+| arm | `max_sugg` | median `ncand` | median saturation | growth exponent |
+|---|---|---|---|---|
+| `aggressive` | 2^14 | 1 446 | 0.088 | — |
+| `aggressive` | 2^18 | **16 778** | 0.064 | 0.88 |
+| `aggressive` | 2^19 | **16 778** | 0.032 | **0.00** |
+| `aggressive` | 2^20 | **16 778** | 0.016 | **0.00** |
+| `quadrature` | 2^14 | 10 906 | 0.666 | — |
+| `quadrature` | 2^18 | 152 007 | 0.580 | 0.95 |
+| `quadrature` | 2^19 | 390 575 | 0.745 | 1.36 |
+| `quadrature` | 2^20 | 808 116 | 0.771 | **1.05** |
+
+`growth exponent` = `d log2(median ncand) / d log2(max_sugg)` against the previous
+buffer. Zero means the candidate set has converged and the buffer is irrelevant; one
+means the buffer is the only thing setting the answer.
+
+**`aggressive` converges at 2^18 and stays there — 16 778 candidates at 2^18, 2^19 and
+2^20, identical to the unit.** That is what a non-binding buffer looks like.
+
+**`quadrature` never converges.** Its exponent is 0.95, 1.36, 1.05 across three
+successive increases, and its median saturation does not fall — it *rises*, 0.580 →
+0.745 → 0.771. Doubling the buffer simply doubles the candidate count. The mechanism is
+the ratchet itself: the effective cut is `max(scheme threshold, top-K, median)`, so as
+the buffer grows the cut relaxes to keep it full, and the buffer stays full at every
+size.
+
+#### What this means
+
+**There is no feasible `max_sugg` at which `quadrature` clears §7.1's criterion, so
+stage 1 of the remedy cannot be completed and the campaign in §9 cannot be run as
+designed.** This is not a cost problem that a bigger machine solves. The count is
+tracking the buffer with exponent ≈ 1 at 2^20 with no sign of a knee; the true
+unconstrained count is far above 10⁶, consistent with `quadrature`'s branching product
+being 2^28.4 times `aggressive`'s (5.4 × 10²⁰ vs 1.5 × 10¹²). Cost at 2^20 is already
+152 s/run against `aggressive`'s 1.3.
+
+**The consequence for everything measured in the `quadrature` arm on this branch is
+that the scheme's thresholds were never the operative cut.** At every buffer ever used
+here — 2^14, 2^18, 2^19, 2^20 — `quadrature` ran against the ratchet, not against
+`cheby_quadrature.npz`. The equal-`P_d` recalibration (§6.3) is therefore not doing in
+the `quadrature` arm what §6.3 says it does, and the one check that appeared to validate
+it — batch A, 3/24 in both arms at S/N 12 — was run at 2^14, where **both** arms were
+saturating and the agreement cannot be attributed to the ladders.
+
+**What is still answerable.** §7.1 already separated two questions, and only one of them
+dies here:
+
+- *Does tiling matter for the idealised thresholded search?* Needs a non-binding buffer
+  in both arms. **Not answerable in this configuration.**
+- *Does tiling matter for what a user actually runs?* Runs at the shipped default and
+  treats the ratchet as part of the system under test. **Still answerable**, and §6.5's
+  apparatus answers it directly — but it is a statement about pyloki-as-shipped, not
+  about tiling, and it must be reported as such.
+
+A third option is to shrink the configuration — fewer segments, smaller
+`prune_poly_order`, smaller `branch_max` — until `quadrature`'s true candidate count is
+affordable, and ask the idealised question there. That is a different experiment with a
+different external validity, and it has not been costed.
+
+*Scope.* Measured at Phase 3's configuration only (268.4 s, 64 segments,
+`poly_order = 4`, `N_b = 64`, `branch_max = 16`, Chebyshev, `eta = 1`) and on 10
+realisations. The `aggressive` convergence is exact and needs no more data; the
+`quadrature` non-convergence rests on three successive exponents near 1 and would be
+worth one more point at 2^21 (~5 min/run, ~50 min for 10) before the conclusion is
+treated as final.
+
 ---
 
 ## 7. What has to change before this is worth running
+
+> **§6.6 supersedes item 1 below: the ratchet cannot be eliminated for `quadrature`.**
+> Item 1 was written assuming a large enough buffer exists. It does not, in this
+> configuration. The two-questions paragraph inside it survives and is now the whole of
+> the decision; the "start the search at 2^20" instruction was carried out (§6.6) and
+> answered in the negative.
 
 1. **Characterise the buffer ratchet, then eliminate it.** This is the whole of the
    problem, and §6.4 is where it stands: the buffer changes outcomes on fixed data, and
