@@ -2179,4 +2179,40 @@ Conventions fixed: an offset inferred from one point is not an offset, it is a g
 Open questions: batch A's buffer (asked); whether the outcome bias can be bounded below
   0.06; the operating point from their 3-point pilot, which now replaces D78.
 Next session starts at: their operating-point pilot at the raised buffer.
+
+## 2026-09-17 (ad) — the criteria never disagreed; and the rebase trap is benign
+Done:
+  - **D89 — the "unresolved disagreement" over the operating point dissolves: both
+    criteria point to the same place.** Relayed by the Overview session as needing an
+    owner, and worth settling from what each criterion is *for* rather than from the
+    numbers. In my own model, discordance against S/N:
+
+    | S/N | 13 | 14 | 15 | **16** | 17 | 18 | 20 |
+    |---|---|---|---|---|---|---|---|
+    | model `P_d` | 0.267 | 0.368 | 0.471 | **0.567** | 0.655 | 0.732 | 0.848 |
+    | discordance | .00385 | .00495 | .00508 | **.00532** | .00476 | .00417 | .00273 |
+
+    Peak discordance sits at **model `P_d` = 0.567**, i.e. exactly the `P_d ~ 0.5` their
+    §9 targets. **The two criteria are the same criterion in different variables.** The
+    disagreement was never conceptual -- it was entirely my `S/N <-> P_d` mapping being
+    2x too shallow (D85), which misplaces *which S/N* delivers `P_d ~ 0.5` while getting
+    the `P_d` at the optimum right.
+    So their §9 wins for a sharper reason than "direct measurement beats model": it is
+    parameterised in the **observable** rather than in the input, which makes it immune
+    to precisely the error my model has. General form, worth keeping: fix an operating
+    point by the quantity you can measure, not by the quantity you have to model.
+  - **D90 — the rebase trap is benign, checked rather than assumed.** `upstream/main` is
+    now `18d04b3` with #4, #6, #7 and #10 merged; this branch is 15 behind and carries
+    three cherry-picks taken while those PRs were blocking (D28 among them).
+    `git range-diff upstream/main...HEAD` reports all three as **identical**:
+    `575b1f5 = 553f47d` (nested parallel), `8d42ab6 = f4ee619` (zero-filled states),
+    `6d62d79 = 7864770` (trials_scheme -inf). So git will drop them silently on rebase
+    and there is no `detection/` conflict to negotiate. The injection-design branch
+    descends from here and inherits the clean rebase.
+    **Not rebasing on my own initiative**: another session's branch is downstream of this
+    one, so the timing is assaferan's to pick, not mine.
+Conventions fixed: when two sessions appear to disagree about a design criterion, check
+  whether they are the same criterion in different variables before either concedes.
+Open questions: unchanged. The operating point now comes from their pilot at the raised
+  buffer, under a criterion my own model agrees with.
 ```
