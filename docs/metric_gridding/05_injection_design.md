@@ -684,10 +684,12 @@ same data):
 | `aggressive` | 2^18 | **16 778** | 0.064 | 0.88 |
 | `aggressive` | 2^19 | **16 778** | 0.032 | **0.00** |
 | `aggressive` | 2^20 | **16 778** | 0.016 | **0.00** |
+| `aggressive` | 2^21 | **16 778** | 0.008 | **0.00** |
 | `quadrature` | 2^14 | 10 906 | 0.666 | — |
 | `quadrature` | 2^18 | 152 007 | 0.580 | 0.95 |
 | `quadrature` | 2^19 | 390 575 | 0.745 | 1.36 |
-| `quadrature` | 2^20 | 808 116 | 0.771 | **1.05** |
+| `quadrature` | 2^20 | 808 116 | 0.771 | 1.05 |
+| `quadrature` | 2^21 | **1 610 052** | 0.768 | **0.99** |
 
 `growth exponent` = `d log2(median ncand) / d log2(max_sugg)` against the previous
 buffer. Zero means the candidate set has converged and the buffer is irrelevant; one
@@ -762,12 +764,32 @@ not because there is evidence it works. The obvious risk is that a stricter ladd
 lowers `P_d` below the ~0.5 operating point §9 wants, and the two constraints may not be
 simultaneously satisfiable; that is exactly what the 10-realisation test would show.
 
+#### The 2^21 confirmation: no knee
+
+The conclusion was held provisional on one more buffer, because it kills the campaign
+and consecutive exponents are noisy. 2^21 is now in and it confirms rather than softens
+it. Span exponents, which are less noisy than step-to-step ones:
+
+| span | median `ncand` | exponent |
+|---|---|---|
+| 2^18 → 2^19 | 152 007 → 390 575 | 1.361 |
+| 2^18 → 2^20 | 152 007 → 808 116 | 1.205 |
+| **2^18 → 2^21** | **152 007 → 1 610 052** | **1.135** |
+| 2^19 → 2^21 | 390 575 → 1 610 052 | 1.022 |
+| 2^20 → 2^21 | 808 116 → 1 610 052 | 0.994 |
+
+Over a factor of **8** in buffer the candidate count grows by a factor of **10.6**, and
+median saturation is pinned at 0.745 / 0.771 / 0.768 — flat to three buffers. Meanwhile
+`aggressive` returns **16 778 candidates at 2^18, 2^19, 2^20 and 2^21**, identical to
+the unit across the same factor of 8, with saturation falling 0.064 → 0.008. The two
+behaviours could not be more cleanly separated on the same data. There is no knee, and
+cost is now 302 s/run against `aggressive`'s 1.4.
+
 *Scope.* Measured at Phase 3's configuration only (268.4 s, 64 segments,
 `poly_order = 4`, `N_b = 64`, `branch_max = 16`, Chebyshev, `eta = 1`) and on 10
-realisations. The `aggressive` convergence is exact and needs no more data; the
-`quadrature` non-convergence rests on three successive exponents near 1 and would be
-worth one more point at 2^21 (~5 min/run, ~50 min for 10) before the conclusion is
-treated as final.
+realisations. The `aggressive` convergence is exact. The `quadrature` non-convergence
+now rests on four buffers spanning a factor of 8, with the two widest spans giving
+exponents 1.022 and 0.994. **No longer provisional.**
 
 ---
 
