@@ -272,13 +272,98 @@ def propagate(rows: list[dict], ducy: float) -> dict:
     return out
 
 
+def strata(n_positions: int, draws: int, ducy: float) -> dict:
+    """§5.1's stratification, recomputed with the corrected score correlation.
+
+    `injection_power.strata` builds its per-position pi from the same
+    `snr_ratio(delta_A - delta_B)` this script just showed is the wrong quantity
+    (`injection_power.py:337`), so §5.1's distribution -- and the stratum boundaries
+    §9 pre-commits to -- inherit the error. This recomputes it both ways on the SAME
+    sampled positions, so the shift is visible and the old numbers are reproduced as a
+    control rather than asserted.
+    """
+    nbins = IP.NBINS
+    widths = generate_box_width_trials(nbins, ducy_max=DUCY_MAX)
+    prof0 = generate_folded_profile(nbins=nbins, ducy=ducy, center=0.5)
+    s0 = float(boxcar_snr_1d(prof0.astype(np.float32), widths, 1.0).max())
+    thr, mu_all, surv_all = IP.stage_weights("aggressive")
+    cfg = IP.P.make_config("aggressive")
+    dp = np.array(cfg.get_dparams_actual(cfg.niters_ffa), dtype=float)
+    dp[-1] *= IP.C_VAL / IP.F0
+    rng = np.random.default_rng(IP.SEED + 1)
+    positions = np.array([0.001, 0.05, 1.0, 0.0]) + rng.uniform(
+        -0.5, 0.5, size=(n_positions, IP.PO)) * dp
+
+    out = []
+    for idx, tr in enumerate(positions):
+        acc = {"prof": [0.0, 0.0], "signal": [0.0, 0.0]}
+        for st in IP.DECISION_STAGES:
+            _, ex_a, x, top_a = IP._best_leaf("aggressive", tr, st)
+            _, ex_b, _, top_b = IP._best_leaf("quadrature", tr, st)
+            if not (ex_a and ex_b):
+                continue
+            d_a, l_a = IP._pick_by_loss(top_a, x, ducy)
+            d_b, l_b = IP._pick_by_loss(top_b, x, ducy)
+            delta_c = d_a - d_b
+            rho_p = float(snr_ratio(delta_c, x, IP.F0, IP.PO, nbins, ducy,
+                                    filt="matched", basis_fn=cheby_basis))
+            s_full = _full_spectrum(
+                smearing_factor(delta_c, x, IP.F0, IP.PO, nbins,
+                                basis_fn=cheby_basis), nbins)
+            rho_s = simulate(s_full, widths, nbins, draws,
+                             prof0 * (float(mu_all[st]) / s0), rng)
+            mu, t = mu_all[st], thr[st]
+            delta = mu * (l_a - l_b)
+            w = surv_all[st - 1] * IP.stats.norm.pdf(t - mu * (1.0 - l_a))
+            for tag, rho in (("prof", rho_p), ("signal", rho_s)):
+                sd = float(np.sqrt(max(2.0 * (1.0 - rho), 0.0)))
+                e_pos, e_abs = IP._folded_normal_moments(
+                    np.array([delta]), np.array([sd]))
+                acc[tag][0] += float(w * e_pos[0])
+                acc[tag][1] += float(w * e_abs[0])
+        row = {"position": idx}
+        for tag in ("prof", "signal"):
+            num_pos, num_abs = acc[tag]
+            row[f"pi_{tag}"] = float(num_pos / num_abs) if num_abs > 0 else 0.5
+        out.append(row)
+        print(f"  pos{idx:2d}  pi  profile={row['pi_prof']:.4f}  "
+              f"corrected={row['pi_signal']:.4f}", flush=True)
+
+    res = {"n_positions": n_positions, "ducy": ducy, "positions": out}
+    for tag in ("prof", "signal"):
+        v = np.array([r[f"pi_{tag}"] for r in out])
+        res[tag] = {
+            "min": float(v.min()), "q25": float(np.percentile(v, 25)),
+            "median": float(np.median(v)), "q75": float(np.percentile(v, 75)),
+            "max": float(v.max()),
+            "frac_null_below_0.55": float((v < 0.55).mean()),
+            "frac_effect_above_0.70": float((v > 0.70).mean()),
+        }
+    print("\n" + f"{'':10}{'min':>8}{'q25':>8}{'median':>8}{'q75':>8}{'max':>8}"
+          f"{'<0.55':>8}{'>0.70':>8}")
+    for tag, label in (("prof", "profile"), ("signal", "corrected")):
+        d = res[tag]
+        print(f"{label:10}{d['min']:>8.3f}{d['q25']:>8.3f}{d['median']:>8.3f}"
+              f"{d['q75']:>8.3f}{d['max']:>8.3f}"
+              f"{d['frac_null_below_0.55']:>8.2f}{d['frac_effect_above_0.70']:>8.2f}")
+    return res
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--strata", type=int, default=0, metavar="N",
+                    help="recompute §5.1's stratification with the corrected rho")
     ap.add_argument("--cells", type=int, default=10**6)
     ap.add_argument("--draws", type=int, default=20000)
     ap.add_argument("--ducy", type=float, default=IP.DUCY)
     ap.add_argument("--out", type=Path, default=HERE / "rho_check.json")
     args = ap.parse_args()
+
+    if args.strata:
+        res = strata(args.strata, args.draws, args.ducy)
+        args.out.write_text(json.dumps(res, indent=1))
+        print(f"\nwritten to {args.out}")
+        return
 
     rows, meta = measure(args.cells, args.draws, args.ducy)
     if not rows:

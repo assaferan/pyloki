@@ -350,6 +350,33 @@ a "corner" stratum with a large effect cannot be obtained at all. This is a meas
 constraint on the design, and it is the opposite of what the sketch in the brief
 assumed.
 
+**Corrected for §5.2, and it changes the design, not just the numbers.**
+`injection_power.strata` builds each position's `pi` from the same wrong `rho_AB`
+(`injection_power.py:337`), so everything above inherits the error. Recomputed on the
+same 24 positions with the corrected score correlation (`rho_check.py --strata 24`,
+`rho_strata.json`):
+
+| `rho_AB` from | min | q25 | median | q75 | max | `pi` < 0.55 | `pi` > 0.70 |
+|---|---|---|---|---|---|---|---|
+| profile overlap (in use) | 0.440 | 0.595 | 0.645 | 0.704 | 0.741 | **12%** | **29%** |
+| **corrected** | 0.470 | 0.556 | **0.590** | 0.619 | **0.643** | **21%** | **0%** |
+
+*Control:* the profile row reproduces the cached per-position values to 5 × 10⁻⁵ on all
+24 positions, so the shift is the correction and nothing else.
+
+Two consequences, in opposite directions:
+
+- **The `effect` stratum of §9 does not exist.** It was defined as `pi > 0.70`; the
+  corrected maximum over 24 positions is **0.643**. No position reaches it, so the
+  three-stratum design collapses to two. The earlier `pi > 0.75` finding ("not
+  reachable") was right for the wrong threshold — it is `pi > 0.70` that is unreachable.
+- **The `null` stratum is roughly twice as easy to find**: about 1 position in 5 rather
+  than 1 in 8. That is the control §9 leans on hardest, and pre-screening for it gets
+  cheaper.
+
+The distribution is also *narrower* (0.470–0.643 against 0.440–0.741), which is what a
+larger common noise term does: it pulls every position toward ½.
+
 ---
 
 ## 6. Prerequisites and cost, measured
@@ -562,9 +589,13 @@ exclusion count is reported.
 **Strata.** Three, assigned by pre-screening candidate positions with
 `nearest_template_cheby.py` over the decision stages (2–28) and binning on the
 decision-weighted `pi` of §5.1:
-- **null** (`pi < 0.55`, ~1 position in 8): must show no strategy difference.
-- **mid** (0.55 ≤ `pi` ≤ 0.70, the bulk).
-- **effect** (`pi > 0.70`, the upper quartile; a `pi > 0.75` stratum is not reachable).
+- **null** (`pi < 0.55`, ~1 position in **5** after the §5.2 correction): must show no
+  strategy difference.
+- **mid** (`pi ≥ 0.55`, the remaining ~4 in 5).
+- ~~**effect** (`pi > 0.70`)~~ — **deleted. It is not reachable.** The corrected
+  per-position maximum over 24 sampled positions is `pi` = 0.643 (§5.1), so no position
+  qualifies. The design is **two strata**, and the secondary "monotonicity of `pi`
+  across the three strata" below is correspondingly a two-point comparison.
 
 **Controls.**
 - *Built-in null (the important one).* The null stratum must give `n01 ≈ n10`. If it
@@ -588,9 +619,10 @@ stopping** — this branch has retracted three results, and a stopping rule that
 the data is how a fourth would happen.
 
 **Pre-committed analysis.** Primary: two-sided McNemar (exact binomial on the discordant
-pairs) of `pi = 1/2`, pooled over the mid and effect strata, α = 0.05. Secondary,
-descriptive only, not tested: per-stratum `pi`, and the monotonicity of `pi` across the
-three strata. Reported unconditionally: the null-stratum result, the saturation
+pairs) of `pi = 1/2`, over the **mid** stratum (the effect stratum is deleted above;
+what was "pooled over mid and effect" is now just mid), α = 0.05. Secondary,
+descriptive only, not tested: per-stratum `pi`, and its ordering across the **two**
+strata. Reported unconditionally: the null-stratum result, the saturation
 distribution, the exclusion count, and `n01` and `n10` separately. Effect size of
 interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggressive`.
 
