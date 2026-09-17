@@ -161,3 +161,61 @@ def test_narrower_pulses_lose_more():
         for d in (0.20, 0.10, 0.05)
     ]
     assert losses[0] < losses[1] < losses[2]
+
+
+# --- Chebyshev port -------------------------------------------------------------
+
+from nearest_template_cheby import (  # noqa: E402
+    build_sets_cheby,
+    cheby_basis,
+    min_excursion as min_excursion_cheby,
+)
+
+
+@pytest.mark.parametrize("strategy", ["aggressive", "quadrature", "conservative"])
+@pytest.mark.parametrize(("stage", "n_seed"), [(4, 0), (6, 0)])
+def test_cheby_branch_and_bound_matches_brute_force(strategy, stage, n_seed):
+    """The port keeps the guarantee: B&B equals exhaustive enumeration."""
+    cfg = P.make_config(strategy)
+    sets, x, scale = build_sets_cheby(
+        cfg, strategy, PO, F0, TRUTH, stage, n_seed=n_seed)
+    total = float(np.prod([float(len(s)) for s in sets]))
+    if total > 3e6:
+        pytest.skip(f"{total:.2g} leaves is too many to enumerate")
+
+    value, exact, _ = min_excursion_cheby(sets, x, scale, PO, cfg.eta / cfg.nbins)
+    assert exact
+
+    acc = sets[0]
+    for nxt in sets[1:]:
+        acc = (acc[:, None, :] + nxt[None, :, :]).reshape(-1, PO)
+    basis = cheby_basis(x, PO) * (scale / (cfg.eta / cfg.nbins))
+    brute = float(np.abs(acc @ basis.T).max(axis=1).min())
+    assert value == pytest.approx(brute, rel=1e-12, abs=1e-12)
+
+
+def test_cheby_step_is_uniform_and_corner_is_kmax_over_two():
+    """|T_k| <= 1 bounds every coefficient alike, so the corner is linear in the order.
+
+    Against the Taylor grid's `2**(k-1) - 1/2` (D46), which is geometric. Both are
+    nominal-cell corners and neither is a covering radius (D48).
+    """
+    for k_max in range(2, 9):
+        step = psr_utils.poly_cheb_step_vec(
+            k_max, P.NBINS, 1.0, np.array([F0]))[0]
+        assert np.allclose(step, step[0])
+        corner = (F0 / C_VAL) * np.sum(step / 2.0) * P.NBINS
+        assert corner == pytest.approx(k_max / 2.0, rel=1e-12)
+
+
+def test_cheby_transform_diagonal_is_not_unity():
+    """The reason no Taylor tiling result transfers: diag(C) = (ts_new/ts_old)**k."""
+    from pyloki.utils import maths
+    ts1, ts2 = 10.0, 20.0
+    c_mat = maths.poly_chebyshev_transform_matrix(4, 0.0, ts1, 0.0, ts2, 1)
+    expected = (ts2 / ts1) ** np.arange(4, -1, -1)
+    np.testing.assert_allclose(np.diag(c_mat), expected, rtol=1e-12)
+    assert not np.allclose(np.diag(c_mat), 1.0)
+    # alpha_0 is a constant phase offset and never leaks into a higher coefficient,
+    # which is what lets the search drop it from the excursion basis.
+    np.testing.assert_allclose(c_mat[-1], np.eye(5)[-1], atol=1e-12)

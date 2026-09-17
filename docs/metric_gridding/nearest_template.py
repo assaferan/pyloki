@@ -128,6 +128,7 @@ def min_excursion(
     max_nodes: int = 4_000_000,
     init_best: float = np.inf,
     keep: int = 0,
+    basis_fn=None,
 ) -> tuple[float, bool, int] | tuple[float, bool, int, list]:
     """Min over the Minkowski sum of `sets` of max_t |dPhi| / tol.
 
@@ -138,7 +139,7 @@ def min_excursion(
     when one side is exact, and it is the honest thing to report when the search cannot
     finish; what it never does is pass off a truncated search as a minimum.
     """
-    basis = _basis(tau, poly_order) * (scale / tol)
+    basis = (basis_fn or _basis)(tau, poly_order) * (scale / tol)
     proj = [s @ basis.T for s in sets]                    # (m_i, n_time) each
     # Branch on the most decisive sets first. `sets` is permuted identically so that a
     # delta can be reconstructed from the choices.

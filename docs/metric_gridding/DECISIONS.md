@@ -1729,4 +1729,60 @@ Open questions: the pruning interaction is still open (this is geometry plus a p
   model, and still does not model whether the closer leaf survives thresholding), and
   the Chebyshev/circular transforms.
 Next session starts at: the human's read of the report, or the injection test.
+
+## 2026-09-17 (u) — the Chebyshev port: the basis question, measured
+Done:
+  - **D58 — the port is sound for the same structural reason.**
+    `poly_chebyshev_branch_batch` also goes through `branch_param_padded` with
+    `(param_cur, dparam_cur, dparam_new)`, and `shift_cheby_errors` propagates the error
+    vector with no reference to the values, so every leaf at a stage still shares
+    `dparam_cur` and child offsets stay parent-independent. The leaf set is again exactly
+    a Minkowski sum. `nearest_template_cheby.py`; brute-force agreement at rel 1e-12 on
+    all 8 enumerable cases across the three strategies. Two convention differences:
+    `poly_cheb_step_vec` is **uniform across axes** and the branch guard uses
+    `|dparam_old - dparam_new|` rather than the width. The Chebyshev branch also
+    transforms *inside* itself (coord_prev -> coord_cur) where the Taylor path branches
+    then transforms.
+  - **D59 — the Chebyshev nominal corner is `k_max/2`, exactly.** Uniform step, so the
+    corner is `k_max * (1/2)`: 1.0 / 1.5 / 2.0 / 2.5 ... against the Taylor grid's
+    `2^(k_max-1) - 1/2` = 1.5 / 3.5 / 7.5 / 15.5 (D46). **Linear against geometric**, and
+    it confirms the conjecture relayed from the Chebyshev branch, whose 2.0 at order 4
+    and 2.5 at order 5 are the `k_max=4,5` cases. The mechanism is *not* `|T_k| <= 1` as
+    such: the Taylor grid with coarsening removed is also 1/2 per order, so the entire
+    difference is the `2^(k-1)` coarsening factor.
+  - **D60 — measured, the Chebyshev basis helps, and the tiling matters LESS there, not
+    more.** Same 90 cells, `aggressive` EXACT in all of them:
+
+    | basis | `aggressive` nearest | `quadrature` closer | proven gain | loss at ducy 0.10 |
+    |---|---|---|---|---|
+    | Taylor | 1.069 | 89/90 | >= 2.30x | 1.73% |
+    | Chebyshev | **0.904** | 87/90 | >= 1.56x | **2.03%** |
+
+    So Chebyshev puts a ~15% closer template near the signal *and* shrinks the tiling
+    gap. This is the opposite of what the relayed EP-score result (+2.028 Chebyshev vs
+    +0.584 Taylor for `aggressive`'s cost) would suggest, and the two are not
+    contradictory: that measurement is a full pruning run with thresholds, mine is
+    geometry. If template proximity is fine in Chebyshev but the score deficit is larger,
+    the deficit is in the **pruning interaction** -- survival of the covering leaf -- not
+    in template distance. Offered as a hypothesis; I have not run their pipeline.
+  - **D61 — a lower sup-norm does not mean a lower loss, again.** Chebyshev wins on
+    sup-norm (0.904 vs 1.069) and *loses* on amplitude (2.03% vs 1.73%). The Chebyshev
+    residual is a combination of `T_k` over the whole domain and oscillates across it,
+    while the Taylor residual peaks only briefly at the window edge (D56). What smears
+    the profile is the residual's distribution. Third time this distinction has changed
+    a conclusion; the nominal corner (D59: 2.0 vs 7.5, a 3.75x advantage to Chebyshev)
+    predicts the amplitude ordering **wrongly**.
+  - **D62 — `aggressive` is the only strategy that fits the shipped `branch_max`.**
+    Max per-axis child count against `branch_max = 16`: Taylor 7 / 28 / 27 and Chebyshev
+    9 / 16 / 20 for aggressive / quadrature / conservative. So `quadrature` and
+    `conservative` describe trees the shipped code would **refuse to build**
+    (`branch_param_padded` raises), independently corroborating the relayed report that
+    Chebyshev+quadrature fails that guard at `branch_max=16`. Their proven advantage is
+    therefore conditional on raising a config limit, and every D52/D60 gain figure must
+    carry that.
+Conventions fixed: `min_excursion` now takes `basis_fn`, so one search serves both bases;
+  `amplitude_loss` likewise. No monkeypatching.
+Open questions: the pruning interaction, now the prime suspect for the Chebyshev score
+  deficit (D60) and the last unmeasured mechanism; the circular basis.
+Next session starts at: the human's read of the report.
 ```
