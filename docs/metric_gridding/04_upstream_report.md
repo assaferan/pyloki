@@ -115,12 +115,15 @@ measurement puts 0% there. The decision is made in the middle and late stages.
 **What is and is not validated here.** The *shape* is robust: "no losses before level 13"
 holds across two criteria (the excursion threshold above, and the metric mismatch
 `m <= 1.0` this project already uses for recovery), two injected parameter sets and two
-independent batches — 0/11, 0/15 and 0/13 losses by level 10. The *absolute level* is not:
-the final-level alive fraction is 29/40 in one batch and 15/30 in another (Fisher
-`p` = 0.08 between them), and combined at 44/70 = 0.629 it is discrepant with an
-independently measured recovery rate of 38/50 = 0.760 (two-sided `p` = 0.019). So the
-conclusions below rest on where losses occur, not on how many — and this profile should
-not be used to set absolute survival probabilities until that discrepancy is understood.
+independent batches — 0/11, 0/15 and 0/13 losses by level 10. The *absolute level* is merely
+unvalidated, which is weaker: the final-level alive fraction is 29/40 in one batch and
+15/30 in another, and combined at 44/70 = 0.629 it is **consistent** with an
+independently measured recovery rate of 38/50 = 0.760 (Fisher exact `p` = 0.16; pooled
+82/120 = 0.683). It is unvalidated because one batch agreeing was never evidence, not
+because the two disagree. Note also that this pipeline calibrates the injected amplitude
+against each realisation's own noise, so runs are not exchangeable and binomial `p`-values
+here are anti-conservative. The conclusions below rest on *where* losses occur, not on how
+many.
 
 Measuring the gain in that window:
 

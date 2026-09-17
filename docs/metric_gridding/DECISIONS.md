@@ -2503,8 +2503,8 @@ Done:
     instantaneous curves agree to three decimals and either is usable. Non-monotonicity is
     physically possible -- refinement can bring a child inside tolerance where no parent
     was -- but it is negligible here.
-  - **D109 — RETRACTED: the validation against their recovery rate does not hold on more
-    data, and my reported `p = 0.72` was the favourable half of a noisy pair.**
+  - **D109 — PARTLY OVER-CORRECTED; see D111. The substance holds (one batch was never a
+    validation) but the "discrepant" label was a statistical error.** Original entry:
 
     | | alive at final level |
     |---|---|
@@ -2542,4 +2542,53 @@ Done:
     exactly the shape-not-level split D110 describes, arrived at independently.
 Conventions fixed: never put two denominators in one table. And an agreement on one batch
   is not a validation -- run the second batch before calling it one.
+
+## 2026-09-17 (ak) — "discrepant" was my error: it is consistent, and merely unvalidated
+Done:
+  - **D111 — D109's "discrepant" is withdrawn. I tested an estimate as though it were a
+    known parameter.** Their 38/50 is an *estimate* from n = 50, not a fixed rate, so the
+    correct comparison is two-sample rather than one-sample:
+
+    | test | result |
+    |---|---|
+    | one-sample, 44/70 against `p = 0.760` fixed (**what I did**) | `p = 0.0192` |
+    | two-sample, 44/70 against 38/50 (**correct**) | Fisher exact `p = 0.1641` |
+
+    So there is **no evidence my instrument disagrees with theirs**. Pooled, the best
+    estimate is **82/120 = 0.683**, 95% interval [0.600, 0.767], which contains both my
+    0.629 and their 0.760. The honest label is **unvalidated** -- because one batch
+    agreeing was never evidence -- and *not* discrepant. D109's substance stands and its
+    headline does not, which is the same shape of error as the framings this branch has
+    repeatedly got wrong, this time in the pessimistic direction against my own work.
+  - **D112 — their non-exchangeability point is verified in the code, and it widens the
+    intervals further.** `calibrate_scale_on_folds` (`simulation/pulse.py:72-110`) solves
+    iteratively for the injected amplitude so that the *measured* boxcar S/N on the
+    *realised* folded noise equals `snr_target`, with `noise_scale` taken from that
+    realisation's own off-pulse std (`pulse.py:381`). So the injected signal is tuned per
+    draw and runs are not exchangeable Bernoulli trials in the way a two-proportion test
+    assumes. Their documented spread at identical settings supports it in one place:
+    `quadrature` 4/20 against 11/20 gives Fisher `p = 0.048`, while `aggressive` 7/20
+    against 11/20 gives 0.341. Either way the effect is overdispersion, which makes every
+    nominal `p` above **anti-conservative** -- so the corrected 0.164 is if anything an
+    understatement of the consistency.
+  - **D113 — one real residual difference remains, and it is theirs to name: end-to-end
+    versus final-level.** Their 38/50 is a candidate in the final `ScatteredPeriodogram`
+    within `m <= 1.0` of truth in the full-baseline metric; my predicate is evaluated at
+    the last prune level, before the final ascend and the report/resolve steps. So the two
+    need not agree exactly even on identical data. Cheap to test if it ever matters -- run
+    both on the same realisations and compare per-run -- and currently not worth it, since
+    nothing uses the absolute level.
+  - Noted from their side, and it is the better catch: every line-number citation in their
+    upstream note pointed at *this branch's* `prune.py`, which carries 166 lines this
+    branch added -- a note whose purpose is to point a maintainer at specific code, in the
+    wrong file's numbering. Now machine-checked against `upstream/main` and the diff
+    copied from `git diff` rather than transcribed (the transcription had drifted, claiming
+    "three lines" against an actual +16/-2). Their framing, which I am adopting: **my
+    denominator mismatch and their wrong-file numbering are the same mistake -- a number
+    correct in its own frame, presented in a frame where it is not.** Theirs would have
+    reached a maintainer; mine stayed between us.
+Conventions fixed: when comparing against someone else's measured rate, test two-sample
+  -- their number has an interval too. And check whether the trials are exchangeable
+  before using any binomial test on this pipeline; `calibrate_scale_on_folds` means they
+  are not.
 ```
