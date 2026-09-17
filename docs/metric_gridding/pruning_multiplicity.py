@@ -1,4 +1,15 @@
-"""Does tiling redundancy put a *closer* template near the signal?
+"""SUPERSEDED AND UNSOUND (D47). Use `nearest_template.py` instead.
+
+Kept only because the retraction in DECISIONS.md session (r) refers to it. Its
+`MAX_TRACKED` cap keeps the best N leaves by *current* excursion and so discards
+leaves that would become nearest after later branching; the minima it reports are not
+monotone in the search width and must not be quoted. Its `aggressive` numbers happen
+to be reliable (the cap never binds there) and agree with the exact search, which is
+corroboration for that one column and nothing more.
+
+Original docstring follows.
+
+Does tiling redundancy put a *closer* template near the signal?
 
 `sensitivity_loss.py` (D39) sampled offsets uniformly inside a leaf's own cell and
 measured the phase excursion from *that* cell's centre. That is the right quantity only

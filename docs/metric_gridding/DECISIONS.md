@@ -1625,4 +1625,52 @@ Open questions: a cap-free method for multiplicity > 1. The leaf set is a Cartes
   work. Until then the strategy comparison is open, and so is the pruning interaction.
 Next session starts at: either building the branch-and-bound nearest-template search, or
   accepting D48/D49 and rewriting the report around only those.
+
+## 2026-09-17 (s) — the sound method, and D43's direction restored
+Done:
+  - **D50 — `docs/metric_gridding/nearest_template.py`, exact and validated.** The
+    structural fact that makes it possible: `branch_param_padded` derives a child's
+    offset from `(dparam_cur, dparam_new)` alone, and every leaf at a stage shares
+    those, so **child offsets are identical for every parent**. Hence the leaf set at
+    stage `S` is *exactly* a Minkowski sum
+    `M_0.Seed (+) M_1.O_1 (+) ... (+) O_S` of small per-stage offset sets -- 1e34 leaves
+    in a representation of a few hundred points per stage, with no approximation.
+    Minimising the sup-norm over that sum is done by branch and bound with the
+    admissible bound `|<p,b(t)>| - sum_{i>=m} max_a |<a,b(t)>|`, so nothing is discarded
+    except against a bound. Where the budget runs out it returns the incumbent, which is
+    a real leaf and therefore a **valid upper bound**, flagged as not exact. It never
+    passes a truncated search off as a minimum, which was D47's defect.
+    `tests/test_nearest_template.py` pins parent-independence of the offsets, exact
+    agreement with brute-force enumeration (9 cases, all three strategies, rel 1e-12),
+    monotonicity in the seed width, and the seeded-incumbent verdicts.
+  - **D51 — `aggressive`'s nearest-template error, exactly: median 1.069**, range
+    [0.240, 2.115], EXACT in all 90 cells (6 signals x 15 stages). This *confirms* D49's
+    ~1.09 from the old tracker, which is expected: the cap never binds for `aggressive`,
+    so that one column was always sound. Under the shipped default the nearest template
+    sits just above one tolerance from the signal.
+  - **D52 — D43's direction is restored on a sound footing; its magnitude is not.**
+    Seeding the incumbent with `aggressive`'s exact value turns the comparison into a
+    decision problem, which is far cheaper than optimising. Over the same 90 cells:
+
+    | vs `aggressive` | strictly closer (proved) | not closer (proved) | unresolved |
+    |---|---|---|---|
+    | `quadrature` | **89** | 1 | 0 |
+    | `conservative` | 28 | 0 | 62 |
+
+    Median proven gain where closer: **2.30x** for `quadrature`, 2.05x for
+    `conservative` -- and because these come from upper bounds, each is a *lower* bound
+    on the true gain. So redundancy does put a closer template near the signal, and
+    `tiling_strategy` does affect sensitivity in the Taylor basis. The withdrawn 3.1x is
+    replaced by ">= 2.30x"; `conservative` is expensive to resolve and there is no
+    evidence against it, only absence of proof in 62 cells.
+Conventions fixed: report `(value, exact)` from any nearest-template search and never a
+  bare number; a budget-limited result is an upper bound and may only be used one-sided.
+Still withdrawn: **D44 (0.34% in S/N) stays withdrawn** and has NOT been recomputed. The
+  amplitude consequence of D52's >= 2.30x is unknown, so nothing here says whether the
+  difference matters in practice, and the pruning interaction remains open -- D52 is
+  geometry, and still does not model whether the closer leaf survives thresholding.
+Open questions: the amplitude conversion; whether `conservative`'s 62 unresolved cells
+  can be closed with a better bound; the Chebyshev/circular transforms.
+Next session starts at: converting D52 into an amplitude number, carefully, or the
+  injection test that D44's withdrawal reopened.
 ```
