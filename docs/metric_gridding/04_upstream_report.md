@@ -47,19 +47,23 @@ x 15 stages = 90 cells.
    neighbouring centres gives ~0.5. The `2^(k-1)` coarsening is economization working,
    not a defect, and `eta` is not optimistic by 7.5x.
 
+4. **The amplitude cost is small.** Converting the phase geometry into S/N *without* a
+   metric -- the folded profile is `P(k) * S(k)` with `S(k)` the characteristic function
+   of the phase residual, scored with the shipped boxcar bank and cross-checked against a
+   matched filter -- the tiling choice is worth **0.47% in S/N at a 10% duty cycle**
+   (0.11% at 20%, 1.56% at 5%; duty cycle is the dominant uncertainty). `aggressive`
+   itself loses 1.73% at 10% duty to grid coarseness, of which about 0.5 points is the
+   tiling and the rest is irreducible at `eta = 1`. Both figures are upper bounds, since
+   the template comes from a sup-norm search rather than a loss search, so the difference
+   is indicative; the proven part is the >= 2.30x above. Worth stating separately: a
+   sup-norm phase error *overestimates* the loss by ~3x, because the residual attains its
+   peak only briefly.
+
 ## What this does NOT establish
 
-- **The amplitude cost is small.** Converting the phase geometry into S/N *without* a
-  metric -- the folded profile is `P(k) * S(k)` with `S(k)` the characteristic function
-  of the phase residual, scored with the shipped boxcar bank and cross-checked against a
-  matched filter -- the tiling choice is worth **0.47% in S/N at a 10% duty cycle**
-  (0.11% at 20%, 1.56% at 5%; duty cycle is the dominant uncertainty). `aggressive`
-  itself loses 1.73% at 10% duty to grid coarseness, of which about 0.5 points is the
-  tiling and the rest is irreducible at `eta = 1`. Both figures are upper bounds, since
-  the template comes from a sup-norm search rather than a loss search, so the difference
-  is indicative; the proven part is the >= 2.30x above. Worth stating separately: a
-  sup-norm phase error *overestimates* the loss by ~3x, because the residual attains its
-  peak only briefly.
+- **No proven amplitude *difference*.** The two losses in (4) are upper bounds, since the
+  template comes from a sup-norm search rather than a loss search. The proven claim is
+  the `>= 2.30x` phase gap in (2); the half-percent that follows from it is indicative.
 - **Pruning is not modelled.** These are geometric distances to the nearest leaf. Whether
   that leaf survives thresholding is a separate question and is open.
 - **Taylor basis only.** The Chebyshev and circular transforms are not unit-diagonal
@@ -77,6 +81,13 @@ Reproducers on https://github.com/assaferan/pyloki/tree/metric-gridding :
 `tests/test_nearest_template.py`.
 
 ---
+
+# ⚠ EVERYTHING BELOW THIS LINE IS THE WITHDRAWN EARLIER DRAFT
+
+Kept only so the retractions in DECISIONS.md sessions (r) and (s) have something to
+point at. **Its title and its central claim are both retracted** — the corner figure is
+not a covering radius (D48), so `eta` is *not* optimistic by 7.5x. Do not quote, post,
+or excerpt any of it. The live report is above.
 
 
 
