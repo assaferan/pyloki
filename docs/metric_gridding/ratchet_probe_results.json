@@ -1,0 +1,157 @@
+{
+ "note": "Section 6.7: does the overflow ratchet fire, and can a stricter ladder stop it. 'levels_ratcheted' counts levels where the effective cut exceeded the scheme's nominal threshold, measured with the threshold_eff field added by PR #14. max_sugg = 2^20, three fixed realisations, 64 prune levels each.",
+ "cells": {
+  "agg_2p20_baseline": [
+   {
+    "file": "tim_0000.npz",
+    "levels": 64,
+    "levels_ratcheted": 0,
+    "max_excess": 0.0,
+    "first_ratchet_level": null,
+    "ncand": 14921,
+    "saturation": 0.014229774475097656,
+    "recovered": true,
+    "mismatch": 0.024330140473951656,
+    "seconds": 11.189357999988715
+   },
+   {
+    "file": "tim_0001.npz",
+    "levels": 64,
+    "levels_ratcheted": 0,
+    "max_excess": 0.0,
+    "first_ratchet_level": null,
+    "ncand": 32949,
+    "saturation": 0.03142261505126953,
+    "recovered": true,
+    "mismatch": 0.0018548553685189214,
+    "seconds": 1.3755137089901837
+   },
+   {
+    "file": "tim_0002.npz",
+    "levels": 64,
+    "levels_ratcheted": 0,
+    "max_excess": 0.0,
+    "first_ratchet_level": null,
+    "ncand": 54011,
+    "saturation": 0.05150890350341797,
+    "recovered": true,
+    "mismatch": 0.0018548553685189214,
+    "seconds": 2.508124083004077
+   }
+  ],
+  "quad_2p20_baseline": [
+   {
+    "file": "tim_0000.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 4.1899999999999995,
+    "first_ratchet_level": 4,
+    "ncand": 552544,
+    "saturation": 0.526947021484375,
+    "recovered": true,
+    "mismatch": 5.0679372625648714e-05,
+    "seconds": 168.0309504589968
+   },
+   {
+    "file": "tim_0001.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 4.92,
+    "first_ratchet_level": 4,
+    "ncand": 999824,
+    "saturation": 0.9535064697265625,
+    "recovered": true,
+    "mismatch": 4.5337510024049324e-05,
+    "seconds": 155.4220631250064
+   },
+   {
+    "file": "tim_0002.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 5.16,
+    "first_ratchet_level": 4,
+    "ncand": 945571,
+    "saturation": 0.9017667770385742,
+    "recovered": true,
+    "mismatch": 7.054083841961452e-05,
+    "seconds": 151.71648749998712
+   }
+  ],
+  "quad_2p20_pd0.01": [
+   {
+    "file": "tim_0000.npz",
+    "levels": 64,
+    "levels_ratcheted": 19,
+    "max_excess": 3.450000000000001,
+    "first_ratchet_level": 5,
+    "ncand": 707320,
+    "saturation": 0.6745529174804688,
+    "recovered": true,
+    "mismatch": 6.12141767011367e-05,
+    "seconds": 115.65545016700344
+   },
+   {
+    "file": "tim_0001.npz",
+    "levels": 64,
+    "levels_ratcheted": 18,
+    "max_excess": 4.34,
+    "first_ratchet_level": 5,
+    "ncand": 949921,
+    "saturation": 0.9059152603149414,
+    "recovered": true,
+    "mismatch": 4.5337510024049324e-05,
+    "seconds": 84.81656616700639
+   },
+   {
+    "file": "tim_0002.npz",
+    "levels": 64,
+    "levels_ratcheted": 19,
+    "max_excess": 4.520000000000001,
+    "first_ratchet_level": 5,
+    "ncand": 1019530,
+    "saturation": 0.9722995758056641,
+    "recovered": true,
+    "mismatch": 7.054083841961452e-05,
+    "seconds": 119.51772004200029
+   }
+  ],
+  "quad_2p20_pd0.1031_matched": [
+   {
+    "file": "tim_0000.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 4.1899999999999995,
+    "first_ratchet_level": 4,
+    "ncand": 589103,
+    "saturation": 0.5618124008178711,
+    "recovered": true,
+    "mismatch": 5.0679372625648714e-05,
+    "seconds": 176.60167091700714
+   },
+   {
+    "file": "tim_0001.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 4.98,
+    "first_ratchet_level": 4,
+    "ncand": 759098,
+    "saturation": 0.7239322662353516,
+    "recovered": true,
+    "mismatch": 4.5337510024049324e-05,
+    "seconds": 157.76421158399899
+   },
+   {
+    "file": "tim_0002.npz",
+    "levels": 64,
+    "levels_ratcheted": 20,
+    "max_excess": 5.32,
+    "first_ratchet_level": 4,
+    "ncand": 730462,
+    "saturation": 0.6966228485107422,
+    "recovered": true,
+    "mismatch": 0.0001124005839747208,
+    "seconds": 164.43579158300417
+   }
+  ]
+ }
+}

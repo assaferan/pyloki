@@ -852,6 +852,78 @@ realisations. The `aggressive` convergence is exact. The `quadrature` non-conver
 now rests on four buffers spanning a factor of 8, with the two widest spans giving
 exponents 1.022 and 0.994. **No longer provisional.**
 
+### 6.7 The stricter ladder fails too, and the ratchet is not set by the ladder at all
+
+§6.6 left four routes open. Option 4 — recalibrate the ladder to a smaller `P_d` so it
+admits fewer leaves, keeping both the deployed configuration and the idealised question
+— is the only one that preserved everything. **It does not work**, and the reason rules
+out any variant of it.
+
+**A better criterion than saturation, and a correction to §6.5 and §6.6.** Both sections
+used `saturation = ncand / max_sugg` as the evidence for ratcheting. It is only a
+correlate: saturation is measured at the *end* of a level, while the ratchet fires on
+overflow *during* one and never relaxes, so a run can finish well below the buffer
+having spent most of the level ratcheted. The `threshold_eff` field added by
+[PR #14](https://github.com/pravirkr/pyloki/pull/14) measures it directly — the cut
+actually applied, per level — so the question becomes exactly the one that matters:
+**did the search run the ladder it was given?**
+
+**Measured at `max_sugg` = 2^20 on three fixed realisations, 64 levels each:**
+
+| arm | ladder | realised `P_d` | thresholds | levels ratcheted | clean runs | recovered |
+|---|---|---|---|---|---|---|
+| `aggressive` | shipped | 0.1031 | 2.10–7.70 | **0 / 192** | **3/3** | 3/3 |
+| `quadrature` | shipped | 0.1031 | 2.00–7.90 | 60 / 192 (20.0/run) | **0/3** | 3/3 |
+| `quadrature` | matched baseline | 0.1083 | 1.40–8.10 | 60 / 192 (20.0/run) | **0/3** | 3/3 |
+| `quadrature` | **strict** | **0.0100** | 2.40–8.50 | 56 / 192 (18.7/run) | **0/3** | 3/3 |
+
+`aggressive` is the control and it is perfectly clean — 0 of 192 levels, three runs out
+of three running exactly the ladder they were given. That demonstrates what §6.6's
+convergence only predicted, and it means the `quadrature` numbers are not an artefact of
+the instrument.
+
+**A ten-fold reduction in the detection target buys 4 levels out of 192.** The strict
+and matched-baseline ladders come from the *same* `DynamicThresholdScheme` run,
+backtracked at different `P_d`, so they differ only in the target and not in the
+unseeded draw (§6.1). Going from `P_d` = 0.108 to 0.010 — thresholds raised by ~1.0 at
+the low end — moves the ratcheted count from 20.0 to 18.7 per run and leaves **zero**
+clean runs. The candidate count does not fall either: median 730 462 against 949 921,
+i.e. it went *up*, because the count is pinned to the buffer rather than set by the
+scheme.
+
+**Why no ladder can fix this.** The effective cut is
+`max(nominal, top-K, median)` (`utils/world_tree.py:547`). Measured max excess over the
+nominal is **4.19 / 4.98 / 5.32** on thresholds of order 2–8, so the operative cut is
+roughly **double** what the scheme asked for, and it is `top-K` that is setting it —
+a function of the buffer size and the score distribution, **not of the ladder**. Raising
+the nominal threshold by 1.0 changes nothing when top-K already exceeds it by 5.
+
+The signature is visible in the numbers: matched-baseline minus strict max excess is
+**0.74 / 0.64 / 0.80** across the three realisations (mean 0.73, spread 0.16), which is
+what a *fixed* `eff` and a *shifted* `thresh` produce. On `tim_0000` the max excess is
+4.19 under both the shipped and the matched-baseline ladder despite different thresholds.
+
+#### Verdict on §6.6's options
+
+**Option 4 is dead, structurally rather than by tuning.** No `P_d` target fixes a cut
+that is not being set by `P_d`. What remains:
+
+- **Option 2 — the user-facing question** at the shipped default, ratchet included.
+  Answerable now. A claim about pyloki-as-shipped, not about tiling.
+- **Option 3 — a smaller configuration.** Untested, different external validity.
+- And a route none of the four anticipated: **change the buffer policy rather than the
+  ladder.** The ratchet exists because `max_sugg` is a hard cap enforced by discarding
+  the lowest-scoring candidates. A policy that instead refused to proceed — or that
+  reported the shortfall — would let `quadrature` fail honestly rather than silently
+  substitute a different cut. That is a library change, not a campaign design, and it is
+  out of scope here; it is noted because it is the only remaining way to ask the
+  idealised question at the deployed configuration.
+
+*Scope.* Three realisations per cell at one buffer, one arm's control. The effect is not
+marginal — 0/192 against 60/192 — so n = 3 is adequate to separate them, but the
+per-run ratcheted count (18.7 vs 20.0) is not resolved at this n and nothing is claimed
+from that difference beyond "not zero".
+
 ---
 
 ## 7. What has to change before this is worth running — **superseded by §6.6**
