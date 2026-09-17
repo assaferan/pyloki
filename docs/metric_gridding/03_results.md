@@ -3,6 +3,21 @@
 Deliverable for `metric_PLAN.md` Phase 3. **Provisional**: steps 1, 2 and 3 are done,
 steps 4 and 5 are not, and step 3 is at low statistics.
 
+> **PARTIALLY SUPERSEDED — read this first.** The section "The sensitivity loss,
+> quantified" below, and its conclusion that the three tiling strategies are
+> indistinguishable, are **withdrawn** (D43, D47, D52). Those numbers are *own-cell*
+> distances: they measure a signal against the centre of the cell containing it, which
+> is the right quantity only at covering multiplicity 1. The redundant strategies
+> over-claim under transport, so the signal is covered many times and what scores is the
+> *nearest* template. Measured exactly, `quadrature` is strictly closer than
+> `aggressive` in **89 of 90** cells, by a factor of **>= 2.30x** — worth 0.47% in S/N at
+> a 10% duty cycle (D55). So `tiling_strategy` does affect sensitivity in the Taylor
+> basis; it just does not affect it by enough to pay for ~1e5x more branching.
+> `aggressive` remains the right default, for that reason rather than for equivalence.
+> The `aggressive` column happens to be sound (multiplicity 1 there) and agrees with the
+> exact search. Current numbers: `04_upstream_report.md`; method:
+> `nearest_template.py` and `amplitude_loss.py`; history: DECISIONS.md sessions (o)-(t).
+
 ## Configuration
 
 Not the plan's config, for two measured reasons (D29, D30):
@@ -200,6 +215,10 @@ The metric strategy is then paying ~1070x at equal `P_d` to guarantee something
 
 ## The sensitivity loss, quantified — the paper's actual open question
 
+> **WITHDRAWN (D43/D47/D52).** Own-cell distances, not nearest-template distances; valid
+> only at multiplicity 1, i.e. for `aggressive` alone. Kept for the record. Do not quote
+> the cross-strategy comparison below.
+
 §5.2.4 closes with *"Further work is required to quantify the sensitivity loss and
 compare basis strategies."* That is a different measurement from anything above, and it
 is cheap. For a signal anywhere inside a leaf's cell, what phase error does it actually
@@ -222,7 +241,7 @@ Sampling offsets uniformly inside each leaf, 268 s / 64 seg / `po=4`, in units o
 | `quadrature` | 3.58 | 14.38 | 0.0258 |
 | `conservative` | 3.42 | 14.20 | 0.0251 |
 
-**The three strategies are indistinguishable.** A typical signal costs ~3.4x the nominal
+**[WITHDRAWN] The three strategies are indistinguishable.** A typical signal costs ~3.4x the nominal
 phase budget and ~2.5% in amplitude; a corner signal costs ~15x. Identical across
 strategies that differ by **twenty orders of magnitude** in cost.
 
@@ -244,6 +263,12 @@ All within a factor of ~2 of the criterion and of each other; the scatter is the
 `ceil`. **The transported width does not set the cell — the criterion does. It sets only
 how much redundant subdivision is done on the way.** So it can only buy cost, never
 sensitivity.
+
+> **The last sentence is false (D52).** The cell-size mechanism above is correct and
+> still verified, but the conclusion does not follow from it: the transported width also
+> sets how much sibling cells *overlap*, and overlap puts a nearer template next to the
+> signal even when the cell size is unchanged. Effective template density is not cell
+> size.
 
 That is the general statement, and it applies to the metric strategy too: a covering is
 just another transport rule. It cannot improve sensitivity, and it measurably worsens
