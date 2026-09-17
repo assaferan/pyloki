@@ -116,11 +116,23 @@ and the figure should be recomputed on the Chebyshev ladder before committing.
 
 And ~770 is a **floor**, not an estimate: this model treats the arms as differing only by
 a deterministic `loss_s`. They also score *different templates*, which adds a stochastic
-term that a peer session measures at sd 0.133 against a deterministic amplitude
-difference of 0.044 — noise roughly 3x the signal. Pairing on the noise realisation does
+term that a peer session measures at **sd 0.230** against a deterministic amplitude
+difference of 0.044 — noise roughly **5x** the signal. (The 0.133 first reported came
+from a profile-overlap correlation that has since been corrected to a score correlation;
+`sqrt(2 x 0.0265) = 0.230`.) Pairing on the noise realisation does
 not remove it. Carried into McNemar that shrinks the discordance asymmetry and raises `n`,
 plausibly by an order of magnitude. **That term must be in the model before any n is
-committed to.**
+committed to.** Their `injection_power.py:power()` already implements the aggregation,
+and `rho_check.py:propagate()` reproduces the uncorrected `pi` exactly as a control, so
+this is a substitution rather than a re-derivation.
+
+One caveat inherited with the deterministic term is now **partly retired**: it assumes
+`L_A` and `L_B` are upper bounds whose looseness need not be symmetric. Over stages 1-10
+-- the only window that decides detection -- both are *exact* (identical at 4M and 16M
+nodes, searches completing in 0-2 s), so no asymmetry can enter where it would matter.
+What that check did reveal is that `quadrature` is genuinely **worse** at stages 2 and 8
+(1.667 vs 1.027, 2.067 vs 1.657), so the deterministic term is not sign-definite early
+and the design must expect two-sided discordance there.
 
 Two caveats, both one-sided in the safe direction. `quadrature`'s per-stage losses are
 *upper* bounds from a budget-limited search, so `r` is overestimated, the effect

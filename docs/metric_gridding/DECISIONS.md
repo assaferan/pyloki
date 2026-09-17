@@ -1891,8 +1891,12 @@ Next session starts at: the two prerequisites above -- threshold calibration for
 Done:
   - **D70 — the headline gain is not the detection-relevant gain.** Raised by the
     Overview session from the Injection Campaign session's per-stage `P_d` curve, and
-    confirmed independently inside my own survival model: at S/N 14, **99% of first
-    threshold failures occur in stages 1-10** (1% in 11-20, 0% beyond). My D52/D60 cells
+    reproduced inside my own survival model: at S/N 14, **99% of first threshold failures
+    occur in stages 1-10** (1% in 11-20, 0% beyond). **NOT independent confirmation** --
+    corrected per that session: my model shares their Viterbi ladder and the same
+    `mu(s) = snr sqrt((s+1)/nseg)` accumulation, so the agreement is a consistency check
+    on a shared assumption set, not a second line of evidence. I had described it as
+    independent, and it is not. My D52/D60 cells
     were `range(4, 63, 4)`, so only **2 of 15** sit in that window. Splitting the exact
     comparison:
 
@@ -1940,4 +1944,43 @@ Open questions: the template-noise term (D72) before any campaign `n`; Chebyshev
   power; the `max_sugg` confound (owned elsewhere).
 Next session starts at: folding D72 into `injection_power.py`, which decides whether the
   campaign is affordable at all.
+
+## 2026-09-17 (y) — the early window is exact, and the floor gets worse
+Done:
+  - **D73 — the early-stage losses are EXACT, which closes the largest open caveat where
+    it matters.** The Injection Campaign session flagged that the deterministic term
+    `mu (L_A - L_B)` rests on both losses being *upper* bounds from a sup-norm search,
+    that the two bounds need not be equally loose, and that if the asymmetry is
+    stage-dependent it would bite precisely in the early window my stage split relies on.
+    Checked directly: over stages 1-10, both arms' per-stage losses are **identical at
+    4M and 16M nodes** (max change 0.0000 points), with the searches completing in 0-2 s.
+    They are exhaustive, not bound-limited, so no asymmetry can enter there. The caveat
+    stands for the late stages and is now retired for the early ones.
+    Per-stage, stages 1-10 (%): `aggressive` 0.674 1.027 2.163 0.891 1.042 0.639 1.302
+    1.657 0.896 1.467; `quadrature` 0.674 1.667 1.694 0.167 0.214 0.463 0.442 2.067
+    0.362 0.918.
+  - **D74 — and it shows `quadrature` is genuinely WORSE at some early stages**, not just
+    unproven: 1.667 against 1.027 at stage 2, and 2.067 against 1.657 at stage 8. Since
+    these losses are exact, that is a real sign reversal rather than a loose bound. It
+    matches the sup-norm picture (`quadrature` fails to beat `aggressive` in 13 of 60
+    early cells against 0 of 48 late) and it means the deterministic term is **not
+    sign-definite in the window that decides detection**. A paired design must therefore
+    expect discordance in both directions early, which is exactly what McNemar tests and
+    exactly what an aggregate `P_d` comparison would hide.
+  - **D75 — D72's stochastic floor is worse than recorded: sd 0.230, not 0.133.** The
+    figure is `sqrt(2(1 - rho_AB))`, and it was computed from the profile-overlap `rho`
+    that the same session has since corrected; with the score correlation it is
+    `sqrt(2 x 0.0265) = 0.230`, 1.73x larger. Against the deterministic median of 0.044
+    the noise is now ~5x the signal, not 3x. Through their model `pi` goes 0.697 -> 0.628
+    and pairs 161 -> 391 at their `p_disc`. My ~770 omits the term altogether, so it
+    remains a floor and the true `n` is materially higher.
+Conventions fixed: do not call a check "independent" when it shares a ladder and a score
+  model with the thing it agrees with (see the D70 amendment above).
+Open questions: the campaign's true `n` once D75's term is in the model; whether the late
+  stages' bound asymmetry matters at all now that the early window is exact (probably
+  not, since the late stages decide ~nothing).
+Next session starts at: assaferan's decision on who owns the power calculation. The
+  Injection Campaign session declines to take it on a peer's say-so, correctly, and its
+  `injection_power.py:power()` + `rho_check.py:propagate()` already implement the
+  aggregation my model lacks. One owner beats two half-models.
 ```
