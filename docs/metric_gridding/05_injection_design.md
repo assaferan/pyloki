@@ -43,10 +43,12 @@ shown to do so symmetrically between the arms.**
   correlation. They are the same smearing factor `S(k)` weighted by the pulse's spectrum
   and the filter's respectively, and the bank's selected boxcar has 4.10x the pulse's
   `<k²>`. Median `1 − rho` at ducy 0.10 is **0.0265, not 0.0088**; `pi` falls 0.697 →
-  **0.628** and the pairs needed at `p_disc` = 0.30 rise **161 → 391** (1 464 at the
-  pilot's worst `p_disc` = 0.08). **`n = 2 000` still covers it**, so this makes the
-  design adequate rather than comfortable. It was §10's row 3 and is now measured; row 1
-  is still the one to worry about.
+  **0.628** and the pairs needed at `p_disc` = 0.30 rise **161 → 391** on that aggregate.
+  **The operative figure is §9's 954**, not 391: the primary test runs on the mid
+  stratum, where `pi` = 0.593, and the null stratum's 21% of screened positions do not
+  enter it. **`n = 2 000` still covers that** at the operating point but no longer across
+  the whole measured `p_disc` range — it covers `p_disc` ≥ 0.145. It was §10's row 3 and
+  is now measured; row 1 is still the one to worry about.
 
 - **Cost, measured.** At `max_sugg = 2^18` (the library default) a pair costs **49.8 s**
   — `aggressive` 2.3 s, `quadrature` 47.5 s — so 2 000 pairs is **28 core-hours** and
@@ -261,7 +263,8 @@ At the pilot's *measured* `p_disc = 0.30` (§6.3) rather than the modelled one, 
 three rows are n = 74 / 163 / 560, i.e. 1.0 / 2.3 / 7.8 core-hours.
 
 > **The ducy 0.10 row of both tables above is superseded by §5.2**, which corrects
-> `rho_AB`: `pi` = 0.628 and n = 391 at `p_disc` = 0.30, not 0.697 and 163. The 0.05 and
+> `rho_AB`: `pi` = 0.628 and n = 391 at `p_disc` = 0.30, not 0.697 and 163 — and §9
+> supersedes even that with 954, the count for the test actually run. The 0.05 and
 > 0.20 rows have not been recomputed. They are left in place because the *shape* of the
 > argument — that `p_disc` enters linearly and `pi` quadratically — is what §5 is for,
 > and that is unchanged.
@@ -347,8 +350,11 @@ values back through the same path reproduces the cached `pi = 0.69684` and
 moved.
 
 **What it does and does not change.** `pi` falls from 0.697 to **0.63**, and the pairs
-needed at the measured `p_disc` rise by ~2.4x. The pre-committed `n = 2 000` (§9) still
-covers it — 391 pairs at `p_disc = 0.30` and 1 464 at the pilot's worst 0.08 — so the
+needed at the measured `p_disc` rise by ~2.4x, to 391 at `p_disc` = 0.30 and 1 464 at
+the pilot's worst 0.08. **These are aggregate-`pi` figures and are not what the campaign
+needs** — §9 carries the operative count (954), because the primary test runs on the mid
+stratum and the null stratum does not enter it. The pre-committed `n = 2 000` covers the
+operating point either way, so the
 verdict moves from comfortable to **adequate**, not from reachable to unreachable.
 
 **Across duty cycle, and it is not uniform.** Only ducy 0.10 was recomputed in full, but
@@ -943,8 +949,9 @@ assumption the whole answer turns on. Two specific weaknesses:
    does not preserve the profile overlap: both quantities are the same `S(k)` weighted
    by `|P(k)|²` and `|H(k)|²` respectively, and the selected boxcar's `<k²>` is 4.10x
    the pulse's. Median `1 − rho` at ducy 0.10 is **0.0265, not 0.0088**, and `pi` falls
-   from 0.697 to **0.628**, raising the pairs needed at `p_disc = 0.30` from 161 to 391.
-   `n = 2 000` still covers it. `rho_check.py`.
+   from 0.697 to **0.628**, raising the pairs needed at `p_disc = 0.30` from 161 to 391
+   on that aggregate — and to **954** once §9's mid-stratum `pi` and the null stratum's
+   share are accounted for, which is the operative number. `rho_check.py`.
 2. `L_A` and `L_B` are both **upper** bounds (the search minimises sup-norm over 30
    retained leaves, not loss), and the bounds are not symmetric, so their *difference* is
    not sign-proven. This is D52's caveat, inherited.
