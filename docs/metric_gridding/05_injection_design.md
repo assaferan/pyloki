@@ -301,8 +301,26 @@ same reason — few segments have been accumulated.
 >
 > First-loss levels are 13, 13, 17, 19, 24, 27, 36, 41, 41, 44, 47 — median 27, **none
 > before 13**. So **0% of losses occur by stage 10**, where the modelled curve put 99%.
-> Its own check against my data holds: 29/40 = 0.725 alive at the final level against my
-> independently measured 38/50 = 0.760 recovery, Fisher exact two-sided `p` = 0.81.
+>
+> **Status of the instrument: uncontradicted, not validated.** An early claim that its
+> first batch validated it (29/40 = 0.725 against my 38/50 = 0.760, `p` = 0.81) was
+> **retracted by its author** — one batch agreeing is not evidence, and a second batch
+> gave 15/30 = 0.500. Across all its batches, 44/70 = 0.629 against my 38/50 = 0.760 is
+> **consistent**, two-sample Fisher exact `p` = 0.164 (reproduced here), pooled
+> 82/120 = 0.683 with a 95% interval containing both. An initial report of `p` = 0.019
+> was a one-sample test treating my 38/50 as a known rate rather than an estimate.
+>
+> Two reasons not to read even the consistency as strong. The runs are **not
+> exchangeable** — `calibrate_scale_on_folds` (`pulse.py:72-110`, `:381`) tunes the
+> injected amplitude against each realisation's own noise, so the signal varies per draw
+> and every nominal `p` here is anti-conservative. And my 38/50 is **end-to-end**
+> recovery from the final periodogram while its predicate is evaluated at the last prune
+> level, before the final ascend and resolve; the two need not agree even on identical
+> data.
+>
+> **So: the shape is solid and the absolute levels are not.** "No losses before level
+> 13" holds across two criteria, two injected parameter sets and three batches. Nothing
+> below uses the absolute levels.
 >
 > **The decision is late, not early — so §4.3's title is not just unsupported, it is
 > the wrong way round**, and the "structural reason the effect is small" is withdrawn.
