@@ -53,14 +53,27 @@ x 15 stages = 90 cells.
 4. **The amplitude cost is small.** Converting the phase geometry into S/N *without* a
    metric -- the folded profile is `P(k) * S(k)` with `S(k)` the characteristic function
    of the phase residual, scored with the shipped boxcar bank and cross-checked against a
-   matched filter -- the tiling choice is worth **0.47% in S/N at a 10% duty cycle**
-   (0.11% at 20%, 1.56% at 5%; duty cycle is the dominant uncertainty). `aggressive`
-   itself loses 1.73% at 10% duty to grid coarseness, of which about 0.5 points is the
-   tiling and the rest is irreducible at `eta = 1`. Both figures are upper bounds, since
-   the template comes from a sup-norm search rather than a loss search, so the difference
-   is indicative; the proven part is the >= 2.30x above. Worth stating separately: a
-   sup-norm phase error *overestimates* the loss by ~3x, because the residual attains its
-   peak only briefly.
+   matched filter. Median fractional S/N loss, Taylor basis:
+
+   | pulse duty | `aggressive` | `quadrature` | `quadrature`'s advantage (paired) |
+   |---|---|---|---|
+   | 0.05 | 5.34% | 2.26% | +1.56% |
+   | 0.10 | 1.73% | 0.75% | **+0.47%** |
+   | 0.20 | 0.40% | 0.17% | +0.11% |
+
+   The last column is the **median over cells of the per-cell ratio**, which is the
+   paired comparison and the one to use. Note it is *not* what dividing the two medians
+   in the same row gives (+1.00% at 10% duty): the two losses are not co-monotone across
+   cells, so the paired statistic is the smaller and the more honest of the two. Duty
+   cycle is the dominant uncertainty -- an order of magnitude across the range -- and
+   0.05 is marginal at `N_b = 64`, so the 0.10 row is the one to quote.
+
+   So `aggressive` loses 1.73% at 10% duty to grid coarseness, of which about half a
+   point is the tiling choice and the rest is irreducible at `eta = 1`. Both loss figures
+   are upper bounds, since the template comes from a sup-norm search rather than a loss
+   search, so the advantage is indicative; the proven part is the >= 2.30x above. Worth
+   stating separately: a sup-norm phase error *overestimates* the loss by ~3x, because
+   the residual attains its peak only briefly.
 
 ## What this does NOT establish
 
@@ -79,10 +92,12 @@ The same search ports to `poly_basis="chebyshev"` -- the branch there also goes 
 `branch_param_padded`, and `shift_cheby_errors` ignores the values, so child offsets stay
 parent-independent and the Minkowski-sum structure holds. Same 90 cells:
 
-| basis | `aggressive` nearest template | `quadrature` closer | proven gain | loss at 10% duty |
-|---|---|---|---|---|
-| Taylor | 1.069 | 89/90 | >= 2.30x | 1.73% |
-| Chebyshev | **0.904** | 87/90 | >= 1.56x | **2.03%** |
+| basis | `aggressive` nearest template | `quadrature` closer | proven gain | `aggressive` loss | `quadrature` loss |
+|---|---|---|---|---|---|
+| Taylor | 1.069 | 89/90 | >= 2.30x | 1.73% | 0.75% |
+| Chebyshev | **0.904** | 87/90 | >= 1.56x | **2.03%** | 1.14% |
+
+(losses at 10% duty cycle; paired advantage +0.47% Taylor, +0.52% Chebyshev)
 
 Chebyshev puts a ~15% closer template near the signal, and the tiling choice matters
 *less* there, not more. Its nominal cell corner is also far better behaved --

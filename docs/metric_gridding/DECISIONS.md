@@ -1801,4 +1801,44 @@ Conventions fixed: `min_excursion` now takes `basis_fn`, so one search serves bo
 Open questions: the pruning interaction, now the prime suspect for the Chebyshev score
   deficit (D60) and the last unmeasured mechanism; the circular basis.
 Next session starts at: the human's read of the report.
+
+## 2026-09-17 (v) — the report's figures are generated, not typed
+Done:
+  - **D63 — `report_numbers.py` + `report_numbers.json` + `tests/test_report_numbers.py`.**
+    Every figure in `04_upstream_report.md` is now computed, committed as JSON, and bound
+    to the document by tests. Aimed at this branch's actual failure mode rather than at
+    typos: twice a sentence contradicted a table in the same document that was itself
+    correct. So the suite (a) recomputes the cheap groups live against the JSON, (b)
+    asserts each headline figure the report quotes equals the JSON value at the printed
+    precision, and (c) checks the `branch_max` verdicts as **booleans** against the
+    report's wording. `test_only_one_nonaggressive_configuration_builds` pins the D62
+    amendment so it cannot be over-generalised again.
+  - **D64 — it immediately caught a real inconsistency in the report.** The report quoted
+    losses of 1.73% and 0.747% beside an advantage of 0.47%, and those do not combine:
+    the ratio of the two medians is **+1.00%**, while the median of the per-cell ratios
+    is **+0.47%**. The two losses are not co-monotone across cells, so the paired
+    statistic is the smaller one, and it is the right one (cell-to-cell scatter cancels).
+    A reader dividing the quoted medians would have got double the stated figure and
+    concluded one of them was wrong. Both statistics are now in the JSON, the report
+    leads with the paired one and says explicitly why division does not reproduce it,
+    and a test asserts they still differ so the caveat does not become noise.
+  - **D65 — and a typed figure that disagreed with the computation.** I had written
+    "+0.53% Chebyshev" where the computed paired advantage formats to **0.52%**. Caught
+    by the binding test on the first run. Corrected.
+  - Two test bugs found in the writing, both mine, neither a defect in the report:
+    matching `"7 — raises"` as a bare substring also matches inside `"27 — raises"` (now
+    guarded against a preceding digit), and `_dig` split paths on `.` while several keys
+    contain one (`ducy_0.10`), silently walking into missing keys. Now `/`-separated.
+  - Full regeneration reproduces every live figure exactly: Taylor `aggressive` 1.06888
+    (range 0.2399-2.114554, exact 90/90), `quadrature` 89/1/0 at gain 2.302674,
+    `conservative` 28/0/62; Chebyshev `aggressive` 0.904452 (exact 90/90), `quadrature`
+    87/3/0 at gain 1.563983.
+Conventions fixed: no figure in the report is typed. `python report_numbers.py --full`
+  regenerates the expensive groups (~12 min), `--only amplitude|nearest` regenerates one.
+  Any paired comparison records both the per-cell median and the ratio of medians,
+  because quoting one beside the inputs of the other is what D64 was.
+Open questions: unchanged -- the pruning interaction and the circular basis.
+Next session starts at: the human's decision on the injection campaign (relayed as
+  approved in another session; not acted on, since it was not approved to me) and, if it
+  goes ahead, the design doc and the power calculation before any production run.
 ```
