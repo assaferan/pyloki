@@ -102,9 +102,7 @@ disagree completely.
 
 `survival_profile.py` drives the real pruning loop and records, at every prune level, the
 minimum phase excursion from the injected signal to any surviving candidate — so
-"is a covering leaf still alive?" is observed rather than inferred. Over 40 real runs
-(`aggressive`, S/N 14, `max_sugg` = 2^18), validated against an independently measured
-recovery rate of 38/50 (this method gives 29/40; two-sided binomial `p` = 0.72):
+"is a covering leaf still alive?" is observed rather than inferred. Over 40 real runs (`aggressive`, S/N 14, `max_sugg` = 2^18):
 
 | level | 1 | 10 | 20 | 30 | 40 | 50 | 63 |
 |---|---|---|---|---|---|---|---|
@@ -113,6 +111,16 @@ recovery rate of 38/50 (this method gives 29/40; two-sided binomial `p` = 0.72):
 First-loss levels are 13, 13, 17, 19, 24, 27, 36, 41, 41, 44, 47 — **none before level
 13**. A single-leaf survival model had put 99% of first losses in stages 1-10; the
 measurement puts 0% there. The decision is made in the middle and late stages.
+
+**What is and is not validated here.** The *shape* is robust: "no losses before level 13"
+holds across two criteria (the excursion threshold above, and the metric mismatch
+`m <= 1.0` this project already uses for recovery), two injected parameter sets and two
+independent batches — 0/11, 0/15 and 0/13 losses by level 10. The *absolute level* is not:
+the final-level alive fraction is 29/40 in one batch and 15/30 in another (Fisher
+`p` = 0.08 between them), and combined at 44/70 = 0.629 it is discrepant with an
+independently measured recovery rate of 38/50 = 0.760 (two-sided `p` = 0.019). So the
+conclusions below rest on where losses occur, not on how many — and this profile should
+not be used to set absolute survival probabilities until that discrepancy is understood.
 
 Measuring the gain in that window:
 

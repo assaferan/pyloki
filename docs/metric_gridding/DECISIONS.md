@@ -2488,4 +2488,58 @@ Conventions fixed: when an inherited measurement blocks someone else's work, har
   measurement rather than applying it for them.
 Open questions: a `quadrature` profile, still blocked by the buffer non-convergence
   (302 s/run at 2^21); their strata, if the configuration question is reopened.
+
+## 2026-09-17 (aj) — the validation fails on more data; the shape survives
+Done:
+  - **D107 — their reconciliation query, answered: a denominator mismatch in my
+    presentation, not a non-monotone predicate.** "Losses by level 20 = 20/28" was a
+    fraction of the **28 runs that ever dip**, while the alive fractions were over all
+    **60** runs. Alive at level 20 = (60 - 20)/60 = 0.667, which matches the computed
+    instantaneous 0.667. The figures reconcile; the presentation put two denominators in
+    one table. Their hypothesis (a) was reasonable and wrong; the query was right.
+  - **D108 — and the predicate is *essentially* monotone, so it can serve as `reach(s)`.**
+    Checked explicitly: the `m <= 1.0` predicate is re-satisfied after a dip in **3** of
+    3 720 level-observations, the excursion predicate in **1**. So the never-dipped and
+    instantaneous curves agree to three decimals and either is usable. Non-monotonicity is
+    physically possible -- refinement can bring a child inside tolerance where no parent
+    was -- but it is negligible here.
+  - **D109 — RETRACTED: the validation against their recovery rate does not hold on more
+    data, and my reported `p = 0.72` was the favourable half of a noisy pair.**
+
+    | | alive at final level |
+    |---|---|
+    | set A, batch 1 (N=40) | 29/40 = 0.725 |
+    | set A, batch 2 (N=30) | 15/30 = 0.500 |
+    | **combined set A (N=70)** | **44/70 = 0.629** |
+
+    My own two batches are only marginally consistent with each other (Fisher exact
+    `p = 0.080`), and combined against their independently measured 38/50 = 0.760 the
+    two-sided `p = 0.019` -- **discrepant**, with 0.760 lying outside the combined 95%
+    interval [0.514, 0.743]. I reported the batch-1 agreement as the validation; on more
+    data it fails. That validation was, in their words, "the only thing tying your
+    instrument to an independently measured quantity", so its loss matters.
+    Candidate causes, none yet established: my injected parameters may differ from theirs
+    (I have asked -- if the signals differ the rates were never comparable and the
+    batch-1 agreement was coincidence); their recovery criterion may not be my alive
+    predicate; or the instrument is biased. **Until resolved, the profile's absolute
+    level is not validated and should not be used to set `reach(s)` values.**
+  - **D110 — the SHAPE survives, and that is what the conclusions rest on.** "No losses
+    before level 13" holds across **two criteria** (excursion, and metric `m <= 1.0`),
+    **two parameter sets** (A and B), and **two batches**: 0/11, 0/15, 0/13 by level 10
+    in each. The falsified model put 99% there. So D101/D102 -- the decision is not made
+    early, and the gain sits in the decision window -- do not depend on the absolute
+    calibration that D109 withdraws. What does depend on it is any numeric `reach(s)`, and
+    hence their `pi`.
+  - Their pushback on "better anchored" is **accepted and withdrawn**: the metric
+    criterion is independently *defined* but its final alive fraction (0.50-0.57) is the
+    one that sits furthest from their measured recovery, while the calibrated-threshold
+    excursion version was closer. Being independent of the data is not the same as
+    agreeing with external data. The two measure different things, `m <= 1.0` is stricter
+    than end-to-end recovery, and per D109 neither is currently validated as `reach(s)`.
+  - Also noting their 368 -> 368-691: they checked my window shift against their model
+    rather than assuming stability, and it moves by 1.9x. Their defensible claim is now
+    "the early-decision corner is excluded and `n` is in the high hundreds" -- which is
+    exactly the shape-not-level split D110 describes, arrived at independently.
+Conventions fixed: never put two denominators in one table. And an agreement on one batch
+  is not a validation -- run the second batch before calling it one.
 ```
