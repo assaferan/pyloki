@@ -49,17 +49,32 @@ x 15 stages = 90 cells.
 
 ## What this does NOT establish
 
-- **No amplitude number.** The >= 2.30x is phase geometry. An earlier draft converted a
-  (since withdrawn) phase gain into 0.34% in S/N; that conversion is withdrawn and has
-  not been redone. Nothing here says whether the difference matters in practice.
+- **The amplitude cost is small.** Converting the phase geometry into S/N *without* a
+  metric -- the folded profile is `P(k) * S(k)` with `S(k)` the characteristic function
+  of the phase residual, scored with the shipped boxcar bank and cross-checked against a
+  matched filter -- the tiling choice is worth **0.47% in S/N at a 10% duty cycle**
+  (0.11% at 20%, 1.56% at 5%; duty cycle is the dominant uncertainty). `aggressive`
+  itself loses 1.73% at 10% duty to grid coarseness, of which about 0.5 points is the
+  tiling and the rest is irreducible at `eta = 1`. Both figures are upper bounds, since
+  the template comes from a sup-norm search rather than a loss search, so the difference
+  is indicative; the proven part is the >= 2.30x above. Worth stating separately: a
+  sup-norm phase error *overestimates* the loss by ~3x, because the residual attains its
+  peak only briefly.
 - **Pruning is not modelled.** These are geometric distances to the nearest leaf. Whether
   that leaf survives thresholding is a separate question and is open.
 - **Taylor basis only.** The Chebyshev and circular transforms are not unit-diagonal
   triangular and none of this transfers.
 - `conservative`'s 62 unresolved cells are absence of proof, not evidence against it.
 
+So `tiling_strategy` is a real but small sensitivity knob, and `quadrature`'s ~1e5x
+extra branching (and its higher recalibrated threshold ladder, 9.10 against 7.70 at
+equal `P_d`) buys about half a percent of amplitude. That does not look like a trade
+worth making, but it is a different statement from "the strategies are equivalent",
+which is what an earlier draft of this file wrongly said.
+
 Reproducers on https://github.com/assaferan/pyloki/tree/metric-gridding :
-`docs/metric_gridding/nearest_template.py` with `tests/test_nearest_template.py`.
+`docs/metric_gridding/nearest_template.py` and `amplitude_loss.py`, with
+`tests/test_nearest_template.py`.
 
 ---
 

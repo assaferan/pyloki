@@ -104,3 +104,60 @@ def test_seeded_incumbent_gives_sound_verdicts():
     v_lo, ex_lo, _ = min_excursion(sets, tau, scale, PO, tol, init_best=target)
     assert ex_lo
     assert v_lo == pytest.approx(target)
+
+
+# --- amplitude conversion -------------------------------------------------------
+
+from amplitude_loss import snr_ratio  # noqa: E402
+
+from pyloki.utils.misc import C_VAL  # noqa: E402
+
+TAU = np.linspace(-10.0, 10.0, 2048)
+
+
+def _ramp(x: float) -> np.ndarray:
+    """A pure d_1 offset whose phase residual has sup-norm x * (eta/N_b) cycles."""
+    d = np.zeros(PO)
+    d[-1] = x * (1.0 / P.NBINS) * C_VAL / F0 / np.abs(TAU).max()
+    return d
+
+
+@pytest.mark.parametrize("filt", ["boxcar", "matched"])
+def test_zero_phase_error_costs_nothing(filt):
+    assert snr_ratio(np.zeros(PO), TAU, F0, PO, P.NBINS, 0.1, filt=filt) == (
+        pytest.approx(1.0, abs=1e-12))
+
+
+@pytest.mark.parametrize("filt", ["boxcar", "matched"])
+@pytest.mark.parametrize("ducy", [0.05, 0.1, 0.2])
+def test_loss_is_monotone_in_phase_error(filt, ducy):
+    """More smearing cannot raise the recovered S/N.
+
+    Before the phase average was added this failed: a Gaussian smeared towards a flat
+    top scores *better* against a boxcar bank than a sharp one, which produced negative
+    losses of the same size as the effect under study.
+    """
+    ratios = [
+        snr_ratio(_ramp(x), TAU, F0, PO, P.NBINS, ducy, filt=filt)
+        for x in (0.0, 0.5, 1.0, 2.0, 3.0)
+    ]
+    for lo, hi in zip(ratios[:-1], ratios[1:], strict=True):
+        assert hi <= lo + 1e-9
+
+
+@pytest.mark.parametrize("ducy", [0.1, 0.2])
+def test_boxcar_and_matched_filters_agree(ducy):
+    """The loss must be a property of the grid, not of the filter used to read it."""
+    for x in (1.0, 2.0):
+        box = 1.0 - snr_ratio(_ramp(x), TAU, F0, PO, P.NBINS, ducy, filt="boxcar")
+        mat = 1.0 - snr_ratio(_ramp(x), TAU, F0, PO, P.NBINS, ducy, filt="matched")
+        assert box == pytest.approx(mat, rel=0.35)
+
+
+def test_narrower_pulses_lose_more():
+    """Smearing costs a narrow pulse more than a broad one, at equal phase error."""
+    losses = [
+        1.0 - snr_ratio(_ramp(1.0), TAU, F0, PO, P.NBINS, d, filt="matched")
+        for d in (0.20, 0.10, 0.05)
+    ]
+    assert losses[0] < losses[1] < losses[2]

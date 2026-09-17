@@ -1673,4 +1673,60 @@ Open questions: the amplitude conversion; whether `conservative`'s 62 unresolved
   can be closed with a better bound; the Chebyshev/circular transforms.
 Next session starts at: converting D52 into an amplitude number, carefully, or the
   injection test that D44's withdrawal reopened.
+
+## 2026-09-17 (t) — the amplitude conversion, done without the metric
+Done:
+  - **D53 — `docs/metric_gridding/amplitude_loss.py`, and why it avoids the metric.**
+    A phase residual does not attenuate the pulse, it *smears* it: the folded profile is
+    `<p(phi - dPhi(t))>_t`, which in Fourier is exactly `P(k) * S(k)` with
+    `S(k) = <exp(-2 pi i k dPhi(t))>_t`, the characteristic function of the residual
+    distribution. Exact, with no second-order truncation and no harmonic-weighting
+    choice -- the two things that made D44's metric route unsafe (O4 was still open, and
+    the metric's mean-square mismatch was being applied to a template selected by a
+    sup-norm criterion). Scored with `detection.scoring`'s own boxcar bank, cross-checked
+    against an ideal matched filter.
+  - **D54 — phase averaging is not cosmetic.** Scored at one pulse position the answer
+    carried a discretisation artefact the size of the effect: a Gaussian smeared toward a
+    flat top scores *better* against a boxcar bank than a sharp one, which produced
+    **negative losses**. Averaging over 16 sub-bin positions (the signal's absolute phase
+    is arbitrary and uniform) fixes it, and the boxcar and matched-filter answers then
+    agree to ~30%. Pinned by `test_loss_is_monotone_in_phase_error`.
+  - **D55 — the numbers.** 6 signals x 8 stages, actual offset vectors from the exact
+    search, best of the 30 nearest templates, boxcar (matched in brackets):
+
+    | pulse duty | `aggressive` loss | `quadrature` loss | `quadrature`'s S/N advantage |
+    |---|---|---|---|
+    | 0.05 | 5.34% (8.00%) | 2.26% (4.03%) | +1.56% (+1.38%) |
+    | 0.10 | 1.73% (2.21%) | 0.75% (1.05%) | +0.47% (+0.40%) |
+    | 0.20 | 0.40% (0.57%) | 0.17% (0.27%) | +0.11% (+0.11%) |
+
+    Duty cycle is the dominant uncertainty -- an order of magnitude across the range --
+    and `ducy=0.05` is marginal at `N_b=64` (sigma 0.75 bins), so the 0.10 row is the one
+    to quote.
+  - **D56 — sup-norm badly overestimates the loss.** At `ducy=0.10` the real offsets cost
+    1.73% at a sup-norm of 1.04, where a *linear ramp* of the same sup-norm costs 4.78%.
+    The residual attains its sup only briefly at the window edge, so what smears the
+    profile is the residual's distribution, not its peak. Anyone converting a grid
+    tolerance to an S/N loss via the peak phase error will be pessimistic by ~3x.
+  - **D57 — the practical conclusion of the withdrawn D44 is restored, on a sound basis
+    and with a different number.** The tiling choice is worth **0.1% to 1.6% in S/N**
+    (0.47% at `ducy=0.10`), against `quadrature` costing `2^8.8` ~ 1e5 times more
+    branching and, at equal `P_d`, a recalibrated top threshold of 9.10 against
+    `aggressive`'s 7.70. A half-percent of amplitude cannot pay for either. So
+    `aggressive` remains the right default -- not because the strategies are equivalent
+    (D52 proves they are not) but because the difference is small and the price is not.
+    Note the coincidence: withdrawn D44 said 0.34% and the sound answer at `ducy=0.10` is
+    0.47%. It was roughly right by luck, from wrong inputs and an unsound conversion.
+Caveat that must travel with D55: both losses are **upper bounds**. The template comes
+  from a sup-norm search, not a loss search, so the best-scoring leaf may not be among
+  the 30 supplied. The *difference* is therefore indicative rather than proven; the
+  proven part remains D52's sup-norm gap of >= 2.30x.
+Also worth reporting independently of any tiling question: at `eta=1`, `N_b=64`,
+  `poly_order=4` the shipped default loses ~1.7% of S/N for a 10%-duty pulse and ~5-8%
+  for a 5%-duty one, to grid coarseness alone. Of the 1.7%, about 0.5 points is the
+  tiling choice and ~0.75% is irreducible at this `eta`.
+Open questions: the pruning interaction is still open (this is geometry plus a profile
+  model, and still does not model whether the closer leaf survives thresholding), and
+  the Chebyshev/circular transforms.
+Next session starts at: the human's read of the report, or the injection test.
 ```
