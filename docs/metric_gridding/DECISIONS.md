@@ -1995,10 +1995,14 @@ Done:
     and correctly drags `pi` down. Reversals are absorbed, not violated. D74's *finding*
     stands -- the deterministic term is not sign-definite early -- but it breaks nothing,
     and it is one of the things the paired/McNemar framing was chosen for.
-  - **D77 — the first non-circular check on my survival model, and it passes but with a
-    bias.** Their pilot batch A is external to both models: **3 of 24 recovered at
+  - **D77 — the first non-circular check on my survival model: not contradicted, and
+    biased.** (Wording corrected: an earlier draft said the model "passes" and
+    "survives". At n = 24 that test has very little power, so non-rejection is an
+    *absence of contradiction*, not support, and the stronger word reads as evidence it
+    is not. Flagged by the Injection Campaign session.) Their pilot batch A is external to both models: **3 of 24 recovered at
     S/N 12** on real data, against the ladder's nominal `P_d = 0.1031`. My model gives
-    0.1771 at S/N 12, and `P(X <= 3 | p = 0.1771) = 0.364`, so it is **not rejected**.
+    0.1771 at S/N 12, and `P(X <= 3 | p = 0.1771) = 0.364` -- **not contradicted**, which
+    at n = 24 is nearly all such a test can say.
     But the model reaches the nominal 0.1031 at **S/N 11.00** while the pilot is
     consistent with nominal at S/N 12, so it runs about **1.0 S/N optimistic**. Weak
     (n = 24) but it is the only check on the ladder from outside either model, and it is
@@ -2022,4 +2026,49 @@ Open questions: the campaign's `n` with D75's term in the model (theirs); the co
   stratum boundaries (theirs); whether the ~1 S/N bias is real or small-sample.
 Next session starts at: assaferan's ruling on power-calculation ownership, and their
   strata table.
+
+## 2026-09-17 (aa) — the effect stratum does not exist
+Done:
+  - **D79 — inherited from the Injection Campaign session, unverified by me: the `effect`
+    stratum is empty.** Corrected decision-weighted `pi` over the same 24 positions and
+    stages [2,6,10,14,20,28]:
+
+    | `rho_AB` from | min | q25 | median | q75 | max | pi<0.55 | pi>0.70 |
+    |---|---|---|---|---|---|---|---|
+    | profile (was in use) | 0.440 | 0.595 | 0.645 | 0.704 | 0.741 | 12% | 29% |
+    | corrected | 0.470 | 0.556 | **0.590** | 0.619 | **0.643** | 21% | **0%** |
+
+    Their control: the profile row reproduces the cached per-position values to 5e-5 on
+    all 24 positions, so the shift is the correction and nothing else. Consequences run in
+    opposite directions -- the `pi > 0.70` **effect stratum is unreachable** (corrected
+    max 0.643), collapsing their three-stratum design to two with the primary test on the
+    mid stratum alone; while the **null stratum roughly doubles** in incidence, from ~1
+    position in 8 to ~1 in 5, which makes the design's most important control cheaper to
+    find. The distribution also narrows, which is what a larger common noise term does:
+    it pulls every position toward 1/2.
+  - **D80 — every correction since the campaign was approved has pushed `n` up, and this
+    one continues it.** The primary test now runs where `pi` is ~0.590 rather than the
+    0.628 that gave their 391 pairs, and pairs scale as `(pi - 1/2)^-2`, so this is
+    another factor of ~2 on its own. Chain so far: stage weighting halved the gain where
+    it matters (D70/D71, ~290 -> ~770 on my model), the `rho` correction raised the
+    stochastic term 0.133 -> 0.230 (D75, ~5x the deterministic difference), the ~1 S/N
+    optimism shifts the operating point (D77/D78), and now the effect stratum vanishes.
+    I am deliberately **not** multiplying these into a single `n`: mine omits the
+    stochastic term and theirs includes it, so the factors are not composable, and
+    manufacturing a combined figure is exactly the kind of move that produced D64.
+    The direction is unambiguous and the magnitude is theirs to compute.
+  - D78's S/N 15-17 is compatible with their section 9, which already required the
+    operating point to be fixed by a 3-point pilot **at the final `max_sugg`** rather than
+    carried over (S/N 14 gave 13/20 and 15/20 at 2^18 against 7/20 and 4/20 at 2^14). My
+    1.0 S/N offset is a reason to centre that pilot at **16** rather than 14.
+  - Language corrected throughout per their caution: "not contradicted", never "passes"
+    or "survives", for a non-rejection at n = 24. See the D77 amendment.
+Conventions fixed: a non-rejection from a low-powered test is an absence of contradiction
+  and must be worded as one. Do not compose `n` factors across two models with different
+  terms in them.
+Open questions: the campaign's `n` under the two-stratum design (theirs); whether a
+  second pilot S/N point gets funded, which would test whether my model is shifted or
+  differently shaped.
+Next session starts at: assaferan on ownership, and on whether the campaign is still
+  affordable given D80.
 ```

@@ -52,11 +52,20 @@ rather than by nominal cell coordinate:
 
 - **centre** — at the nearest template. **This is the null stratum: the arms must agree.**
 
-  **The boundaries below are provisional.** The `rho` correction propagates into the
-  per-position `pi` that sets them (corrected values ~0.05 lower per position), which
-  makes the null stratum easier to find and the effect stratum harder. Awaiting the
-  corrected table from the session that owns it; these are not yet the numbers to
-  pre-commit to.
+  **REVISED with the corrected table (inherited, not verified here). The effect stratum
+  does not exist.** Decision-weighted `pi` over 24 positions, corrected against the
+  profile-overlap version that was in use:
+
+  | `rho_AB` from | min | q25 | median | q75 | max | pi<0.55 | pi>0.70 |
+  |---|---|---|---|---|---|---|---|
+  | profile (was in use) | 0.440 | 0.595 | 0.645 | 0.704 | 0.741 | 12% | 29% |
+  | corrected | 0.470 | 0.556 | **0.590** | 0.619 | **0.643** | 21% | **0%** |
+
+  So `pi > 0.70` is unreachable: **three strata collapse to two**, and the primary test
+  runs on the mid stratum alone. The null stratum roughly doubles in incidence (~1 in 5
+  rather than ~1 in 8), which makes the design's most important control cheaper to
+  screen for. Their control for the substitution: the profile row reproduces the cached
+  per-position values to 5e-5 on all 24 positions.
 - **face** — half way to the nearest template.
 - **corner** — at the maximum distance the strategy permits.
 
