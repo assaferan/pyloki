@@ -2215,4 +2215,62 @@ Conventions fixed: when two sessions appear to disagree about a design criterion
   whether they are the same criterion in different variables before either concedes.
 Open questions: unchanged. The operating point now comes from their pilot at the raised
   buffer, under a criterion my own model agrees with.
+
+## 2026-09-17 (ae) — the apparatus cannot answer the idealised question; and my external checks were void
+Done:
+  - **D91 — inherited, and it is decisive: `quadrature` never converges in the buffer.**
+    From the Injection Campaign session, one fixed set of 10 realisations swept over four
+    buffers, growth exponent `d log2(median ncand) / d log2(max_sugg)`:
+
+    | arm | 2^14 | 2^18 | 2^19 | 2^20 | exponent |
+    |---|---|---|---|---|---|
+    | `aggressive` ncand | 1 446 | 16 778 | 16 778 | 16 778 | 0.00 (converged) |
+    | `aggressive` sat | 0.088 | 0.064 | 0.032 | 0.016 | falling |
+    | `quadrature` ncand | 10 906 | 152 007 | 390 575 | 808 116 | ~1.0 throughout |
+    | `quadrature` sat | 0.666 | 0.580 | 0.745 | 0.771 | **rising** |
+
+    `aggressive` converges at 2^18 and is identical to the unit at 2^19 and 2^20.
+    `quadrature` never does: doubling the buffer doubles the count, because the ratchet
+    relaxes the cut to keep the buffer full at any size. So **in the `quadrature` arm the
+    scheme's thresholds have never been the operative cut**, at any buffer tested.
+    Provisional on a 2^21 point they have running.
+  - **D92 — CONSEQUENCE FOR MY OWN RECORD, which they did not claim and I am recording
+    against myself: the external checks in D77 and D85 were void.** Both used recovery
+    measured at **2^14**, where both arms saturate, so what those numbers measured was
+    the ratchet, not the Viterbi ladder that `injection_power.survival` models. Therefore:
+    - **D77's "not contradicted" is withdrawn as a validation.** Batch A's 3/24 at S/N 12
+      was not a check on my survival model; it was a measurement of a different cut. I
+      had called it "the first non-circular check" and "the only external constraint
+      either of us has" -- it is neither, because it does not constrain the thing being
+      modelled. The circularity I worried about (shared ladder) was the lesser problem;
+      the datum was not measuring the ladder at all.
+    - **D85's conclusion is restated.** The measured curve being 2.0x steeper than mine
+      over S/N 12-14 is a real disagreement with the **buffer-limited** search, but
+      "my model is differently shaped" was an unwarranted attribution -- the discrepancy
+      may be entirely the ratchet. What stands is that my model does not describe the
+      search as actually run; what does not stand is any claim about *why*.
+    - **D86 and D89 are unaffected and D89 is strengthened.** Withdrawing D78 was right
+      whatever the cause, and "parameterise the operating point by the observable, not by
+      the quantity you model" is *more* robust in this light: measured `P_d ~ 0.5` does
+      not care whether the operative cut is the ladder or the ratchet.
+  - **D93 — where this leaves my result, stated once and plainly.** Nothing geometric is
+    retracted: the exact search (D50), its brute-force validation, `aggressive` at 1.069
+    exact (D51), the proven `>= 2.30x` / `>= 1.56x` (D52/D60), the stage split (D70) and
+    the amplitude conversion (D55) all stand. What cannot be established at this
+    configuration is whether that geometry **converts into detections**, because the
+    thresholding that would convert it is not the thresholding the search applies in the
+    arm the geometry favours. "Geometry proven, relevance not measurable with this
+    apparatus" is the end state, and the apparatus -- not the geometry -- is what failed.
+  - Their §7.1 split survives and only half dies: the *idealised thresholded search*
+    question is unanswerable here, while "does tiling matter for what a user actually
+    runs?" remains answerable at the shipped default, treating the ratchet as part of the
+    system -- but that is a claim about pyloki-as-shipped, not about tiling, and must be
+    reported as such.
+Open question for assaferan, not for either session: a third path neither of us has
+  costed -- shrink the configuration (fewer segments, smaller `prune_poly_order` or
+  `branch_max`) until `quadrature`'s true candidate count is affordable, and ask the
+  idealised question there. Different external validity, and whether a smaller search is
+  still the search anyone cares about is a judgement call rather than a measurement.
+Next session starts at: assaferan on the shrink-the-configuration option, and on the
+  report, which is unaffected by all of this but should now carry D93's framing.
 ```

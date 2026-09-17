@@ -80,8 +80,16 @@ x 15 stages = 90 cells.
 - **No proven amplitude *difference*.** The two losses in (4) are upper bounds, since the
   template comes from a sup-norm search rather than a loss search. The proven claim is
   the `>= 2.30x` phase gap in (2); the half-percent that follows from it is indicative.
-- **Pruning is not modelled.** These are geometric distances to the nearest leaf. Whether
-  that leaf survives thresholding is a separate question and is open.
+- **Pruning is not modelled, and at this configuration it cannot be.** These are
+  geometric distances to the nearest leaf; whether that leaf survives thresholding is a
+  separate question. An injection campaign to settle it was designed, powered and then
+  blocked: in the `quadrature` arm the candidate buffer never converges (doubling
+  `max_sugg` from 2^18 to 2^20 doubles the candidate count each time, with saturation
+  *rising*), because `prune_on_overload` relaxes the cut to keep the buffer full. So the
+  scheme's thresholds are not the operative cut in that arm at any buffer tested, and the
+  search cannot be run in a regime where the geometry is what decides survival. The
+  geometry below stands; its conversion into detections is untested and, here,
+  untestable. (Measured by another session; the buffer ratchet is theirs to report.)
 - **The circular basis is untested.** Chebyshev is now measured (below); the circular
   transform is not.
 - `conservative`'s 62 unresolved cells are absence of proof, not evidence against it.
