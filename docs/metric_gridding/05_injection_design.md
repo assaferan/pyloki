@@ -333,9 +333,29 @@ moved.
 **What it does and does not change.** `pi` falls from 0.697 to **0.63**, and the pairs
 needed at the measured `p_disc` rise by ~2.4x. The pre-committed `n = 2 000` (§9) still
 covers it — 391 pairs at `p_disc = 0.30` and 1 464 at the pilot's worst 0.08 — so the
-verdict moves from comfortable to **adequate**, not from reachable to unreachable. Only
-ducy 0.10 was recomputed; the 0.05 and 0.20 rows of §5's table are uncorrected and
-should be assumed to move by a similar factor.
+verdict moves from comfortable to **adequate**, not from reachable to unreachable.
+
+**Across duty cycle, and it is not uniform.** Only ducy 0.10 was recomputed in full, but
+the leading-order factor — the `<k²>` ratio that sets the correction in the
+small-smearing limit — is a pure spectral calculation and costs nothing:
+
+| ducy | selected boxcar | `<k²>` boxcar | `<k²>` pulse | ratio |
+|---|---|---|---|---|
+| 0.05 | 3 | 104.2 | 101.6 | **1.03** |
+| 0.10 | 3 | 104.2 | 25.4 | 4.10 |
+| 0.20 | 9 | 37.4 | 7.0 | **5.35** |
+
+**At ducy 0.05 the substitution is very nearly right, and for a comprehensible reason:**
+a 5% pulse in 64 bins occupies ~3.2 bins, which is the width the bank selects, so the
+filter *is* the pulse and the two weightings coincide. That is the one regime where the
+original code was doing the right thing. At ducy 0.20 the correction is larger than at
+0.10. So §5's table moves hardly at all in its top row and more than measured here in
+its bottom one — the opposite of assuming "a similar factor" throughout.
+
+These are leading-order indicators, not corrections: the measured inflation at ducy 0.10
+was 2.95x against the 4.10 this predicts, because the linearisation overstates it once
+the smearing is large and the bank can re-optimise. The 0.05 and 0.20 rows of §5's table
+remain formally uncorrected.
 
 ### 5.1 Stratification: measured, and it does not stratify
 
