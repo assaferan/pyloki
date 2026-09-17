@@ -1983,4 +1983,43 @@ Next session starts at: assaferan's decision on who owns the power calculation. 
   Injection Campaign session declines to take it on a peer's say-so, correctly, and its
   `injection_power.py:power()` + `rho_check.py:propagate()` already implement the
   aggregation my model lacks. One owner beats two half-models.
+
+## 2026-09-17 (z) — the model checked against outside data, and it runs ~1 S/N optimistic
+Done:
+  - **D76 — my sign worry (D74) was unfounded as a criticism of their model.** Checked by
+    the Injection Campaign session against the code rather than memory:
+    `injection_power.power()` forms `delta = mu (l_a - l_b)` with whatever sign it has and
+    puts it through signed folded-normal moments
+    (`E[D+] = sd phi(d) + mean Phi(d)`, `E[|D|] = 2 sd phi(d) + mean(2 Phi(d) - 1)`), so a
+    stage where `quadrature` is worse contributes a small `E[D+]` against a full `E[|D|]`
+    and correctly drags `pi` down. Reversals are absorbed, not violated. D74's *finding*
+    stands -- the deterministic term is not sign-definite early -- but it breaks nothing,
+    and it is one of the things the paired/McNemar framing was chosen for.
+  - **D77 — the first non-circular check on my survival model, and it passes but with a
+    bias.** Their pilot batch A is external to both models: **3 of 24 recovered at
+    S/N 12** on real data, against the ladder's nominal `P_d = 0.1031`. My model gives
+    0.1771 at S/N 12, and `P(X <= 3 | p = 0.1771) = 0.364`, so it is **not rejected**.
+    But the model reaches the nominal 0.1031 at **S/N 11.00** while the pilot is
+    consistent with nominal at S/N 12, so it runs about **1.0 S/N optimistic**. Weak
+    (n = 24) but it is the only check on the ladder from outside either model, and it is
+    the one thing that is not circular in the way D70's amendment describes.
+  - **D78 — consequence for the design: inject at S/N 15-17, not 14.** The model's
+    discordance peak is flat over S/N 14-16 (0.50-0.53%, 723-772 pairs); shifted by the
+    ~1 S/N bias that becomes **S/N 15-17**. Injecting at the model's nominal peak would
+    sit below the real one, where the ladder is cleared less often than the model
+    believes and the effect is smaller.
+  - Also inherited, and marked as theirs: the `rho` correction propagates into
+    `injection_power.strata()`, which builds per-position `pi` from the same substitution,
+    so **the stratification boundaries move too** -- corrected `pi` ~0.05 lower per
+    position, making the null stratum easier to find and the effect stratum harder. That
+    is a change to my design doc's section 5, not just to a number, and I am waiting for
+    their table rather than guessing at it.
+Conventions fixed: the ladder is the shared dependency between my survival model and
+  their `pi` profile, so any check that also assumes it cannot test it. Pilot batch A is
+  currently the only external constraint; prefer it over internal agreement when they
+  disagree.
+Open questions: the campaign's `n` with D75's term in the model (theirs); the corrected
+  stratum boundaries (theirs); whether the ~1 S/N bias is real or small-sample.
+Next session starts at: assaferan's ruling on power-calculation ownership, and their
+  strata table.
 ```

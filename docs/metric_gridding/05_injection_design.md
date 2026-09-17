@@ -51,6 +51,12 @@ Inject at controlled positions relative to the leaf lattice, using
 rather than by nominal cell coordinate:
 
 - **centre** — at the nearest template. **This is the null stratum: the arms must agree.**
+
+  **The boundaries below are provisional.** The `rho` correction propagates into the
+  per-position `pi` that sets them (corrected values ~0.05 lower per position), which
+  makes the null stratum easier to find and the effect stratum harder. Awaiting the
+  corrected table from the session that owns it; these are not yet the numbers to
+  pre-commit to.
 - **face** — half way to the nearest template.
 - **corner** — at the maximum distance the strategy permits.
 
@@ -110,7 +116,12 @@ detection is actually decided, and `aggressive`'s own loss there is 1.03% rather
 | **14** | **+0.50 pt** | **0.50%** | **772** |
 | 16 | +0.53 pt | 0.53% | 723 |
 
-So **~770 pairs for Arm B**, not 290, at S/N 14-16. Arm A (Chebyshev) is weaker again —
+So **~770 pairs for Arm B**, not 290 — and at **S/N 15-17, not 14-16**. The model has
+now been checked against the only data external to it, a pilot batch recovering 3 of 24
+at S/N 12 against the ladder's nominal `P_d = 0.1031`: it is not rejected
+(`P(X <= 3 | 0.1771) = 0.36`) but it reaches nominal at S/N 11.00 where the pilot is
+consistent with nominal at 12, so it runs about **1 S/N optimistic** and the discordance
+peak should be shifted up by that much. Arm A (Chebyshev) is weaker again —
 its early gain is 1.15x against Taylor's 1.71x — so it needs materially more than that,
 and the figure should be recomputed on the Chebyshev ladder before committing.
 
