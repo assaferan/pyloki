@@ -1,28 +1,68 @@
 # 04_upstream_report.md — draft report for pravirkr/pyloki
 
-Status: **NOT PUBLISHABLE. Do not post any part of this.** Both load-bearing claims
-below were withdrawn in session (r), 2026-09-16:
+Status: **draft, unposted, and awaiting human review.** Rewritten again on 2026-09-17
+after session (s) replaced the withdrawn measurement with an exact one. History matters
+here: an earlier version of this file claimed `tiling_strategy` buys no sensitivity
+(refuted), then that `eta` is optimistic by 7.5x (retracted — that figure is a distance
+to the containing cell's centre, not a covering radius). What follows is only what a
+validated method now supports.
 
-- the **headline** reading of D46 ("`eta` is optimistic by 7.5x") is retracted by D48.
-  The 7.5x is the distance to the *containing cell's* centre; a search enumerates every
-  grid point, so the operative quantity is the covering radius, measured at 0.58 to a
-  neighbouring centre and 0.50 over a wider lattice. The grid covers at O(1). The
-  closed form itself is exact and survives — only what it *measures* was misread.
-- the **nearest-template table** (D43) is retracted by D47. The tracked-leaf cap binds
-  in 37-61 of 63 stages for `quadrature`/`conservative`, and the reported minimum is
-  not monotone in the search width, which a true minimum cannot be. `aggressive`'s
-  entry survives, converged and cap-free, but at **~1.09**, not the 1.89 below.
+## What the exact search establishes
 
-Consequently D44 (0.34% in S/N) and D45's sensitivity half are withdrawn too, the
-pruning interaction is **re-opened**, and D39's conclusion is undetermined rather than
-refuted. What is left that would survive review: the closed form as arithmetic (D46
-with the `t = t_s` hypothesis), the covering radius O(1) reading (D48), and
-`aggressive`'s ~1.09 (D49). That is a different and much shorter report, and it needs a
-cap-free nearest-template method before the strategy comparison can go in at all.
+`nearest_template.py` computes the true minimum phase error to *any* leaf in the tree.
+It rests on a structural fact — `branch_param_padded` derives a child's offset from
+`(dparam_cur, dparam_new)` alone, which every leaf at a stage shares, so child offsets
+are parent-independent and the leaf set is *exactly* a Minkowski sum of small per-stage
+offset sets. 1e34 leaves live in a few hundred points per stage, and branch and bound
+over that sum, with an admissible bound, never discards the optimum. It agrees with
+brute-force enumeration to 1e-12 on every case small enough to enumerate, across all
+three strategies, and its minimum is monotone in the search width.
 
-The text below is kept verbatim as the withdrawn draft, for the record only.
+Config: 268.4 s / 64 segments / `poly_order=4` / `N_b=64` / `eta=1`, 6 signal positions
+x 15 stages = 90 cells.
+
+1. **`aggressive`'s nearest template sits at 1.069 `eta/N_b`** (median; range 0.240 to
+   2.115), exact in all 90 cells. So under the shipped default the closest template to a
+   signal is a little over one tolerance away.
+
+2. **`tiling_strategy` does affect sensitivity in the Taylor basis.** Seeding the
+   incumbent with `aggressive`'s exact value makes the comparison a decision problem:
+
+   | vs `aggressive` | strictly closer (proved) | not closer (proved) | unresolved |
+   |---|---|---|---|
+   | `quadrature` | **89** | 1 | 0 |
+   | `conservative` | 28 | 0 | 62 |
+
+   Median proven gain where closer: **>= 2.30x** for `quadrature` (a lower bound, since
+   it comes from upper bounds on the other side). The mechanism is redundancy: the box
+   strategies over-claim under transport, sibling cells overlap, and the signal is
+   covered many times, so the template that scores is the nearest rather than the one
+   whose cell contains it.
+
+3. **The corner figure is not a covering radius.** The corner of the optimal grid costs
+   exactly `(2^(k_max-1) - 1/2) * eta/N_b` — verified for orders 2-8, independent of
+   `t_s` and `f_max` provided the corner is evaluated at the span that enters the step
+   formula. That is 7.5x at `poly_order=4`. But it measures the distance to the
+   *containing cell's* centre, and a search enumerates every grid point: minimising over
+   neighbouring centres gives ~0.5. The `2^(k-1)` coarsening is economization working,
+   not a defect, and `eta` is not optimistic by 7.5x.
+
+## What this does NOT establish
+
+- **No amplitude number.** The >= 2.30x is phase geometry. An earlier draft converted a
+  (since withdrawn) phase gain into 0.34% in S/N; that conversion is withdrawn and has
+  not been redone. Nothing here says whether the difference matters in practice.
+- **Pruning is not modelled.** These are geometric distances to the nearest leaf. Whether
+  that leaf survives thresholding is a separate question and is open.
+- **Taylor basis only.** The Chebyshev and circular transforms are not unit-diagonal
+  triangular and none of this transfers.
+- `conservative`'s 62 unresolved cells are absence of proof, not evidence against it.
+
+Reproducers on https://github.com/assaferan/pyloki/tree/metric-gridding :
+`docs/metric_gridding/nearest_template.py` with `tests/test_nearest_template.py`.
 
 ---
+
 
 
 **Title:** Taylor grid: the cell corner costs `(2^(k_max-1) - 1/2) * eta/N_b`, so `eta` is not the phase bound it looks like
