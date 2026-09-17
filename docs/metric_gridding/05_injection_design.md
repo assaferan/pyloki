@@ -35,6 +35,16 @@ shown to do so symmetrically between the arms.**
   0.55**, and 1.6 × 10⁴ in the pessimistic corner `pi` = 0.52 (all at `p_disc` = 0.30;
   scale inversely for smaller). The pre-committed design is **n = 2 000 pairs**.
 
+- **`pi` is 0.63, not 0.70 — `rho_AB` was the wrong quantity (§5.2, new).** The code set
+  `rho_AB` to the *profile* overlap `snr_ratio(delta_A − delta_B)`; M4 needs the *score*
+  correlation. They are the same smearing factor `S(k)` weighted by the pulse's spectrum
+  and the filter's respectively, and the bank's selected boxcar has 4.10x the pulse's
+  `<k²>`. Median `1 − rho` at ducy 0.10 is **0.0265, not 0.0088**; `pi` falls 0.697 →
+  **0.628** and the pairs needed at `p_disc` = 0.30 rise **161 → 391** (1 464 at the
+  pilot's worst `p_disc` = 0.08). **`n = 2 000` still covers it**, so this makes the
+  design adequate rather than comfortable. It was §10's row 3 and is now measured; row 1
+  is still the one to worry about.
+
 - **Cost, measured.** At `max_sugg = 2^18` (the library default) a pair costs **49.8 s**
   — `aggressive` 2.3 s, `quadrature` 47.5 s — so 2 000 pairs is **28 core-hours** and
   the pessimistic corner ~230. At `max_sugg = 2^14` it is 3.8–5.1 s/pair, but §6.3 says
@@ -268,6 +278,58 @@ two-sided α = 0.05.
    `√L` rather than `L`: a factor of 15 in the losses between ducy 0.05 and 0.20 becomes
    a factor of 1.3 in `pi` (0.787 → 0.607) and a factor of 32 in `n` (31 → 997). All
    three remain affordable at 50 s/pair: 0.4 to 14 core-hours.
+
+### 5.2 `rho_AB` corrected: it was the profile overlap, not the score correlation
+
+§10 row 3 and §11.4 both flagged this as unchecked and as the thing `pi` depends on most.
+It is now checked (`rho_check.py`), and it was wrong, in the direction that costs pairs.
+
+`injection_power.py` computes `rho_AB = snr_ratio(delta_A − delta_B, filt="matched")`,
+which is `<p, p∗s>/<p, p>` — the overlap of two **signals**. M4 needs the correlation of
+two **scores** under noise. Writing the score as a linear filter `h` on the folded
+profile, and using that folding on two ephemerides assigns the same samples to bins
+differing by `dPhi(t)`, both quantities are the *same* smearing factor `S(k)` under a
+different weight:
+
+    rho_score = Σ_k |H(k)|² S(k) / Σ_k |H(k)|²          the score correlation
+    rho_prof  = Σ_k |P(k)|² S(k) / Σ_k |P(k)|²          what is in the code
+
+They agree only if the filter **is** the pulse. It is not: at ducy 0.10 with `N_b = 64`
+the bank selects a boxcar of **width 3**, whose `<k²>` is **4.10x** the pulse's, so it
+weights exactly the high `k` where `S(k)` is small. The direction — `rho` overstated,
+`pi` overstated, `n` understated — was predicted from the two spectra before anything
+was simulated.
+
+Measured over the same 83 exact cells the power calculation uses, at ducy 0.10:
+
+| `rho_AB` from | median `1 − rho` | vs. profile | `pi` | `n` at `p_disc` = 0.30 | at 0.08 |
+|---|---|---|---|---|---|
+| profile overlap (in use) | 0.0088 | — | 0.697 | 161 | 603 |
+| **with a signal present** | **0.0265** | **2.95x** | **0.628** | **391** | **1 464** |
+| fixed selected boxcar | 0.0375 | 4.23x | 0.611 | 527 | 1 976 |
+| max over bank, pure H0 | 0.176 | 19.3x | 0.560 | 1 805 | 6 768 |
+
+**Use the signal-present row.** With a signal the two arms' bank maxima are anchored to
+the same filter, which is the campaign's situation; the closed-form fixed-boxcar row
+brackets it from below and agrees with it to within the re-optimisation the bank is free
+to do. The pure-H0 row is only a **lower bound** on the correlation — with no signal the
+two maxima land wherever they like — and it drives the model's `p_disc` to 1.0, which is
+M5 breaking down, not a result. It is quoted to show where the bound is, not as a
+candidate value.
+
+*Controls.* The sampler draws the two folded profiles from their exact joint law in
+Fourier rather than Monte-Carloing the time series, and is checked against the closed
+form on a one-width bank before anything else runs. Substituting the *uncorrected*
+values back through the same path reproduces the cached `pi = 0.69684` and
+`p_disc = 0.36994` on all 83 cells exactly, so the correction is the only thing that
+moved.
+
+**What it does and does not change.** `pi` falls from 0.697 to **0.63**, and the pairs
+needed at the measured `p_disc` rise by ~2.4x. The pre-committed `n = 2 000` (§9) still
+covers it — 391 pairs at `p_disc = 0.30` and 1 464 at the pilot's worst 0.08 — so the
+verdict moves from comfortable to **adequate**, not from reachable to unreachable. Only
+ducy 0.10 was recomputed; the 0.05 and 0.20 rows of §5's table are uncorrected and
+should be assumed to move by a similar factor.
 
 ### 5.1 Stratification: measured, and it does not stratify
 
@@ -538,9 +600,9 @@ interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggr
 
 | # | assumption | if wrong, `n` moves by | note |
 |---|---|---|---|
-| 1 | **`pi ≈ 0.70`** (§5), i.e. `mu·(L_A−L_B) / √(2(1−rho_AB)) ≈ 0.4` | **up to 10⁵x** — `n ∝ (pi−½)^-2`, and `pi → ½` makes it unbounded | **the one to worry about.** Everything else is second order. |
+| 1 | **`pi ≈ 0.63`** (§5.2; was 0.70), i.e. `mu·(L_A−L_B) / √(2(1−rho_AB))` | **up to 10⁵x** — `n ∝ (pi−½)^-2`, and `pi → ½` makes it unbounded | **still the one to worry about**, and now closer to ½ than it was: row 3 moved it once already. |
 | 2 | `L_A` and `L_B` are the losses of the leaf that actually scores | factor of a few, **sign not guaranteed** | Both are *upper* bounds (M3, D52 convention): the search minimises sup-norm, not loss, over 30 retained leaves. If `aggressive`'s true best leaf is better than retained, `pi → ½`; if `quadrature`'s is, `pi` rises. The two are not symmetric and the difference is not proven. |
-| 3 | `rho_AB` from the between-template phase residual is the score correlation | factor ~3 in `(pi−½)`, so ~10x in `n` | The smearing model is exact for the *profile* overlap (D53); treating it as the *score* correlation assumes the boxcar filter preserves it. Not checked. |
+| 3 | ~~`rho_AB` from the between-template phase residual is the score correlation~~ **MEASURED, and it was wrong** | **2.4x in `n`, already applied** | §5.2. It is the *profile* overlap; the boxcar bank does not preserve it (`<k²>` ratio 4.10). Median `1−rho` 0.0088 → 0.0265, `pi` 0.697 → 0.628. No longer an assumption at ducy 0.10; still one at 0.05 and 0.20. |
 | 4 | M6 — survival is decided by one covering leaf, not a max over many | raises `pi`, lowers `n` | Deliberately conservative for the stated question. It is also the channel any arm-dependent `max_sugg` bias would ride on (§6.4). |
 | 5 | M2 — `mu(s) = snr_final·√((s+1)/nseg)` | ~20% in `pi` | Same model the shipped ladder uses, so an error here is an error in the ladder too. |
 | 6 | M5 — single crossing, `p_disc = 0.37` | **linear in `n`, and already measured to be ~2–4x high** | Pilot says 0.08–0.30 over five batches. Does not change the verdict (§5). |
@@ -556,6 +618,12 @@ interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggr
   re-derives the tables from `injection_power.json`.
 - `injection_pilot.py` — pairing check, per-pair cost, and `p_disc`.
   `--make` / `--arm` / `--report`, with `--max-sugg`.
+- `rho_check.py` — §5.2. Measures the score correlation against the profile overlap on
+  the same cells and pushes the corrected value back through `power`/`mcnemar_n`.
+  Self-checks the sampler against a closed form first. `rho_check.json` holds every cell.
+- `paired_max_sugg.py` — §11.6. The four-cell paired buffer experiment, with the
+  analysis pre-committed in `plan()` and written to the run directory before the first
+  cell runs. `--plan` / `--make` / `--run` / `--analyse`.
 - `injection_pilot_results.json` — every pilot run behind §6.3, per run, including the
   `saturation` column.
 - `schemes/cheby_aggressive.npz`, `schemes/cheby_quadrature.npz` — the recalibrated
@@ -667,10 +735,13 @@ templates, and measured it is **three times the deterministic term** (0.133 vs 0
 ducy 0.10). That ratio is what sets `pi`, and `n ∝ (pi − ½)^-2`, so it is the single
 assumption the whole answer turns on. Two specific weaknesses:
 
-1. `rho_AB` is computed by feeding `delta_A − delta_B` to `snr_ratio`, which gives the
-   *profile* overlap. Treating that as the *score* correlation assumes the boxcar bank
-   preserves it. **Not checked.** It is checkable cheaply by direct simulation: fold
-   white noise on both ephemerides and correlate the scores.
+1. ~~`rho_AB` is computed by feeding `delta_A − delta_B` to `snr_ratio`, which gives the
+   *profile* overlap.~~ **CHECKED, and it does not hold — see §5.2.** The boxcar bank
+   does not preserve the profile overlap: both quantities are the same `S(k)` weighted
+   by `|P(k)|²` and `|H(k)|²` respectively, and the selected boxcar's `<k²>` is 4.10x
+   the pulse's. Median `1 − rho` at ducy 0.10 is **0.0265, not 0.0088**, and `pi` falls
+   from 0.697 to **0.628**, raising the pairs needed at `p_disc = 0.30` from 161 to 391.
+   `n = 2 000` still covers it. `rho_check.py`.
 2. `L_A` and `L_B` are both **upper** bounds (the search minimises sup-norm over 30
    retained leaves, not loss), and the bounds are not symmetric, so their *difference* is
    not sign-proven. This is D52's caveat, inherited.
