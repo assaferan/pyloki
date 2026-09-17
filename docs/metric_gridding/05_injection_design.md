@@ -1028,12 +1028,32 @@ and it is a point under the weighting now known to be backwards. Under the *meas
 profile the aggregate gives **368 total pairs**, and the expensive 2 842 corner is
 excluded outright, because it assumed the early decision the measurement rules out.
 
-Two cautions against promoting 368 in 954's place. It rests on an inherited N = 40
-measurement from one arm at one parameter set. And it is the *aggregate* `pi`; the
-operative figure is the mid-stratum one, which cannot be recomputed without also moving
-`DECISION_STAGES` into the measured window (§4.3 ⚑) and re-running the stratification.
-What can be said without either: **`n` sits at the cheap end of the range, not the
-expensive one.**
+Three cautions against promoting 368 in 954's place, the third measured after the fact.
+
+1. It rests on an inherited measurement from one arm; hardened since (two injections,
+   N = 30 each, plus the original N = 40) but still `aggressive`-only.
+2. It is the *aggregate* `pi`. The operative figure is the mid-stratum one, which cannot
+   be recomputed without also moving `DECISION_STAGES` into the measured window (§4.3 ⚑)
+   and re-running the stratification.
+3. **It is not stable against the profile's own revision.** Re-deriving the profile under
+   an independent criterion (metric mismatch `m ≤ 1.0` rather than a calibrated
+   excursion) moved the median loss level from 27 to **15** — inside the range the
+   interpolation smooths over. Recomputing `pi` across profiles consistent with that
+   revision:
+
+   | reach profile | `pi` | total pairs |
+   |---|---|---|
+   | excursion criterion, median loss 27 (gives 368) | 0.648 | **368** |
+   | metric criterion, gentle, median 15 | 0.633 | 458 |
+   | metric criterion, as reported | 0.624 | 533 |
+   | metric criterion, steep | 0.609 | **691** |
+
+   **So `n` is 368–691, not 368** — a factor of 1.9 that turns entirely on where the
+   survival curve falls, which the two criteria do not agree on.
+
+What survives all three cautions, and is the only thing that should be quoted: **the
+early-decision corner (2 842 pairs) is excluded, and `n` is in the high hundreds rather
+than the low thousands.** The precise value is not established.
 
 **The campaign remains affordable — 13 to 50 core-hours — but `n = 2 000` no longer
 covers the whole measured `p_disc` range.** It covers `p_disc` ≥ **0.145**. Two honest
