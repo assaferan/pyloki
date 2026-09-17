@@ -893,6 +893,32 @@ so the pair count has to be inflated by 1/0.79.
 | 0.10 | 2 263 | 2 859 | 39.7 |
 | 0.08 (pilot's worst, batch A at S/N 12) | 2 828 | 3 572 | 49.6 |
 
+**And the stage weighting behind all of these is itself an unvalidated model.** `power()`
+weights each stage by `reach(s)` = the ladder's own cumulative H1 survival `succ_h1`.
+That is a modelled quantity from the same single-leaf Gaussian family that the
+`metric-gridding` session has now measured to be badly wrong in the other direction (its
+survival model predicts `P_d` = 0.368 at S/N 14 where §6.5 measures **0.760** in the
+converged `aggressive` arm, a 4.5-S/N error). Re-running the aggregation under different
+stage weightings, changing nothing else:
+
+| stage weighting | `pi` | pairs at `p_disc` = 0.30 | total (÷0.79) |
+|---|---|---|---|
+| ladder `succ_h1` (what §5.2 and the table above use) | 0.628 | 391 | **954** |
+| flat — every stage weighted equally | 0.654 | 268 | 339 |
+| `sqrt(succ_h1)` — decay halved in log | 0.642 | 319 | 404 |
+| late stages only (> 10) | 0.680 | 194 | 246 |
+| **early stages only (≤ 10)** | **0.554** | 2 245 | **2 842** |
+
+**So `n` spans roughly 340 to 2 840 — a factor of 8 — on an assumption that has never
+been checked, which is larger than the `rho` correction of §5.2.** The direction the
+falsification implies is the *favourable* one: if the real search survives far better
+than modelled, the weights should decay less steeply than `succ_h1`, which moves `pi`
+up and `n` down toward 340. But §4.3's claim that the decision is made early, where
+`pi` is only 0.554, is the pessimistic corner and rests on the same modelled profile.
+Both cannot be read off a model that is wrong by 4.5 S/N.
+
+**`n = 954` should therefore be quoted as a point in that range, not as the answer.**
+
 **The campaign remains affordable — 13 to 50 core-hours — but `n = 2 000` no longer
 covers the whole measured `p_disc` range.** It covers `p_disc` ≥ **0.145**. Two honest
 readings, and they differ:
@@ -930,6 +956,7 @@ interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggr
 | 5 | M2 — `mu(s) = snr_final·√((s+1)/nseg)` | ~20% in `pi` | Same model the shipped ladder uses, so an error here is an error in the ladder too. |
 | 6 | M5 — single crossing, `p_disc = 0.37` | **linear in `n`, and already measured to be ~2–4x high** | Pilot says 0.08–0.30 over five batches. Does not change the verdict (§5). |
 | 7 | duty cycle 0.10 | **more than** factor 32 in `n` across 0.05–0.20 | Dominant uncertainty in the *amplitude* numbers (D55), and `pi` only goes as `√L`. But §5.2 shows the `rho` correction is itself ducy-dependent and **compounds in the same direction**: at larger ducy the losses are smaller *and* the correction is larger (`<k²>` ratio 1.03 → 5.35 across 0.05 → 0.20), both pushing `pi` toward ½. So the factor 32 is now a **lower bound**, not an estimate. Not recomputed at 0.05 or 0.20. |
+| 8b | **`reach(s)` = the ladder's `succ_h1` is the right stage weighting** | **factor 8 in `n`** (340 to 2 840) | **NEW, and unchecked.** The weight on each stage is a modelled survival curve of the same single-leaf Gaussian family that is measured wrong by 4.5 S/N elsewhere (§9). It is now the largest unvalidated lever in the calculation — bigger than row 3 was. Testing it needs the real per-stage survival profile, which nothing on this branch measures. |
 | 8 | the Viterbi ladders are a fair equal-`P_d` comparison | would void the result | ~~Checked against real data: 3/24 in both arms at S/N 12 (§6.3). The one assumption that has been independently verified.~~ **WITHDRAWN as a verification (§6.6).** Batch A ran at `max_sugg` = 2^14, where **both** arms were saturating, so the realised cut in each was the ratchet and not the ladder. The 3/24 agreement is real but cannot be credited to the ladders, and in the `quadrature` arm the ladder has never been the operative cut at any buffer tried. This assumption is **unverified**, not verified, and no longer the exception in this table. |
 
 ---
