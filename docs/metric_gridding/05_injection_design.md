@@ -217,6 +217,14 @@ The template-to-template noise difference is 3x the amplitude difference. That i
 `pi` comes out near 0.6–0.7 rather than near 1, and it is why pairing on the noise
 realisation buys much less than it looks like it should.
 
+> **The `1 − rho_AB` and `sigma` columns above are the uncorrected ones (§5.2).** At
+> ducy 0.10 the score correlation gives `1 − rho_AB` = **0.0265**, so `sigma` is
+> **0.230**, not 0.133, and the ratio to the deterministic term is **~5x, not 3x**. The
+> ducy 0.05 row barely moves (`<k²>` ratio 1.03) and 0.20 moves more than 0.10 did; only
+> 0.10 has been recomputed in full. The qualitative point — that the template-to-template
+> noise dominates and pairing buys less than it looks like — is unchanged and
+> strengthened.
+
 ### 4.2 Thresholds, recalibrated per strategy on the Chebyshev pattern
 
 The cached schemes under `schemes/` are Taylor (`kind="poly_taylor_moving"`) and contain
@@ -1190,7 +1198,7 @@ ephemeris averages the same samples so the noise level is unchanged.
 **The part a successor should attack is not M3, it is M4.** `D(s) = score_B − score_A`
 has a stochastic term of sd `√(2(1−rho_AB))` from the two arms scoring *different*
 templates, and measured it is **three times the deterministic term** (0.133 vs 0.044 at
-ducy 0.10). That ratio is what sets `pi`, and `n ∝ (pi − ½)^-2`, so it is the single
+ducy 0.10) — **corrected in §5.2 to 0.230 vs 0.044, i.e. ~5x**. That ratio is what sets `pi`, and `n ∝ (pi − ½)^-2`, so it is the single
 assumption the whole answer turns on. Two specific weaknesses:
 
 1. ~~`rho_AB` is computed by feeding `delta_A − delta_B` to `snr_ratio`, which gives the
