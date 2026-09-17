@@ -904,7 +904,7 @@ interest: `pi = 0.60`, i.e. 3 discordances for `quadrature` to every 2 for `aggr
 | 5 | M2 — `mu(s) = snr_final·√((s+1)/nseg)` | ~20% in `pi` | Same model the shipped ladder uses, so an error here is an error in the ladder too. |
 | 6 | M5 — single crossing, `p_disc = 0.37` | **linear in `n`, and already measured to be ~2–4x high** | Pilot says 0.08–0.30 over five batches. Does not change the verdict (§5). |
 | 7 | duty cycle 0.10 | **more than** factor 32 in `n` across 0.05–0.20 | Dominant uncertainty in the *amplitude* numbers (D55), and `pi` only goes as `√L`. But §5.2 shows the `rho` correction is itself ducy-dependent and **compounds in the same direction**: at larger ducy the losses are smaller *and* the correction is larger (`<k²>` ratio 1.03 → 5.35 across 0.05 → 0.20), both pushing `pi` toward ½. So the factor 32 is now a **lower bound**, not an estimate. Not recomputed at 0.05 or 0.20. |
-| 8 | the Viterbi ladders are a fair equal-`P_d` comparison | would void the result | Checked against real data: 3/24 in both arms at S/N 12 (§6.3). The one assumption that has been independently verified. |
+| 8 | the Viterbi ladders are a fair equal-`P_d` comparison | would void the result | ~~Checked against real data: 3/24 in both arms at S/N 12 (§6.3). The one assumption that has been independently verified.~~ **WITHDRAWN as a verification (§6.6).** Batch A ran at `max_sugg` = 2^14, where **both** arms were saturating, so the realised cut in each was the ratchet and not the ladder. The 3/24 agreement is real but cannot be credited to the ladders, and in the `quadrature` arm the ladder has never been the operative cut at any buffer tried. This assumption is **unverified**, not verified, and no longer the exception in this table. |
 
 ---
 
