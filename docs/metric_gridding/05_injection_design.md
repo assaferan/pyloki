@@ -40,10 +40,12 @@ realisations swept across four buffers:
 
 | arm | 2^18 | 2^19 | 2^20 | 2^21 | saturation at 2^21 |
 |---|---|---|---|---|---|
-| `aggressive` | 16 778 | 16 778 | 16 778 | **16 778** | 0.008 |
+| `aggressive` | 16 778.5 | **16 778.5** | **16 778.5** | **16 778.5** | 0.008 |
 | `quadrature` | 152 007 | 390 575 | 808 116 | **1 610 052** | 0.768 |
 
-`aggressive` returns an identical count at all four and is done. `quadrature`'s count
+`aggressive` is done by 2^19 — its **per-realisation** counts are bit-identical across
+2^19–2^21, so the buffer is provably irrelevant there, not merely indistinguishable.
+(The 2^18 median coincides but one realisation is still clipped; see §6.6.) `quadrature`'s count
 grows by a factor of **10.6** over a factor of 8 in buffer — span exponents 1.135, 1.022,
 0.994 — with saturation pinned near 0.77. The overflow ratchet relaxes the cut to keep
 the buffer full at whatever size it is given, so there is no escape by spending more.
@@ -736,10 +738,10 @@ same data):
 | arm | `max_sugg` | median `ncand` | median saturation | growth exponent |
 |---|---|---|---|---|
 | `aggressive` | 2^14 | 1 446 | 0.088 | — |
-| `aggressive` | 2^18 | **16 778** | 0.064 | 0.88 |
-| `aggressive` | 2^19 | **16 778** | 0.032 | **0.00** |
-| `aggressive` | 2^20 | **16 778** | 0.016 | **0.00** |
-| `aggressive` | 2^21 | **16 778** | 0.008 | **0.00** |
+| `aggressive` | 2^18 | 16 778.5 | 0.064 | 0.88 |
+| `aggressive` | 2^19 | **16 778.5** | 0.032 | **0.00** |
+| `aggressive` | 2^20 | **16 778.5** | 0.016 | **0.00** |
+| `aggressive` | 2^21 | **16 778.5** | 0.008 | **0.00** |
 | `quadrature` | 2^14 | 10 906 | 0.666 | — |
 | `quadrature` | 2^18 | 152 007 | 0.580 | 0.95 |
 | `quadrature` | 2^19 | 390 575 | 0.745 | 1.36 |
@@ -750,16 +752,20 @@ same data):
 buffer. Zero means the candidate set has converged and the buffer is irrelevant; one
 means the buffer is the only thing setting the answer.
 
-**`aggressive` converges and stays converged — 16 778 candidates at 2^18, 2^19 and
-2^20, identical to the unit.** That is what a non-binding buffer looks like.
+**`aggressive` converges at 2^19 and stays converged.** The claim is stronger than the
+medians: the **per-realisation** candidate counts are *bit-identical* across 2^19, 2^20
+and 2^21 — all ten of them, [9, 44, 628, 1482, 14 921, 18 636, 32 949, 33 184, 54 011,
+198 037] — so the buffer is provably irrelevant over a factor of 4, not merely
+statistically indistinguishable. Median 16 778.5, saturation falling 0.032 → 0.016 →
+0.008. That is what a non-binding buffer looks like.
 
-*With one caveat that the subset hides.* These 10 realisations are converged at 2^18,
-but over all 50 of §6.5's, **one** (`tim_0045`) still saturates at 2^18 — p99 = 0.915,
-which fails §7.1's < 0.9 — and it is not among the 10 swept here. So `aggressive` is
-converged for 49/50 at 2^18 and the sweep happens to have missed the exception; the
-buffer at which it clears the criterion on the full set is 2^19, not 2^18. This does not
-affect the conclusion below, which turns entirely on `quadrature`, but the sweep on its
-own would have put `aggressive`'s clearing point one buffer too low.
+*It is 2^19, not 2^18, and the median hides why.* The medians coincide at 2^18, but the
+per-realisation counts do not: `tim_0004` returns 192 661 at 2^18 (saturation 0.735) and
+198 037 at every larger buffer — still clipped at 2^18. Over all 50 of §6.5's
+realisations one more (`tim_0045`) exceeds 0.9 saturation at 2^18, giving p99 = 0.915,
+which fails §7's criterion. **So `aggressive`'s clearing point is 2^19**, and a
+median-only reading of this table would have put it one buffer too low. This does not
+affect the conclusion below, which turns entirely on `quadrature`.
 
 **`quadrature` never converges.** Its exponent is 0.95, 1.36, 1.05 across three
 successive increases, and its median saturation does not fall — it *rises*, 0.580 →
@@ -849,6 +855,9 @@ exponents 1.022 and 0.994. **No longer provisional.**
 ---
 
 ## 7. What has to change before this is worth running — **superseded by §6.6**
+
+*(References elsewhere of the form "§7.1" mean item 1 of the numbered list below; §7 has
+no numbered subsections.)*
 
 > **§6.6 supersedes item 1 below: the ratchet cannot be eliminated for `quadrature`.**
 > Item 1 was written assuming a large enough buffer exists. It does not, in this
