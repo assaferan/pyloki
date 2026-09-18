@@ -2674,7 +2674,44 @@ Done:
     **Not reported upstream**: not my call to post, and the injection session owns the
     upstream note currently in flight. Recorded here so it is not lost.
 Note on what remains open, for whoever reads this next: the campaign cancellation was
-  relayed to me by a peer session as assaferan's decision, and I have not treated it as
-  confirmed — `04_upstream_report.md` stays unposted and this branch is not archived
-  until assaferan says so directly.
+  relayed to me by a peer session as assaferan's decision, and I did not treat it as
+  confirmed until assaferan confirmed it to me directly on 2026-09-18 (see session (an)).
+
+## 2026-09-18 (an) — CLOSED. Cancellation confirmed by assaferan directly.
+The injection campaign is cancelled and this branch is closed. Confirmed by assaferan in
+this session, not via a relay.
+
+**The result the branch ends on.** `quadrature`'s geometric advantage over `aggressive`
+is exactly established — 89/90 cells, `>= 2.30x` in Taylor and `>= 1.56x` in Chebyshev,
+100% of cells in the measured decision window — and is worth about **0.05 in score**,
+against a configuration that cannot run at its own threshold scheme at any affordable
+buffer, and no recalibration of that scheme changes it (`|d eff| / |d thresh| = 0.07`,
+measured by the injection session). The advantage is real, exactly quantified, and
+swamped. Nothing failed in the geometry; what failed is that the configuration the
+geometry favours is precisely the one that cannot run at its own calibration.
+
+**Entry point is `README.md`**, not this file. It carries the live claims, the
+withdrawn-and-what-replaced-it table, what is not established, and the methodological
+conclusions. This log is the audit trail, not the summary — it interleaves live and
+retracted claims in session order and should not be read top-down for conclusions.
+
+**Left unposted, deliberately:** `04_upstream_report.md`. Nothing currently supports an
+upstream sentence about tiling, and the buffer-ratchet finding is stronger standing
+alone, which is what the injection session is taking upstream (PR #14 plus the note it
+drafted). The report remains assaferan's to post or discard.
+
+**Left unreported, and worth someone's time:** D117, the ~1.4% flaky
+`tests/test_maths.py::test_norm_isf_func` — an unseeded RNG plus a tolerance that does
+not hold over the sampled range, now that CI exists to hit it.
+
+**Final state.** Clean worktree, in sync with `origin/metric-gridding`, 60+ commits on
+top of `upstream/main` (rebased 2026-09-17, all three cherry-picks dropped as
+upstream-identical), 289 tests passing, no half-finished measurement.
+
+Last word, for whoever picks this up: the measurements on this branch survived every
+challenge that was put to them, and the framings around them repeatedly did not. Five of
+the corrections here were of the second kind — a correct number presented in a frame
+where it did not hold. If there is one thing to carry forward it is the habit that caught
+them: state what the number is *of*, and check that the comparison datum measures the
+same thing, before interpreting the residual.
 ```

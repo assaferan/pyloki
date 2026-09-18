@@ -1,5 +1,8 @@
 # metric-gridding — what this branch established, and what it withdrew
 
+**Status: CLOSED, 2026-09-18.** The injection campaign was cancelled; the branch ends on
+the negative result below. `04_upstream_report.md` is complete and deliberately unposted.
+
 Entry point. `DECISIONS.md` is 2 600+ lines over 41 sessions with 116 numbered
 decisions and roughly a dozen retractions; read this first or you will cite something
 that was withdrawn. Every claim below points at the decision that carries it.
