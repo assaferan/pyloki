@@ -41,7 +41,7 @@ across four buffers so every row is the same data:
 
 | strategy | 2^18 | 2^19 | 2^20 | 2^21 |
 |---|---|---|---|---|
-| low-branching, median `ncand` | 16 778 | **16 778** | **16 778** | **16 778** |
+| low-branching, median `ncand` | 16 778.5 | **16 778.5** | **16 778.5** | **16 778.5** |
 | low-branching, median saturation | 0.064 | 0.032 | 0.016 | 0.008 |
 | high-branching, median `ncand` | 152 007 | 390 575 | 808 116 | **1 610 052** |
 | high-branching, median saturation | 0.580 | 0.745 | 0.771 | 0.768 |
