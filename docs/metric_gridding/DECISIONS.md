@@ -2898,3 +2898,40 @@ Conventions fixed: when a measurement is available, prefer reading the quantity 
   implementation to drift. And check a suspiciously uniform result against the spread of
   the things it is measuring before believing it.
 Branch remains CLOSED. Entry point is still `README.md`.
+
+## 2026-09-22 (ar) — reconcile the entry point with the day's three findings
+No new measurement. A consistency pass over `README.md`, prompted by asking whether any
+work remained and checking rather than answering from memory.
+  - **D122 — the entry point had drifted from its own log, in four places, three of them
+    introduced by me earlier today.** The header claimed "2 700+ lines over 43 sessions
+    with 120 numbered decisions"; measured, it is **2 900 lines, 46 sessions, 121
+    decisions**. I derived those by arithmetic from the previous values instead of counting
+    them, in the same document whose conclusion 2 warns about exactly that. Also fixed: the
+    header still described `04_upstream_report.md` as "complete and deliberately unposted"
+    after it was decided on, and the file list still called it a draft, still credited
+    `report_numbers.py` with "every figure in the report", omitted `branch_max_probe.py`,
+    and said 41 sessions.
+  - **Conclusion 2's instance count was stale and is now the interesting part.** It said
+    "four instances here"; it is **six** — D107, D111, the wrong-branch line numbers, D89,
+    D118 and D119 — and the last three arrived *after* the conclusion was written down.
+    That is the strongest available evidence for the conclusion and the strongest available
+    evidence that stating it does not help: writing the rule down does not stop it, and
+    neither does actively working on it. Recorded in the README rather than only here.
+  - **Two conclusions added, 9 and 10, because D120 and D121 are new classes.** 9 is that a
+    generated, committed, unit-tested figure inherits the validity of its proxy and none of
+    the authority of its harness — deliberately kept separate from conclusion 2, since
+    there a sound number moved frame while here the quantity was wrong from the start. 10
+    is that where the shipped code already decides something, the answer should be read out
+    of it rather than recomputed alongside, with the two corollaries that cost time today:
+    uniformity where you expect spread is an artefact until proven otherwise, and a green
+    guard is not a discriminating one.
+  - **The count of vacuous guards is worth keeping.** Four across two sessions in one
+    afternoon — two of mine (a paragraph-scoped check that let a table escape its own
+    heading; a false positive on `| 20 |`, a prune level) and two on `fix-flaky-norm-isf`
+    (a test asserting the RNG repeated for a repeated seed, which proved the seed arrived
+    and not that the ladder reproduced; then its replacement comparing a field that is
+    identical even unseeded). All four were green before anyone ran the negative case.
+Conventions fixed: when a document states a count of its own contents, count them. The
+  entry point is the one file where staleness is most expensive, because it is the only
+  one a successor is told to trust.
+Branch remains CLOSED, and with this the documentation matches the log.

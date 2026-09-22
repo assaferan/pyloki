@@ -1,13 +1,16 @@
 # metric-gridding — what this branch established, and what it withdrew
 
 **Status: CLOSED, 2026-09-18.** The injection campaign was cancelled; the branch ends on
-the negative result below. `04_upstream_report.md` is complete and deliberately unposted.
-Reopened since for corrections and one measurement: D118, D119-D120, and D121, all
-2026-09-22. D121 is the only new result after the close.
+the negative result below. `04_upstream_report.md` **will not be posted** — decided
+2026-09-22, reasoning in its own header; it is not awaiting review. Reopened since the
+close for corrections and one measurement: D118, D119-D120 and D121, all 2026-09-22. D121
+is the only new *result* after the close; everything else that day was a withdrawal.
 
-Entry point. `DECISIONS.md` is 2 700+ lines over 43 sessions with 120 numbered
-decisions and roughly a dozen retractions; read this first or you will cite something
-that was withdrawn. Every claim below points at the decision that carries it.
+Entry point. `DECISIONS.md` is 2 900 lines over 46 sessions with 121 numbered decisions
+and roughly a dozen retractions; read this first or you will cite something that was
+withdrawn. Every claim below points at the decision that carries it. (Those three counts
+were wrong here until 2026-09-22 — derived by arithmetic rather than counted. They are
+now measured.)
 
 ## How it ended
 
@@ -158,9 +161,14 @@ defects on its first run. But see D120: the harness asserts that a figure still
    out to be identical in different variables, and the one parameterised in *measured*
    `P_d` was immune to a 2x error in the other's `S/N -> P_d` mapping. (D89)
 2. **A number can be correct in its own frame and wrong in the frame it is presented in.**
-   Four instances here: a table with two denominators, a one-sample test against someone
-   else's estimate, line-number citations against the wrong branch, and a model right
-   about the `P_d` at the optimum and wrong about which S/N delivers it. (D107, D111, D89)
+   **Six instances on this branch**, and the last three arrived *after* this conclusion was
+   written down, which is the strongest thing that can be said for it: a table with two
+   denominators (D107), a one-sample test against someone else's estimate (D111),
+   line-number citations against the wrong branch, a model right about the `P_d` at the
+   optimum and wrong about which S/N delivers it (D89), a flake rate computed against half
+   of numpy's real tolerance (D118), and an alive fraction pooled across two different
+   predicates (D119). Writing the rule down does not stop it; neither does actively working
+   on it. The cheapest check remains: read the table, then read the sentence above it.
 3. **Bound, don't cap.** A one-sided bound is harmless when comparing two numbers and
    fatal inside a model that takes an extremum over many of them — a loose per-stage bound
    inverted a whole power calculation. Replace truncation with an admissible bound, and
@@ -178,6 +186,26 @@ defects on its first run. But see D120: the harness asserts that a figure still
    a conclusion three times. (D56, D61)
 8. **When asked whether a result depends on X, grep for X** rather than reasoning about
    whether it should. (D114)
+9. **A generated, committed, unit-tested figure inherits the validity of its proxy and
+   none of the authority of its harness.** This is *not* conclusion 2 — there a sound
+   number was carried into the wrong frame; here the quantity was wrong from the start and
+   the machinery is what made it credible. `report_numbers.py` exists so no figure is typed
+   by hand and its tests assert the figures still **reproduce**; nothing asserted they
+   **measure the claim**, and only the first is cheap to automate. The withdrawn
+   `branch_max` table survived five rounds of review that caught seven weaker errors,
+   because it was harder to doubt than a hand-typed number. Name the quantity the claim is
+   about and the quantity the code computes, and confirm in words that they are the same
+   one. (D120)
+10. **Where the shipped code already decides something, read the answer out of it instead
+   of recomputing it alongside.** The withdrawn table reimplemented the branch guard's
+   arithmetic and drifted; the replacement bisects the guard itself — a prune that completes
+   at `branch_max = B` and raises at `B-1` fixes the maximum at exactly `B` — so there is no
+   second implementation to be wrong. Two corollaries that cost real time here: **uniformity
+   where you expect spread is an artefact until proven otherwise** (six configurations
+   differing by orders of magnitude all "needing" 11 was a config validator, not a
+   measurement), and **a green guard is not a discriminating one** — run the negative case
+   by hand and record that you ran it. Four vacuous guards were written across two sessions
+   in one afternoon, all green before anyone checked. (D121)
 
 ## Incidental finding, not about tiling
 
@@ -202,10 +230,15 @@ will be attributed to whatever change is in flight. Not reported upstream. (D117
     nearest_template_cheby.py exact search, Chebyshev         (same)
     amplitude_loss.py         phase residual -> S/N loss      (same)
     survival_profile.py       measured per-stage survival
-    report_numbers.py         every figure in the report      tests/test_report_numbers.py
+    branch_max_probe.py       max num_points, by bisecting the shipped guard (D121)
+    report_numbers.py         report figures; branch_max_counts() is UNSOUND (D120)
     sensitivity_loss.py       own-cell excursions; see D43/D47 before quoting
     pruning_multiplicity.py   SUPERSEDED AND UNSOUND (D47)
-    04_upstream_report.md     draft, unposted
+    04_upstream_report.md     WILL NOT BE POSTED (2026-09-22); methods kept, not a draft
     05_injection_design.md    pre-registered design; campaign not run
     03_results.md             Phase 3; carries a banner, partially superseded
-    DECISIONS.md              full log, 41 sessions
+    DECISIONS.md              full log, 46 sessions
+
+`report_numbers.json` holds one key, `branch_max_measured`, that is **recorded rather than
+recomputed** — it needs real prunes, so the suite does not assert it reproduces. Every
+other key is regenerated by `report_numbers.py`.
