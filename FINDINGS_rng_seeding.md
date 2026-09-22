@@ -195,6 +195,16 @@ mid-measurement.
 
 ## Limitation: a seed is not sufficient at `DynamicThresholdScheme.run()`
 
+> **The rule, before the mechanism: to put two runs on the same threshold ladder,
+> generate the ladder once and commit the array. A seed is not enough. This holds
+> regardless of how you invoke it, and it is not conditional on anything you can
+> check locally.**
+
+The mechanism is below, but read the rule first — an explanation phrased in terms of
+thread counts invites the reader to conclude their own case is different. It is not.
+`NUMBA_NUM_THREADS=1` is how the residue was *located*; it is not a supported way to
+get reproducibility, since anything that changes the thread count changes the answer.
+
 Found by the reproducer after the fix was written, and it corrects a claim this file
 made in an earlier revision.
 
@@ -223,6 +233,19 @@ from `(seed, ibeam_cur)` so the result is independent of which thread runs which
 iteration — which is a change to a numba kernel rather than a signature, and is **not
 done here**.
 
+**The `prange` is upstream's, not this change's.** `run_stage_legacy` was already
+`@njit(parallel=True)` consuming a shared `rng` inside a `prange` before any of this;
+verified independently on the `injection-design` branch, which predates the fix. So the
+gap is a property of the library, not something seeding introduced. An upstream report
+should say so, or it reads as a regression.
+
+**Practical consequence, and it is a sharp one.** "It takes a seed now" reads as
+permission to stop committing the ladder array. It is not. Two arms of a comparison can
+only be put on one ladder by generating it once and reusing it, exactly as before —
+`injection-design`'s `wt-injection-design-injections-cannot-be-seeded` still holds for
+that purpose and now says so explicitly. An incomplete fix is more dangerous here than
+no fix, because the workaround looks obsolete and is not.
+
 ### How this got past the first round of testing
 
 The original regression test asserted that `scheme.rng` produced the same draws for the
@@ -238,10 +261,20 @@ unseeded single-threaded runs differ in it, two seeded runs do not.
 The parallel case is deliberately **not** asserted anywhere. A test asserting that two
 runs *differ* would itself be flaky, which is the defect this branch exists to remove.
 
-## Note on the site count
+## Note on the site count: 8, 5 and 7 all appear and mean different things
 
-The library had eight bare `default_rng()` calls; the fixed tree has five seeded ones.
-The four in `pulse.py` collapsed into the single construction in
-`__attrs_post_init__`, since the generator is now built once per config instead of once
-per `generate*` call. Nothing was dropped — `rng_reproducibility.py` enumerates the
-sites from the source, so the count is checkable rather than asserted.
+- **8** — bare `default_rng()` calls on `main` at `18d04b3`. The defect's size.
+- **5** — seeded `default_rng(...)` calls in the fixed tree, as
+  `rng_reproducibility.py` reports. Lower than 8 because `pulse.py`'s four collapsed
+  into the single construction in `__attrs_post_init__`: the generator is now built once
+  per config instead of once per `generate*` call. Nothing was dropped.
+- **7** — of the original 8 *sites*, the number whose user-visible output now reproduces.
+  The eighth is `DynamicThresholdScheme.run()`, which takes a seed but still varies
+  under parallelism.
+
+So 8 counts the original calls, 5 counts the surviving constructions, and 7 counts the
+sites actually fixed. The struck-through text in `injection-design`'s superseded
+`08_upstream_rng_seeding.md` says "eight sites", corrected there to seven, and means the
+third sense. Because `rng_reproducibility.py` enumerates from the source rather than
+from a typed list, the 5 is checkable rather than asserted — which is the whole reason
+the count could change without anything going wrong.
