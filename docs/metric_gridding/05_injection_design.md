@@ -93,10 +93,14 @@ is not doing what §6.3 says in that arm.
 
 `n` is **368–691** and the precise value is not established. The early-decision corner
 (2 842 pairs) is excluded by the measured survival profile; the spread that remains is
-the profile's own, whose two criteria disagree on where the survival curve falls. The
-survival profile is **inherited from the `metric-gridding` session, uncontradicted but
-not validated** (§4.3 ⚑) — its shape is robust across two criteria, two parameter sets
-and three batches; its absolute levels are not. Earlier figures of 954 and 368 in this
+the profile's own, whose two criteria disagree on where the survival curve falls: the
+**368** end is the excursion criterion (median loss level 27), the **691** end the
+metric `m <= 1.0` criterion at its steepest (median 15); §9, caution 3, has the
+four-profile table. The survival profile is **inherited from the `metric-gridding`
+session, uncontradicted but not validated** (§4.3 ⚑) — its shape is robust across two
+criteria, two parameter sets
+and three groups spanning two batches; its absolute levels are not, and any fraction
+taken from it must name its criterion (§4.3 ⚠). Earlier figures of 954 and 368 in this
 document are superseded and marked.
 
 ### What would unblock it
@@ -304,9 +308,9 @@ same reason — few segments have been accumulated.
 > ### ⚑ Now measured, and the premise is not merely wrong — it is backwards
 >
 > The `metric-gridding` session measured the real profile at assaferan's request
-> (its `1f8a7e8`): 40 runs, `aggressive`, S/N 14, 2^18, recording the minimum phase
-> excursion from the signal to any survivor at each prune level. **Inherited and not
-> re-run here**; §11.1's rule applies.
+> (its `1f8a7e8`): 40 runs — batch 1, **excursion** criterion — `aggressive`, S/N 14,
+> 2^18, recording the minimum phase excursion from the signal to any survivor at each
+> prune level. **Inherited and not re-run here**; §11.1's rule applies.
 >
 > | level | 1 | 10 | 20 | 30 | 40 | 50 | 63 |
 > |---|---|---|---|---|---|---|---|
@@ -317,11 +321,28 @@ same reason — few segments have been accumulated.
 >
 > **Status of the instrument: uncontradicted, not validated.** An early claim that its
 > first batch validated it (29/40 = 0.725 against my 38/50 = 0.760, `p` = 0.81) was
-> **retracted by its author** — one batch agreeing is not evidence, and a second batch
-> gave 15/30 = 0.500. Across all its batches, 44/70 = 0.629 against my 38/50 = 0.760 is
-> **consistent**, two-sample Fisher exact `p` = 0.164 (reproduced here), pooled
-> 82/120 = 0.683 with a 95% interval containing both. An initial report of `p` = 0.019
-> was a one-sample test treating my 38/50 as a known rate rather than an estimate.
+> **retracted by its author** — one batch agreeing is not evidence. That comparison is
+> nevertheless the only one that survives, because batch 1 is the sole group measured
+> under a predicate comparable to mine: 29/40 = 0.725 against 38/50 = 0.760 is plainly
+> consistent. **No evidence the two instruments disagree — which is not validation.**
+> An initial report of `p` = 0.019 was a one-sample test treating my 38/50 as a known
+> rate rather than an estimate.
+>
+> ⚠ **`44/70 = 0.629` and its `p` = 0.164, quoted here in an earlier revision, are
+> withdrawn: that fraction does not measure one thing.** It is 29+15 over 40+30 — batch
+> 1's **excursion** numerator added to batch 2 set A's **metric `m <= 1.0`** numerator —
+> so it pools two different predicates, and it also silently drops the third group
+> (set B, 17/30); all three groups together would be 61/100. The `metric-gridding`
+> session found this on 2026-09-22, after both branches closed, and has marked it
+> do-not-quote (its `DECISIONS.md` D109 and `README.md` still carry it). I reproduced
+> the arithmetic here without checking that the numerators were commensurable. The
+> pooled 82/120 = 0.683 goes with it.
+>
+> The metric arm alone is 32/60 = 0.533 against my 0.760, Fisher `p` = 0.017 — which
+> looks like a disagreement and is not one: `m <= 1.0` at the last prune level is a
+> stricter predicate than end-to-end recovery from the final periodogram, so a lower
+> rate is expected. That gap is why the two arms must not be pooled, not evidence about
+> either instrument.
 >
 > Two reasons not to read even the consistency as strong. The runs are **not
 > exchangeable** — `calibrate_scale_on_folds` (`pulse.py:72-110`, `:381`) tunes the
@@ -332,8 +353,10 @@ same reason — few segments have been accumulated.
 > data.
 >
 > **So: the shape is solid and the absolute levels are not.** "No losses before level
-> 13" holds across two criteria, two injected parameter sets and three batches. Nothing
-> below uses the absolute levels.
+> 13" holds across two criteria, two injected parameter sets and three groups spanning
+> two batches (N = 100 in all; the table above is batch 1 alone). Nothing below uses the
+> absolute levels — and per the box above, any alive fraction or median taken from this
+> profile must name its criterion before it is quoted.
 >
 > **The decision is late, not early — so §4.3's title is not just unsupported, it is
 > the wrong way round**, and the "structural reason the effect is small" is withdrawn.
