@@ -266,7 +266,14 @@ the wrong ladders. The correct ones are `schemes/cheby_*.npz`.
 6. **Void at the granularity of the datum, not the result.** Over-withdrawing has its own
    cost: the conclusion behind the withdrawn `44/70` survived intact on the comparable arm
    alone, and retracting it wholesale would have destroyed a valid constraint.
-7. **Failure to reject is not a null.** The one that cancelled the campaign: p = 0.34 with
+7. **A severity claim is a claim about the call graph — check the callers before
+   ranking a defect.** `norm_isf_func` returning +28 sigma out of domain was called "a
+   correctness bug a user hits" three times before anyone grepped for its callers. It has
+   two, neither of which the live search reaches. The measurement was right and the
+   ranking built on it was not; "is this reachable" is one grep and it belongs *before*
+   the word "correctness", not after it. The same applies to a mitigating fact: verify it
+   as hard as an aggravating one, because it is what the report will be judged on.
+8. **Failure to reject is not a null.** The one that cancelled the campaign: p = 0.34 with
    a point estimate above the effect of interest is not permission to proceed.
 
 ## Files
