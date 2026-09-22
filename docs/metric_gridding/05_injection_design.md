@@ -1438,9 +1438,9 @@ Second: the `rho_AB` check in §11.4 (1). It is cheap, it has never been done, a
    is below 0.9 in both arms.~~ **Attempted and it fails — §6.6.** There is no such
    buffer for `quadrature`. The de-confound at n ≈ 211 is therefore not reachable
    either, since it would have to run at a buffer where one arm still saturates. The
-   live successors are §6.6's four options, of which the **stricter ladder** is the only
-   one that keeps both the deployed configuration and the idealised question, and it is
-   untested.
+   stricter ladder, which was the only remaining route keeping both the deployed
+   configuration and the idealised question, **was then tested and fails (§6.7)**. What
+   is left is §6.6's options 2 and 3 and the buffer-policy change of §6.7.
 2. **The operating point.** §6.5 measures `P_d` = 0.76/0.80 at S/N 14 and 2^18, well
    above the 0.5 §9 wants, so the 3-point pilot should bracket *below* S/N 14. ~~This
    contradicts the `metric-gridding` session's D78 (S/N 15–17).~~ **Resolved:** that
@@ -1470,6 +1470,32 @@ Second: the `rho_AB` check in §11.4 (1). It is cheap, it has never been done, a
    would put a new headline on an unverified inherited measurement. First thing to redo
    if the configuration question reopens.
 
-8. **The stricter-ladder test (§6.6, option 4)** — one ladder at a smaller `P_d` target,
-   10 realisations at 2^20, does `quadrature`'s count converge. The only untested route
-   that keeps both the deployed configuration and the idealised question.
+8. ~~**The stricter-ladder test (§6.6, option 4).**~~ **Done — §6.7, and it fails.** A
+   tenfold reduction in the detection target buys 4 ratcheted levels out of 192 and
+   leaves zero clean runs, because the effective cut is set by `top-K` rather than by
+   the scheme: raising the ladder by 0.87 moved the cut that actually ran by −0.06.
+
+### 11.8 How this ended
+
+**The campaign was cancelled** (2026-09-18, assaferan) on the strength of §6.6 and
+§6.7: the comparison it was designed to make cannot be made at this configuration,
+because `quadrature` cannot run at its own threshold scheme at any affordable buffer
+and no recalibration of that scheme changes it. That is a result, not a failure to get
+one, and it needed no campaign to establish.
+
+**What went out.** The silent-ratchet defect found along the way is
+[PR #14](https://github.com/pravirkr/pyloki/pull/14), merged upstream. The
+buffer-policy finding is drafted as `07_upstream_buffer_policy.md` — an *issue* rather
+than a patch, since it asks a question about pruning semantics — and is **unposted**,
+awaiting review. This branch is pushed to `assaferan/pyloki` so that draft's reproducer
+links resolve; nothing has been posted to the upstream tracker.
+
+**What deliberately did not go out.** Anything about tiling. Per §8 nothing in this
+document currently supports an upstream sentence about it, and the buffer result is
+stronger standing alone. `04_upstream_report.md` on the `metric-gridding` branch is a
+separate, still-unposted document owned by that session; if both ever go out they need
+to be consistent with each other.
+
+**If someone reopens this**, items 3, 4, 6 and 7 above are the live ones, and item 7 —
+`DECISION_STAGES` sitting before the measured decision window — is the first, because
+the stratification and the strata in §9 are conditioned on it.
