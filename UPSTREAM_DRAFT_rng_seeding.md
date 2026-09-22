@@ -49,12 +49,12 @@ config draw the identical realisation every iteration.
 **`DynamicThresholdScheme.run()` needed more than a constructor seed.** Both kernels
 that draw randomness — `run_stage_legacy` and `pre_simulate_stage_folds` — are
 `@njit(parallel=True)` and consume the generator inside a `prange`. A single shared
-generator there leaves the result dependent on thread scheduling: seeded, on 14 threads,
-5 runs produced 2 distinct ladders — enough to demonstrate that it happens, and not
-offered as a rate. Each parallel iteration now gets its own
-generator, from `SeedSequence(entropy, spawn_key=(istage,)).spawn(n)`, indexed by the
-loop variable — so iteration `i` always uses generator `i` and the result is independent
-of thread order by construction.
+generator there leaves the result dependent on thread scheduling: seeded, on 14
+threads, 5 runs produced 2 distinct ladders — enough to demonstrate that it happens,
+and not offered as a rate. Each parallel iteration now gets its own generator, from
+`SeedSequence(entropy, spawn_key=(istage,)).spawn(n)`, indexed by the loop variable —
+so iteration `i` always uses generator `i`, and the result is independent of thread
+order by construction.
 
 ### It also makes `run()` faster
 
