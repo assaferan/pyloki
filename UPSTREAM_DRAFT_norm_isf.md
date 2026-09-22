@@ -25,9 +25,9 @@ is called anywhere in `src/pyloki`. The live search scores through
 `scoring.snr_score_batch_func` and never reaches `norm_isf_func`.
 
 **So no search output is affected.** This is reachable only by calling the public
-scoring API directly. We are reporting it because it is an exported function returning a
+scoring API directly. I am reporting it because it is an exported function returning a
 maximally wrong answer on input that its own call site routinely produces, and the fix
-is small — not because we think it has corrupted anyone's results.
+is small — not because I think it has corrupted anyone's results.
 
 Everything below should be read with that in mind.
 
@@ -70,7 +70,7 @@ claim that a search emits a 28 sigma candidate, which the scope section above ru
 
 ### Suggested fix
 
-A domain check. We have not sent a patch because the right return value is a judgement
+A domain check. I have not sent a patch because the right return value is a judgement
 about the API rather than about the maths: `-inf`, a clamp of `minus_logsf` at 0, or a
 raise are all defensible, and you may have a convention. Happy to prepare whichever you
 prefer.
@@ -94,5 +94,5 @@ the wrong units:
 If that is a mismatch rather than a deliberate scaling, the penalty is larger than
 intended by `1/ln(2) = 1.4427` when subtracted from a natural-log quantity, which would
 also make the negative-input case above more common than it should be. The dimensional
-observation is verified; only the intent is open, so we are asking rather than
+observation is verified; only the intent is open, so I am asking rather than
 asserting.

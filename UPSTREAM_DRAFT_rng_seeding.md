@@ -66,7 +66,7 @@ Removing the shared generator removed a contention point in the parallel region.
 | `legacy` | 8.589 s | **2.172 s** |
 | `improved` | 0.668 s | **0.391 s** |
 
-We did not set out to change performance and would not have predicted the size of it;
+I did not set out to change performance and would not have predicted the size of it;
 it is reported as measured.
 
 ### Tests
@@ -92,8 +92,8 @@ The example tests now pin a seed, and this PR also fixes a tolerance in
 (unseeded). Those are not two changes. Pinning a seed does not merely *expose* that
 tolerance bug — it would **entomb** it. A 1-in-12 flake becomes deterministic the moment
 the seed is fixed, so a seed that happens to pass freezes the defect permanently out of
-sight and leaves the suite looking healthier than it is. We know which seeds are hard
-because we measured them, so this is concrete rather than hypothetical. Fixing the
+sight and leaves the suite looking healthier than it is. I know which seeds are hard
+because I measured them, so this is concrete rather than hypothetical. Fixing the
 tolerance is what makes the seeding honest rather than cosmetic.
 
 The tolerance itself: `ACCEL_TOL = 1.0` was commented as a ">100x margin" against the
