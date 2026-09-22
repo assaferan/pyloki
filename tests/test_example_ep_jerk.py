@@ -54,6 +54,8 @@ Cost: ~11 s locally on a cold numba cache, ~1.5 s warm.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 
@@ -63,6 +65,11 @@ from pyloki.ffa import DynamicProgramming
 from pyloki.periodogram import ScatteredPeriodogram
 from pyloki.prune import prune_dyp_tree
 from pyloki.simulation.pulse import PulseSignalConfig
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pandas as pd
 
 # --- The notebook's physical setup, unchanged -------------------------------------
 PULSAR_PERIOD = 0.007
@@ -103,10 +110,14 @@ MAX_DACCEL_FRACTION = 0.10  # daccel 8.29 is 1.7% of accel -> passes
 # had no way to reach them; see tests/test_rng_seeding.py.
 SEED = 42
 
+# The sweep. Fixed and enumerated, never random -- a random seed would make a
+# failure unreproducible, which is the defect this file exists to not have.
+# 7 and 11 are the measured one-cell-miss realisations; the rest are ordinary.
+SEED_SWEEP = (7, 11, 1, 15, 26)
 
-@pytest.fixture(scope="module")
-def ep_jerk_search(tmp_path_factory) -> dict:
-    """Run the notebook's pipeline once and return the recovered candidates."""
+
+def _run_search(seed: int, outdir: Path) -> dict:
+    """Run the notebook's pipeline at one noise realisation."""
     cfg = PulseSignalConfig(
         period=PULSAR_PERIOD,
         dt=DT,
@@ -114,7 +125,7 @@ def ep_jerk_search(tmp_path_factory) -> dict:
         snr=SNR,
         ducy=DUCY,
         mod_kwargs={"acc": ACCEL, "jerk": JERK},
-        seed=SEED,
+        seed=seed,
     )
     tim_data = cfg.generate(shape="gaussian")
 
@@ -156,11 +167,10 @@ def ep_jerk_search(tmp_path_factory) -> dict:
         snr_final=SNR,
         ducy_max=0.5,
         wtsp=1.2,
-        seed=SEED,
+        seed=seed,
     )
     thresholds = np.asarray(scheme.thresholds, dtype=np.float64)
 
-    outdir = tmp_path_factory.mktemp("ep_jerk")
     result_file = prune_dyp_tree(
         dyp,
         thresholds,
@@ -182,6 +192,90 @@ def ep_jerk_search(tmp_path_factory) -> dict:
     }
 
 
+@pytest.fixture(scope="module")
+def ep_jerk_search(tmp_path_factory) -> dict:
+    """Run the pinned realisation once; the fast tests share it."""
+    return _run_search(SEED, tmp_path_factory.mktemp("ep_jerk"))
+
+
+def _best(result: dict) -> pd.Series:
+    data = result["data"]
+    return data.loc[data["score"].idxmax()]
+
+
+# One source for each recovery predicate. The pinned tests and the seed sweep both
+# call these, so a sweep cannot quietly assert something weaker than the fast path.
+
+
+def _check_accel(result: dict, seed: object = SEED) -> None:
+    best = _best(result)
+    assert best["daccel"] < MAX_DACCEL_FRACTION * ACCEL, (
+        f"acceleration is not actually constrained (seed={seed}): "
+        f"daccel={best['daccel']:.3f} against accel={ACCEL:.1f} -- the recovery "
+        f"check below would be vacuous"
+    )
+    tol = ACCEL_TOL_DACCEL * float(best["daccel"])
+    error = abs(float(best["accel"]) - ACCEL)
+    assert error < tol, (
+        f"acceleration not recovered (seed={seed}): got {best['accel']:.5f}, "
+        f"want {ACCEL:.1f} (error {error:.5f} > {tol:.5f} = "
+        f"{ACCEL_TOL_DACCEL} x daccel {best['daccel']:.3f})"
+    )
+
+
+def _check_jerk(result: dict, seed: object = SEED) -> None:
+    best = _best(result)
+    assert best["djerk"] < MAX_DJERK_FRACTION * JERK, (
+        f"jerk is not actually constrained (seed={seed}): "
+        f"djerk={best['djerk']:.4f} against jerk={JERK} -- the recovery check "
+        f"below would be vacuous"
+    )
+    error = abs(float(best["jerk"]) - JERK)
+    assert error < JERK_TOL, (
+        f"jerk not recovered (seed={seed}): got {best['jerk']:.4f}, want {JERK} "
+        f"(error {error:.4f} > {JERK_TOL})"
+    )
+
+
+def _check_freq(result: dict, seed: object = SEED) -> None:
+    best = _best(result)
+    error = abs(float(best["freq"]) - result["true_freq"])
+    assert error < FREQ_TOL, (
+        f"frequency not recovered (seed={seed}): got {best['freq']:.10f}, "
+        f"want {result['true_freq']:.10f} (error {error:.3e} > {FREQ_TOL:.3e})"
+    )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("seed", SEED_SWEEP)
+def test_recovery_does_not_depend_on_the_noise_realisation(
+    seed: int,
+    tmp_path: Path,
+) -> None:
+    """The recovery predicates must hold at every realisation, not just `SEED`.
+
+    Fixed seeds, not random ones. A randomly drawn seed would reintroduce exactly
+    the flakiness this file was fixed to remove: an unreproducible failure that
+    cannot be re-examined. Each case here is deterministic and names its seed.
+
+    **7 and 11 are in the list on purpose.** They are the two realisations found,
+    in a 28-seed sweep, where the best candidate lands one acceleration cell off
+    the truth -- the case that the old absolute `ACCEL_TOL = 1.0` failed. A sweep
+    over easy seeds would be weaker evidence than the single pinned run; it is the
+    known-hard ones that make it worth the runtime.
+
+    What this does and does not establish: passing at every seed here bounds the
+    per-realisation failure rate only loosely (0 of 5 is consistent with anything
+    under ~45%). It establishes that recovery is not grossly realisation-dependent
+    and that the known-hard cases pass. The measured rate is in
+    `FINDINGS_rng_seeding.md`, from 60 runs, and that is the number to quote.
+    """
+    result = _run_search(seed, tmp_path)
+    _check_accel(result, seed)
+    _check_jerk(result, seed)
+    _check_freq(result, seed)
+
+
 def test_pipeline_produces_candidates(ep_jerk_search) -> None:
     data = ep_jerk_search["data"]
     assert len(data) > 0, "no candidates survived; the search found nothing at all"
@@ -197,29 +291,11 @@ def test_stage_count_matches_configuration(ep_jerk_search) -> None:
 
 
 def test_recovers_injected_frequency(ep_jerk_search) -> None:
-    data, true_freq = ep_jerk_search["data"], ep_jerk_search["true_freq"]
-    best = data.loc[data["score"].idxmax()]
-    error = abs(float(best["freq"]) - true_freq)
-    assert error < FREQ_TOL, (
-        f"frequency not recovered: got {best['freq']:.10f}, "
-        f"want {true_freq:.10f} (error {error:.3e} > {FREQ_TOL:.3e})"
-    )
+    _check_freq(ep_jerk_search)
 
 
 def test_recovers_injected_acceleration(ep_jerk_search) -> None:
-    data = ep_jerk_search["data"]
-    best = data.loc[data["score"].idxmax()]
-    assert best["daccel"] < MAX_DACCEL_FRACTION * ACCEL, (
-        f"acceleration is not actually constrained: daccel={best['daccel']:.3f} "
-        f"against accel={ACCEL:.1f} -- the recovery check below would be vacuous"
-    )
-    error = abs(float(best["accel"]) - ACCEL)
-    tol = ACCEL_TOL_DACCEL * float(best["daccel"])
-    assert error < tol, (
-        f"acceleration not recovered: got {best['accel']:.5f}, want {ACCEL:.1f} "
-        f"(error {error:.5f} > {tol:.5f} = {ACCEL_TOL_DACCEL} x daccel "
-        f"{best['daccel']:.3f})"
-    )
+    _check_accel(ep_jerk_search)
 
 
 def test_recovers_injected_jerk(ep_jerk_search) -> None:
@@ -228,17 +304,7 @@ def test_recovers_injected_jerk(ep_jerk_search) -> None:
     Constraining it is what forced this test to `2**22` / 64 stages rather than the
     accel test's `2**21` / 8; see the module docstring.
     """
-    data = ep_jerk_search["data"]
-    best = data.loc[data["score"].idxmax()]
-    assert best["djerk"] < MAX_DJERK_FRACTION * JERK, (
-        f"jerk is not actually constrained: djerk={best['djerk']:.4f} against "
-        f"jerk={JERK} -- the recovery check below would be vacuous"
-    )
-    error = abs(float(best["jerk"]) - JERK)
-    assert error < JERK_TOL, (
-        f"jerk not recovered: got {best['jerk']:.4f}, want {JERK} "
-        f"(error {error:.4f} > {JERK_TOL})"
-    )
+    _check_jerk(ep_jerk_search)
 
 
 def test_best_candidate_clears_the_final_threshold(ep_jerk_search) -> None:

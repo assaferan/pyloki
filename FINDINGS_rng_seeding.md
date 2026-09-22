@@ -30,10 +30,10 @@ different output. And `np.random.seed` did not help, because `default_rng` ignor
 legacy global seed — which is what made this easy to miss, since the usual reflex
 appears to work and changes nothing.
 
-Seeding closes this at seven of the eight sites. It does **not** close
-`DynamicThresholdScheme.run()`, for a reason that is about parallelism rather than
-seeding; that is measured and explained under **Limitation** below, and it is a real
-qualification on everything else in this file.
+Seeding the constructors closed seven of the eight sites. The eighth,
+`DynamicThresholdScheme.run()`, needed a second and different fix, because it consumes
+its generator inside a `prange`; that is measured and explained below. All eight
+reproduce now.
 
 It is a **reproducibility** defect, not a correctness one. The search itself is
 deterministic downstream of the time series; the non-determinism is entirely in the
@@ -76,6 +76,34 @@ did not quietly make the library deterministic for callers who never asked.
 fails on any `default_rng()` called with no arguments, so a newly added unseeded
 generator fails the suite instead of going unnoticed. The list is enumerated from the
 source, not typed into the test, so it cannot drift.
+
+### Testing that the conclusion does not depend on the seed
+
+Pinning `SEED = 42` makes CI reproducible but exercises one realisation. The sweep
+`test_recovery_does_not_depend_on_the_noise_realisation` parametrises the whole
+pipeline over `SEED_SWEEP = (7, 11, 1, 15, 26)` and asserts the same three recovery
+predicates at each.
+
+The seeds are **fixed and enumerated, never drawn at random** — a random seed would
+reintroduce exactly what this branch removed, an unreproducible failure. **7 and 11 are
+in the list on purpose**: they are the two realisations, out of 28 measured, where the
+best candidate lands one acceleration cell off the truth. A sweep over easy seeds would
+be weaker evidence than the single pinned run.
+
+Both paths call the same `_check_accel` / `_check_jerk` / `_check_freq` helpers, so the
+sweep cannot drift into asserting something weaker than the fast path.
+
+Negative control, run rather than assumed: with `ACCEL_TOL_DACCEL` lowered to reproduce
+the old absolute tolerance of ~1.0, exactly seeds 7 and 11 fail and the other three
+pass. The sweep has teeth and it names the failing seed.
+
+It is marked `slow` and skipped unless `--runslow` is passed, with a visible skip
+reason rather than a silent deselection. Measured cost: about 7 s on top of a 55 s
+suite, which is cheap enough that running it by default is a defensible choice.
+
+What it does **not** establish: 5 seeds bound the per-realisation failure rate only
+loosely (0 of 5 is consistent with anything under ~45%). The measured rate is the 60-run
+figure above, and that is the number to quote.
 
 Verified separately that the two RNG-derived inputs of the `ep_jerk` pipeline — the
 `2**22`-sample time series and the 64-stage ladder — are **bit-identical across three
@@ -154,10 +182,9 @@ those rates only loosely (0/60 is consistent with anything under ~6%).
 - It **does** let every generator in the library be steered from its caller, and it
   makes `determine_scheme`, `evaluate_scheme` and all four `PulseSignalConfig.generate*`
   paths reproduce exactly, on 14 threads as well as on one.
-- It does **not** make `DynamicThresholdScheme.run()` reproducible under parallel
-  execution — see the limitation section below. A seed there fixes the stream but not
-  the order threads consume it in. This is the one site where seeding is necessary but
-  not sufficient, and it is the site the original draft called the most important one.
+- It **does** make `DynamicThresholdScheme.run()` reproducible, on any thread count,
+  in both modes — but only after a second fix. A constructor seed alone was not enough;
+  see the section below, which is kept as a record of the gap and how it was missed.
 - It **does** fix the `ep_jerk` flake, and by the tolerance rather than by the pin — see
   the unseeded re-measurement below, which holds the new tolerance and lets the noise
   vary.
@@ -193,20 +220,11 @@ consistency check on that reasoning, not independent proof of it.
 Both measurements used one warm numba cache per tree throughout, so no denominator moved
 mid-measurement.
 
-## Limitation: a seed is not sufficient at `DynamicThresholdScheme.run()`
+## A seed alone was not sufficient at `DynamicThresholdScheme.run()` — now closed
 
-> **The rule, before the mechanism: to put two runs on the same threshold ladder,
-> generate the ladder once and commit the array. A seed is not enough. This holds
-> regardless of how you invoke it, and it is not conditional on anything you can
-> check locally.**
-
-The mechanism is below, but read the rule first — an explanation phrased in terms of
-thread counts invites the reader to conclude their own case is different. It is not.
-`NUMBA_NUM_THREADS=1` is how the residue was *located*; it is not a supported way to
-get reproducibility, since anything that changes the thread count changes the answer.
-
-Found by the reproducer after the fix was written, and it corrects a claim this file
-made in an earlier revision.
+Kept as a record: this was a real gap between the first fix and the second, it was
+found by the reproducer rather than by the test suite, and the reason it was missed is
+worth more than the fix.
 
 `run_stage_legacy` is `@njit(cache=True, parallel=True)` and draws from the shared
 generator **inside a `prange`** (`thresholding.py:597`, loop at `:616`, `rng` consumed at
@@ -228,23 +246,40 @@ localises the remaining non-determinism precisely and rules out the seed as its 
 `evaluate_scheme`, and all four `PulseSignalConfig.generate*` methods were each checked
 6x on 14 threads and gave bit-identical output. The limitation is this one site.
 
-Closing it needs per-iteration generators inside the kernel — deriving a child generator
-from `(seed, ibeam_cur)` so the result is independent of which thread runs which
-iteration — which is a change to a numba kernel rather than a signature, and is **not
-done here**.
+**The fix.** Each parallel iteration now gets its own generator, built from
+`SeedSequence(entropy, spawn_key=(istage,)).spawn(n)` and indexed by the loop variable,
+in both `run_stage_legacy` and `pre_simulate_stage_folds`. Because iteration `i` always
+uses generator `i`, the result is independent of thread order *by construction* rather
+than by luck. Deriving from the stage index rather than spawning off a running stream
+also makes it independent of call order. After:
 
-**The `prange` is upstream's, not this change's.** `run_stage_legacy` was already
+| seed | numba threads | distinct | max spread |
+|---|---|---|---|
+| none | 14 | 6 / 10 | 0.479 |
+| **42** | **14** | **1 / 5** | **0.000** |
+| 42 | 1 | matches the 14-thread result exactly | 0.000 |
+
+Verified on `success_h0` in **both** `legacy` and `improved` modes: same seed
+reproduces, 14 threads matches 1 thread, different seeds differ, unseeded still varies.
+
+**It also made `run()` faster.** The shared generator was a contention point in the
+parallel region; removing it sped up the hot loop. `run()` over 32 stages, unseeded,
+best of 3: `legacy` 8.589 s → 2.172 s, `improved` 0.668 s → 0.391 s.
+
+Numba will not construct a `Generator` inside a kernel, but it *will* index a
+`typed.List` of them inside a `prange` and pass one into a nested `njit` function, with
+`cache=True`. That is what kept this a contained change rather than a rewrite.
+
+**The `prange` was upstream's, not this change's.** `run_stage_legacy` was already
 `@njit(parallel=True)` consuming a shared `rng` inside a `prange` before any of this;
 verified independently on the `injection-design` branch, which predates the fix. So the
 gap is a property of the library, not something seeding introduced. An upstream report
 should say so, or it reads as a regression.
 
-**Practical consequence, and it is a sharp one.** "It takes a seed now" reads as
-permission to stop committing the ladder array. It is not. Two arms of a comparison can
-only be put on one ladder by generating it once and reusing it, exactly as before —
-`injection-design`'s `wt-injection-design-injections-cannot-be-seeded` still holds for
-that purpose and now says so explicitly. An incomplete fix is more dangerous here than
-no fix, because the workaround looks obsolete and is not.
+**What this changed for callers.** While the gap was open, "it takes a seed now" was a
+trap: it read as permission to stop committing the ladder array, and it was not. That is
+now resolved — a seed does reproduce the ladder, on any thread count. Committing the
+array still works and is still the only option on `main`.
 
 ### How this got past the first round of testing
 
@@ -261,19 +296,20 @@ unseeded single-threaded runs differ in it, two seeded runs do not.
 The parallel case is deliberately **not** asserted anywhere. A test asserting that two
 runs *differ* would itself be flaky, which is the defect this branch exists to remove.
 
-## Note on the site count: 8, 5 and 7 all appear and mean different things
+## Note on the site count: 8, 6 and 7 all appear and mean different things
 
 - **8** — bare `default_rng()` calls on `main` at `18d04b3`. The defect's size.
-- **5** — seeded `default_rng(...)` calls in the fixed tree, as
-  `rng_reproducibility.py` reports. Lower than 8 because `pulse.py`'s four collapsed
+- **6** — seeded `default_rng(...)` calls in the fixed tree, as
+  `rng_reproducibility.py` reports. Five constructor-level, plus the per-iteration
+  spawn inside `_stage_rngs`. Lower than 8 because `pulse.py`'s four collapsed
   into the single construction in `__attrs_post_init__`: the generator is now built once
   per config instead of once per `generate*` call. Nothing was dropped.
-- **7** — of the original 8 *sites*, the number whose user-visible output now reproduces.
-  The eighth is `DynamicThresholdScheme.run()`, which takes a seed but still varies
-  under parallelism.
+- **7** — of the original 8 *sites*, the number that a constructor seed alone fixed.
+  The eighth, `DynamicThresholdScheme.run()`, needed per-iteration generators as well.
+  All 8 reproduce now; 7 is a fact about the first commit, not about the current state.
 
-So 8 counts the original calls, 5 counts the surviving constructions, and 7 counts the
-sites actually fixed. The struck-through text in `injection-design`'s superseded
+So 8 counts the original calls, 6 counts the surviving constructions (the sixth is the
+per-iteration spawn), and 7 counts what the first commit alone fixed. The struck-through text in `injection-design`'s superseded
 `08_upstream_rng_seeding.md` says "eight sites", corrected there to seven, and means the
 third sense. Because `rng_reproducibility.py` enumerates from the source rather than
 from a typed list, the 5 is checkable rather than asserted — which is the whole reason
