@@ -6,9 +6,12 @@
 > left open and, in doing so, established that the campaign this document designs is not
 > executable at Phase 3's configuration. **Read §1, then §6.6.**
 >
-> One thing did ship: the silent-ratchet defect found along the way is
-> [PR #14](https://github.com/pravirkr/pyloki/pull/14) upstream, written up in
-> `06_upstream_max_sugg_logging.md`.
+> Two things went out, both about the buffer and neither about tiling: the
+> silent-ratchet defect is [PR #14](https://github.com/pravirkr/pyloki/pull/14)
+> (**open, unreviewed since 2026-09-17**), written up in
+> `06_upstream_max_sugg_logging.md`; the buffer-policy question is
+> [issue #15](https://github.com/pravirkr/pyloki/issues/15), posted 2026-09-22 from
+> `07_upstream_buffer_policy.md`.
 >
 > **This document contains retracted claims that are kept visible rather than deleted**,
 > because the branch's failure mode is a correct measurement carrying a framing that
@@ -1485,9 +1488,11 @@ Second: the `rho_AB` check in §11.4 (1). It is cheap, it has never been done, a
 4. **Row 2 of §10** is retired for stages 1–10 *on the `metric-gridding` session's
    measurement, not mine.* If it has to carry weight, re-run it here.
 5. ~~**The upstream logging patch** is written but not applied or verified.~~ **Done and
-   shipped** — implemented on `upstream-max-sugg-logging` off `upstream/main`, verified
-   both directions with a regression test, and merged upstream as
-   [PR #14](https://github.com/pravirkr/pyloki/pull/14).
+   submitted** — implemented on `upstream-max-sugg-logging` off `upstream/main`, verified
+   both directions with a regression test, and opened as
+   [PR #14](https://github.com/pravirkr/pyloki/pull/14). **Open, not merged**: no review
+   and no comments as of 2026-09-22, five days after opening. Nothing here depends on it
+   landing — the `threshold_eff` measurements were taken against the patched branch.
 
 6. **The survival profile is inherited and unvalidated (§4.3 ⚑).** Its shape carries
    §4.3's reversal, the `n` range and the strata critique; its absolute levels carry
@@ -1516,12 +1521,21 @@ because `quadrature` cannot run at its own threshold scheme at any affordable bu
 and no recalibration of that scheme changes it. That is a result, not a failure to get
 one, and it needed no campaign to establish.
 
-**What went out.** The silent-ratchet defect found along the way is
-[PR #14](https://github.com/pravirkr/pyloki/pull/14), merged upstream. The
-buffer-policy finding is drafted as `07_upstream_buffer_policy.md` — an *issue* rather
-than a patch, since it asks a question about pruning semantics — and is **unposted**,
-awaiting review. This branch is pushed to `assaferan/pyloki` so that draft's reproducer
-links resolve; nothing has been posted to the upstream tracker.
+**What went out.** Both buffer findings, after assaferan reviewed them:
+
+- The silent-ratchet defect is [PR #14](https://github.com/pravirkr/pyloki/pull/14),
+  opened 2026-09-17 from a branch off `upstream/main`. **Still open and unreviewed** as
+  of 2026-09-22 — it is *submitted*, not merged, and earlier revisions of this document
+  wrongly said merged.
+- The buffer-policy question is
+  [issue #15](https://github.com/pravirkr/pyloki/issues/15), posted 2026-09-22 by
+  assaferan from `07_upstream_buffer_policy.md`, essentially verbatim: the local status
+  banner was dropped, `upstream/main`/`PR #14` were rewritten for tracker context, and
+  the closing note on `DynamicThresholdScheme.__init__`'s unseeded RNG was cut. That cut
+  note is the one postable item this branch has left, and it is a separate defect —
+  reproducibility, not a design call — not an addition to #15.
+
+This branch is pushed to `assaferan/pyloki` so #15's reproducer links resolve.
 
 **What deliberately did not go out.** Anything about tiling. Per §8 nothing in this
 document currently supports an upstream sentence about it, and the buffer result is

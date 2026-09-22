@@ -1,7 +1,9 @@
 # The `max_sugg` overflow ratchet is silent in the logs
 
-**Status: draft for review. Not posted, not pushed.** One defect, one patch, one
-verification. Separate from `04_upstream_report.md`, which another session owns.
+**Status: SUBMITTED as [PR #14](https://github.com/pravirkr/pyloki/pull/14)**
+(2026-09-17, from `upstream-max-sugg-logging` off `upstream/main`). **Open, not merged
+— no review and no comments as of 2026-09-22.** One defect, one patch, one verification.
+Separate from `04_upstream_report.md`, which another session owns.
 
 *All line numbers refer to `upstream/main` at `18d04b3`.*
 

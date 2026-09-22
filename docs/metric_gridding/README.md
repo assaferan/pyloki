@@ -2,7 +2,7 @@
 
 **Status: CLOSED, 2026-09-18.** The `tiling_strategy` injection campaign this branch was
 created to design was **cancelled, not run** — the comparison it makes cannot be made at
-this configuration. Reopened twice since only to correct the record (2026-09-22).
+this configuration. Reopened since only to correct the record (2026-09-22).
 
 Entry point. `05_injection_design.md` is 1 500+ lines and **deliberately keeps retracted
 claims visible**, because this branch's failure mode is a correct measurement carrying a
@@ -102,22 +102,33 @@ position in 5**.
 `quadrature` 47.5 s), median over runs 2..n to exclude ~25 s of one-off numba JIT.
 `quadrature`'s cost scaled ~13x for a 16x buffer increase, roughly linearly.
 
-## What shipped, and what is held
+## What went upstream
 
-- **Shipped.** The silent-ratchet defect found along the way is
-  [PR #14](https://github.com/pravirkr/pyloki/pull/14), **merged upstream** — it adds the
-  `threshold_eff` field that made every measurement above possible. Implemented on a
-  separate branch off `upstream/main`, not here; verified in both directions by a
-  regression test. Write-up: `06_upstream_max_sugg_logging.md`.
-- **Held, unposted.** `07_upstream_buffer_policy.md` — the buffer-policy question, framed
-  as an *issue* rather than a patch because the fix is a design call. The branch is pushed
-  to the `assaferan` fork **only** so that draft's reproducer links resolve. Nothing has
-  been posted to the upstream tracker, and nothing should be without assaferan reading it
-  first.
-- **Deliberately not shipped.** Anything about tiling. Per §8 nothing in this document
-  supports an upstream sentence about it, and the buffer result is stronger standing
-  alone. If `metric-gridding`'s `04_upstream_report.md` and this ever both go out, they
-  must be consistent with each other.
+Both went out after assaferan reviewed them, and both are about the buffer:
+
+- **[PR #14](https://github.com/pravirkr/pyloki/pull/14)** — the silent-ratchet defect.
+  Adds the `threshold_eff` field that made every measurement above possible. Implemented
+  on a separate branch off `upstream/main`, not here; verified in both directions by a
+  regression test. **Open, not merged** — opened 2026-09-17, no review and no comments as
+  of 2026-09-22. Source: `06_upstream_max_sugg_logging.md`.
+- **[Issue #15](https://github.com/pravirkr/pyloki/issues/15)** — the buffer-policy
+  question, framed as an issue rather than a patch because the fix is a design call.
+  Posted 2026-09-22 from `07_upstream_buffer_policy.md`, essentially verbatim. The branch
+  is pushed to the `assaferan` fork so #15's reproducer links resolve.
+
+**Still unreported, and the one postable item left**: the posted #15 cut the draft's
+closing note that `DynamicThresholdScheme.__init__` (`thresholding.py:740`) does not seed
+its RNG, so two scheme runs with identical arguments give different ladders and any
+comparison varying one scheme parameter must take every ladder from a single `run()`.
+Cutting it from #15 was right — it is a reproducibility defect, not a design call — but
+it deserves its own issue, not an addition to that one.
+
+**Deliberately not sent.** Anything about tiling. Per §8 nothing in this document
+supports an upstream sentence about it, and the buffer result is stronger standing alone.
+If `metric-gridding`'s `04_upstream_report.md` — still unposted — ever goes out too, the
+two must be consistent with each other.
+
+**Nothing reaches the tracker without assaferan reading it first.** Both of the above did.
 
 **No inherited library code was modified by the design work on this branch.**
 
@@ -217,8 +228,8 @@ the wrong ladders. The correct ones are `schemes/cheby_*.npz`.
 ## Files
 
     05_injection_design.md          the design, the verdict, the handoff — START HERE (§1, §6.6, §11)
-    06_upstream_max_sugg_logging.md the logging patch — SHIPPED as PR #14
-    07_upstream_buffer_policy.md    the buffer-policy issue — DRAFT, UNPOSTED, held for review
+    06_upstream_max_sugg_logging.md the logging patch — SUBMITTED as PR #14 (open, unmerged)
+    07_upstream_buffer_policy.md    the buffer-policy issue — POSTED as issue #15
 
     saturation_sweep.py             buffer sweep; the non-convergence result (§6.6)
     ratchet_probe.py                per-level threshold_eff; the direct ratchet measure (§6.7)
