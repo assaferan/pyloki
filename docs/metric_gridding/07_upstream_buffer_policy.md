@@ -1,8 +1,9 @@
 # A high-branching search cannot run at its configured threshold scheme
 
-**Status: draft for review. Not posted, not pushed.** Proposed as an *issue* — a
-question about pruning semantics — rather than a patch, because the fix is a design
-call. Successor to [PR #14](https://github.com/pravirkr/pyloki/pull/14), which made the
+**Status: draft for review. Not posted.** The supporting branch is pushed to the fork
+(`assaferan/pyloki`, branch `injection-design`) so the reproducer links below resolve;
+nothing has been posted to the upstream tracker. Proposed as an *issue* — a question
+about pruning semantics — rather than a patch, because the fix is a design call. Successor to [PR #14](https://github.com/pravirkr/pyloki/pull/14), which made the
 behaviour below visible; this asks whether it should be avoidable.
 
 *All line numbers refer to `upstream/main` at `18d04b3`. All measurements use the
