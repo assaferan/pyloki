@@ -1,8 +1,28 @@
 # A pyloki run cannot be reproduced: `default_rng()` is unseeded in eight places
 
-**Status: draft for review. NOT POSTED.** Held pending assaferan's review, like every
-other upstream item from this branch. The reproducer is committed alongside it as
-`rng_reproducibility.py`.
+> ## ⚠ SUPERSEDED — owned by `fix-flaky-norm-isf`, 2026-09-22
+>
+> This draft and `rng_reproducibility.py` were written here before the fix existed, and
+> the whole RNG story now lives on **`fix-flaky-norm-isf`**: the implementation, an
+> extended five-check reproducer, and `FINDINGS_rng_seeding.md`. **Read those, not this.**
+> Kept unedited below for provenance.
+>
+> **One claim in the text below is now known false.** It says shape (1) was implemented
+> across all eight sites. Running this reproducer against the fix found that
+> `DynamicThresholdScheme.run()` still produces different ladders when seeded:
+> `run_stage_legacy` is `@njit(parallel=True)` (`thresholding.py:597`) and draws from the
+> shared generator inside a `prange`, so a seed fixes the stream but not the order the
+> threads consume it. Seeding cuts the spread from 0.798 to 0.080 and forcing one thread
+> removes it entirely, which locates the residue in scheduling rather than in the seed.
+> The honest summary is **seven of eight closed; the eighth needs per-iteration
+> generators inside the kernel** — not "fixed".
+>
+> The framing that survives, and the reason this draft is kept at all:
+> **`DynamicThresholdScheme` is the site that matters most, because a ladder is an input
+> to a search.** That is still true, and it is now the site with a known-open gap.
+
+**Status: draft, NOT POSTED, and now superseded.** Held pending assaferan's review, like
+every other upstream item from this branch.
 
 *All line numbers refer to `main` at `18d04b3`, and are enumerated from the source by the
 reproducer rather than typed, so they cannot drift.*
@@ -113,9 +133,11 @@ We have no strong view, and the choice interacts with API taste:
 3. **A module-level default generator** that a user can set once. Least invasive at the
    call sites, worst for concurrent use.
 
-**We have implemented (1) in our own tree** across all eight sites — a
-`seed: int | np.random.Generator | None = None` keyword defaulting to `None`, so current
-behaviour is unchanged for every existing caller. It is not proposed here as a patch
+~~**We have implemented (1) in our own tree** across all eight sites~~ — **corrected:
+seven of eight.** A `seed: int | np.random.Generator | None = None` keyword defaulting to
+`None`, so current behaviour is unchanged for every existing caller; but
+`DynamicThresholdScheme.run()` is not made reproducible by it, for the parallel-kernel
+reason in the banner above. It is not proposed here as a patch
 because the choice between the three shapes is yours; say which you prefer and we will
 open it as a PR, with a regression test asserting that two identical constructions agree.
 

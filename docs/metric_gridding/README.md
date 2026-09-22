@@ -150,9 +150,15 @@ points elsewhere — `fix-flaky-norm-isf` fixed the same root class at
 real accuracy of the maths lookup tables instead of sampling it"). That branch also
 carries `FINDINGS_norm_isf_func.md`, unreported, on defects found underneath it.
 
-**Drafted, 2026-09-22**, as `08_upstream_rng_seeding.md` with
-`rng_reproducibility.py` beside it — **held for review, not posted.** The rest of this
-section is what that draft had to account for.
+**Drafted here 2026-09-22, then handed over.** `08_upstream_rng_seeding.md` and
+`rng_reproducibility.py` are **superseded**: the fix, an extended reproducer and
+`FINDINGS_rng_seeding.md` live on **`fix-flaky-norm-isf`**, which owns this. Seven of the
+eight sites are closed there; the eighth, `DynamicThresholdScheme.run()`, is not — it
+draws from the shared generator inside an `@njit(parallel=True)` `prange`
+(`thresholding.py:597`), so a seed fixes the stream but not the thread order. **Pairing
+on one ladder still requires committing the array**, seed or no seed. The rest of this
+section is what the draft had to account for, kept because it is still what a report
+would owe.
 
 **What the draft owed the maintainer.** §6.1 of `05_injection_design.md` is titled
 "Pairing is possible — verified, and it needs no library change", and concludes the
@@ -281,8 +287,8 @@ the wrong ladders. The correct ones are `schemes/cheby_*.npz`.
     05_injection_design.md          the design, the verdict, the handoff — START HERE (§1, §6.6, §11)
     06_upstream_max_sugg_logging.md the logging patch — SUBMITTED as PR #14 (open, unmerged)
     07_upstream_buffer_policy.md    the buffer-policy issue — POSTED as issue #15
-    08_upstream_rng_seeding.md      the unseeded-RNG family — DRAFT, UNPOSTED, held
-    rng_reproducibility.py          its reproducer; self-contained, runs in seconds
+    08_upstream_rng_seeding.md      SUPERSEDED — the RNG story is on fix-flaky-norm-isf
+    rng_reproducibility.py          its reproducer; absorbed and extended on that branch
 
     saturation_sweep.py             buffer sweep; the non-convergence result (§6.6)
     ratchet_probe.py                per-level threshold_eff; the direct ratchet measure (§6.7)
