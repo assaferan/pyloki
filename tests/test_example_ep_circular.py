@@ -70,6 +70,14 @@ if TYPE_CHECKING:
 # had no way to reach them; see tests/test_rng_seeding.py.
 SEED = 42
 
+# Measured over 20 seeded realisations. Every parameter passed at every seed, with
+# error/tolerance peaking at 0.386 (freq). These three seeds are the worst observed
+# case for different parameters, so between them they exercise all five:
+#   1  -> worst crackle (0.234), jerk (0.329) and freq (0.386)
+#   14 -> worst snap (0.330)
+#   7  -> worst accel (0.319)
+SEED_SWEEP = (1, 14, 7)
+
 # --- The notebook's physical setup ------------------------------------------------
 PULSAR_PERIOD = 0.007
 DT = 64e-6
@@ -218,6 +226,23 @@ def _check_param(result: dict, param: str, seed: object = SEED) -> None:
         f"want {true:.6g} (error {error:.5g} > {tol:.5g}, d{param}="
         f"{uncertainty:.5g})"
     )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("seed", SEED_SWEEP)
+def test_recovery_does_not_depend_on_the_noise_realisation(
+    seed: int,
+    tmp_path: Path,
+) -> None:
+    """All five derivatives must come back at every realisation, not just `SEED`.
+
+    Fixed seeds, never random: a random seed makes a failure unreproducible, which
+    is the defect this suite was fixed to not have. The seeds are the measured
+    worst case for each parameter; see `SEED_SWEEP`.
+    """
+    result = _run_search(seed, tmp_path)
+    for param in TOLERANCES:
+        _check_param(result, param, seed)
 
 
 def test_pipeline_produces_candidates(ep_circular_search) -> None:

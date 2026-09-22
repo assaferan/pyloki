@@ -72,6 +72,16 @@ from pyloki.utils import np_utils
 # had no way to reach them; see tests/test_rng_seeding.py.
 SEED = 42
 
+# Measured over 40 seeded realisations, as the largest peak offset on any axis of
+# any case, against INDEX_TOL = 3 bins. Observed offsets were 0, 1 or 2 bins -- never
+# 3 -- so the margin here is a single bin, the tightest of the four examples.
+# These three seeds are the measured 2-bin cases, and between them they cover all
+# three axes:
+#   8  -> freq off by 2 AND jerk off by 2, the worst single realisation seen
+#   12 -> accel off by 2
+#   5  -> jerk off by 2, with freq off by 1
+SEED_SWEEP = (8, 12, 5)
+
 DT = 64e-6
 NBINS = 64
 SNR = 20.0  # notebooks use 10; see docstring
@@ -210,6 +220,64 @@ def _index_offsets(pgram, truth: dict[str, float]) -> dict[str, int]:
     return offsets
 
 
+# One source for each recovery predicate, shared by the pinned tests and the sweep.
+
+
+def _check_detection(result: dict, use_fourier: bool) -> None:
+    pgram = result["pgrams"][use_fourier]
+    peak = float(pgram.find_best_params()["snr"])
+    assert peak > MIN_SNR, (
+        f"peak S/N {peak:.2f} is not a detection (seed={result['seed']}, "
+        f"case={result['case'].name}, use_fourier={use_fourier})"
+    )
+
+
+def _check_peak_cell(result: dict, use_fourier: bool) -> None:
+    offsets = _index_offsets(result["pgrams"][use_fourier], result["truth"])
+    assert offsets, "no searched axis matched an injected parameter"
+    for name, offset in offsets.items():
+        assert abs(offset) <= INDEX_TOL, (
+            f"{name!r} peak is {offset:+d} cells from the injected value "
+            f"(tolerance {INDEX_TOL}); seed={result['seed']}, "
+            f"case={result['case'].name}, use_fourier={use_fourier}"
+        )
+
+
+def _check_backends_agree(result: dict) -> None:
+    direct = _index_offsets(result["pgrams"][False], result["truth"])
+    fourier = _index_offsets(result["pgrams"][True], result["truth"])
+    assert direct.keys() == fourier.keys()
+    for name in direct:
+        assert abs(direct[name] - fourier[name]) <= INDEX_TOL, (
+            f"backends disagree on {name!r}: direct {direct[name]:+d} vs "
+            f"fourier {fourier[name]:+d} cells from the injection "
+            f"(seed={result['seed']}, case={result['case'].name})"
+        )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("case", CASES, ids=lambda c: c.name)
+@pytest.mark.parametrize("seed", SEED_SWEEP)
+def test_recovery_does_not_depend_on_the_noise_realisation(
+    seed: int,
+    case: FfaCase,
+) -> None:
+    """The peak must stay on the injected cell at every realisation, not just `SEED`.
+
+    Fixed seeds, never random: a random seed makes a failure unreproducible, which
+    is the defect this suite was fixed to not have.
+
+    **These seeds are the measured 2-bin cases** -- see `SEED_SWEEP`. The margin
+    here is one bin, so a sweep over easy realisations would be much weaker than
+    the pinned run; the near-miss cases are the point.
+    """
+    result = _run_case(case, seed)
+    for use_fourier in BACKENDS:
+        _check_detection(result, use_fourier)
+        _check_peak_cell(result, use_fourier)
+    _check_backends_agree(result)
+
+
 @pytest.mark.parametrize("use_fourier", BACKENDS)
 def test_search_returns_a_periodogram(ffa_result, use_fourier: bool) -> None:
     pgram = ffa_result["pgrams"][use_fourier]
@@ -237,22 +305,12 @@ def test_searched_axes_are_not_degenerate(ffa_result, use_fourier: bool) -> None
 
 @pytest.mark.parametrize("use_fourier", BACKENDS)
 def test_peak_is_a_real_detection(ffa_result, use_fourier: bool) -> None:
-    pgram = ffa_result["pgrams"][use_fourier]
-    peak = float(pgram.find_best_params()["snr"])
-    assert peak > MIN_SNR, f"peak S/N {peak:.2f} is not a detection"
+    _check_detection(ffa_result, use_fourier)
 
 
 @pytest.mark.parametrize("use_fourier", BACKENDS)
 def test_peak_lands_on_the_injected_cell(ffa_result, use_fourier: bool) -> None:
-    pgram = ffa_result["pgrams"][use_fourier]
-    offsets = _index_offsets(pgram, ffa_result["truth"])
-    assert offsets, "no searched axis matched an injected parameter"
-    for name, offset in offsets.items():
-        assert abs(offset) <= INDEX_TOL, (
-            f"{name!r} peak is {offset:+d} cells from the injected value "
-            f"(tolerance {INDEX_TOL}); case={ffa_result['case'].name}, "
-            f"use_fourier={use_fourier}"
-        )
+    _check_peak_cell(ffa_result, use_fourier)
 
 
 def test_backends_agree(ffa_result) -> None:
@@ -262,11 +320,4 @@ def test_backends_agree(ffa_result) -> None:
     implementations should agree on it. This is the only assertion here that would catch
     a regression in one backend but not the other.
     """
-    direct = _index_offsets(ffa_result["pgrams"][False], ffa_result["truth"])
-    fourier = _index_offsets(ffa_result["pgrams"][True], ffa_result["truth"])
-    assert direct.keys() == fourier.keys()
-    for name in direct:
-        assert abs(direct[name] - fourier[name]) <= INDEX_TOL, (
-            f"backends disagree on {name!r}: direct {direct[name]:+d} vs "
-            f"fourier {fourier[name]:+d} cells from the injection"
-        )
+    _check_backends_agree(ffa_result)

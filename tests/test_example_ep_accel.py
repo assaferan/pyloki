@@ -65,6 +65,17 @@ if TYPE_CHECKING:
 # had no way to reach them; see tests/test_rng_seeding.py.
 SEED = 42
 
+# Measured over 40 seeded realisations: this example produced exactly TWO distinct
+# outcomes, differing only in frequency (error/tolerance 0.067 or 0.140), with the
+# acceleration ratio identical at 0.091 every time. Peak margin is ~7x, and a
+# one-cell acceleration miss would land at 0.93 and still pass, because
+# ACCEL_TOL = 50 sits just above daccel = 46.3.
+#
+# So unlike ep_jerk, this example has no hard realisation to pin -- the sweep below
+# is regression insurance, not coverage of a measured risk. 4 and 16 are from the
+# worse of the two outcomes, 1 from the better.
+SEED_SWEEP = (4, 16, 1)
+
 # --- The notebook's physical setup, unchanged -------------------------------------
 PULSAR_PERIOD = 0.007
 DT = 64e-6
@@ -209,6 +220,27 @@ def _check_accel(result: dict, seed: object = SEED) -> None:
         f"want {ACCEL:.1f} (error {error:.3f} > {ACCEL_TOL:.1f}, "
         f"daccel={best['daccel']:.3f})"
     )
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("seed", SEED_SWEEP)
+def test_recovery_does_not_depend_on_the_noise_realisation(
+    seed: int,
+    tmp_path: Path,
+) -> None:
+    """The recovery predicates must hold at every realisation, not just `SEED`.
+
+    Fixed seeds, never random: a random seed makes a failure unreproducible, which
+    is the defect this suite was fixed to not have.
+
+    This example is genuinely realisation-insensitive -- see `SEED_SWEEP` for the
+    measurement -- so unlike the `ep_jerk` sweep, this one is not exercising a
+    known-hard case. It is here to catch a future change that *makes* the result
+    realisation-dependent, which the pinned single seed could not.
+    """
+    result = _run_search(seed, tmp_path)
+    _check_freq(result, seed)
+    _check_accel(result, seed)
 
 
 def test_pipeline_produces_candidates(ep_accel_search) -> None:

@@ -105,6 +105,58 @@ What it does **not** establish: 5 seeds bound the per-realisation failure rate o
 loosely (0 of 5 is consistent with anything under ~45%). The measured rate is the 60-run
 figure above, and that is the number to quote.
 
+### The other three examples, measured
+
+Each example was swept before a sweep was written for it, because picking seeds
+without measuring gives the same cost for weaker coverage. Ratios are
+error / tolerance; a ratio of 1 is a failure.
+
+| example | seeds | worst ratio | margin | sweep seeds | why those |
+|---|---|---|---|---|---|
+| `ep_jerk` | 28 | **1.00** (fails) | bimodal | 7, 11, 1, 15, 26 | 7 and 11 are the one-cell misses |
+| `ep_accel` | 40 | 0.14 | ~7x | 4, 16, 1 | only two outcomes exist; 4/16 the worse, 1 the better |
+| `ep_circular` | 20 | 0.386 | ~2.6x | 1, 14, 7 | worst observed case for each of the five parameters |
+| `test_example_ffa` | 40 | 0.667 | **1 bin** | 8, 12, 5 | the measured 2-bin offsets, against a 3-bin tolerance |
+
+Two results worth stating separately.
+
+**`ep_accel` is genuinely realisation-insensitive.** Forty seeds produced exactly *two*
+distinct outcomes, differing only in frequency (0.067 or 0.140); the acceleration ratio
+was 0.091 every single time. It is also safe against the `ep_jerk` failure mode by
+accident rather than design: `ACCEL_TOL = 50` sits just above `daccel = 46.3`, so a
+one-cell miss lands at 0.93 and passes. Its sweep is regression insurance, not coverage
+of a measured risk, and the docstring says so.
+
+**`test_example_ffa` has the tightest margin of the four** — one bin. Observed peak
+offsets were 0, 1 or 2 bins against `INDEX_TOL = 3`. It has never flaked, but it is the
+example closest to doing so, and it is the one where pinning the measured near-misses
+matters most.
+
+**`ep_circular`'s reported uncertainties are optimistic.** Every parameter passed at
+every seed against its absolute tolerance, but measured against the search's own
+reported `d<param>`, the error exceeded it routinely: `freq` up to 2.10x, `accel` up to
+1.79x, `jerk` up to 1.34x. That is not a test failure — the tolerances are absolute, by
+choice — but it is the same phenomenon `ep_jerk`'s docstring already records for
+`dfreq`, now measured on a second example. **It means `ep_circular` must not be
+converted to grid-relative tolerances the way `ep_jerk` was**, at least not without
+re-deriving them: `error < d<param>` would fail today on most seeds.
+
+### Negative controls
+
+Every sweep was shown to fail when its claim is false, rather than assumed to:
+
+| example | perturbation | failures |
+|---|---|---|
+| `ep_jerk` | `ACCEL_TOL_DACCEL` → the old absolute ~1.0 | exactly seeds 7 and 11 |
+| `ep_accel` | `FREQ_TOL` 1e-3 → 1e-4 | seeds 4 and 16; seed 1 passes |
+| `ep_circular` | all tolerances × 0.3 | all three seeds |
+| `test_example_ffa` | `INDEX_TOL` 3 → 1 | exactly `8-freq`, `8-jerk`, `12-accel`, `5-jerk` |
+
+The `ffa` and `ep_accel` rows are the informative ones. `ffa` failed on precisely the
+four 2-bin cases the sweep identified, and nothing else. `ep_accel` failed on the two
+seeds drawn from the worse of its two outcomes while the third passed — so even where
+the margin is wide, the seed selection discriminates.
+
 Verified separately that the two RNG-derived inputs of the `ep_jerk` pipeline — the
 `2**22`-sample time series and the 64-stage ladder — are **bit-identical across three
 fresh processes** at `seed=42` (sha256 `9c075133b6450c2a` and `83dbe45a9f57f833`).
