@@ -60,6 +60,11 @@ from pyloki.periodogram import ScatteredPeriodogram
 from pyloki.prune import prune_dyp_tree
 from pyloki.simulation.pulse import PulseSignalConfig
 
+# Pinned so CI is reproducible. Before the library took a `seed`, the noise and the
+# threshold ladder were drawn from unseeded generators inside pyloki and this file
+# had no way to reach them; see tests/test_rng_seeding.py.
+SEED = 42
+
 # --- The notebook's physical setup ------------------------------------------------
 PULSAR_PERIOD = 0.007
 DT = 64e-6
@@ -105,6 +110,7 @@ def ep_circular_search(tmp_path_factory) -> dict:
         ducy=DUCY,
         mod_kwargs={"p_orb": p_orb, "psi": PSI, "m_c": M_C},
         mod_type="circular",
+        seed=SEED,
     )
     tim_data = cfg.generate(shape="gaussian")
     # The truth is the Taylor gauge of the circular orbit, as the notebook computes it.
@@ -151,6 +157,7 @@ def ep_circular_search(tmp_path_factory) -> dict:
         snr_final=SNR,
         ducy_max=0.5,
         wtsp=1.2,
+        seed=SEED,
     )
     thresholds = np.asarray(scheme.thresholds, dtype=np.float64)
 

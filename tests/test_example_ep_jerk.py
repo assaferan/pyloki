@@ -35,6 +35,15 @@ applied, so the assertion cannot pass merely because the uncertainty is huge.
 `accel` error 0.0063-0.0082 (`daccel = 8.29`), `freq` error 1.6e-4 to 3.0e-4
 (`dfreq = 9.2e-5`).
 
+That 5-realisation sample missed the failure mode. Over 28 seeded realisations the
+`accel` error is **bimodal**: 26 in 0.0059-0.0082 and 2 at 8.28, i.e. exactly one
+`daccel` step. The best candidate either lands in the right acceleration cell or in an
+adjacent one; there is no continuum between. Each of the three recovery checks is
+therefore sized against one grid step rather than against the observed spread --
+`JERK_TOL = 0.75` already exceeds `djerk = 0.556` and `FREQ_TOL = 2e-3` already exceeds
+`dfreq = 9.2e-5`, so both survive a one-cell miss, but the old absolute
+`ACCEL_TOL = 1.0` did not, and that was the whole of the flake.
+
 Note the frequency error *exceeds* the reported `dfreq` by 1.8-3.2x here, unlike the
 accel example where it stayed below it. The frequency check therefore uses an absolute
 tolerance rather than a multiple of `dfreq`: the reported frequency uncertainty is
@@ -74,12 +83,25 @@ SNR = 20.0
 MAX_SUGG = 2**18
 
 # --- Tolerances, well above the measured spread -------------------------------------
-JERK_TOL = 0.75  # measured error <= 0.333, i.e. ~2.3x margin
-ACCEL_TOL = 1.0  # measured error <= 0.0082, i.e. >100x margin
+JERK_TOL = 0.75  # measured error <= 0.333, i.e. ~2.3x margin -- and see below
+# Acceleration is checked against the search's OWN reported uncertainty, not an
+# absolute number. The error here is bimodal, not continuous: the best candidate
+# either lands in the correct accel cell (error ~0.008) or one cell away (error
+# ~8.285, which IS `daccel`). Measured over 28 seeded realisations: 26 at
+# 0.0059-0.0082, 2 at 8.2787/8.2915, nothing in between. An absolute `ACCEL_TOL =
+# 1.0` therefore looked like a >100x margin while actually demanding that the peak
+# land in exactly the right cell -- 8x tighter than the uncertainty the search
+# itself quotes -- and that is what made this test flaky.
+ACCEL_TOL_DACCEL = 1.5  # i.e. recovery within ~1 grid step of the reported value
 FREQ_TOL = 2e-3  # measured error <= 3.0e-4; deliberately NOT a multiple of dfreq
 # Guards so the recovery checks cannot pass vacuously.
 MAX_DJERK_FRACTION = 0.50  # djerk 0.556 is 28% of the injected jerk -> passes
 MAX_DACCEL_FRACTION = 0.10  # daccel 8.29 is 1.7% of accel -> passes
+
+# Pinned so CI is reproducible. Before the library took a `seed`, the noise and the
+# threshold ladder were drawn from unseeded generators inside pyloki and this file
+# had no way to reach them; see tests/test_rng_seeding.py.
+SEED = 42
 
 
 @pytest.fixture(scope="module")
@@ -92,6 +114,7 @@ def ep_jerk_search(tmp_path_factory) -> dict:
         snr=SNR,
         ducy=DUCY,
         mod_kwargs={"acc": ACCEL, "jerk": JERK},
+        seed=SEED,
     )
     tim_data = cfg.generate(shape="gaussian")
 
@@ -133,6 +156,7 @@ def ep_jerk_search(tmp_path_factory) -> dict:
         snr_final=SNR,
         ducy_max=0.5,
         wtsp=1.2,
+        seed=SEED,
     )
     thresholds = np.asarray(scheme.thresholds, dtype=np.float64)
 
@@ -190,9 +214,11 @@ def test_recovers_injected_acceleration(ep_jerk_search) -> None:
         f"against accel={ACCEL:.1f} -- the recovery check below would be vacuous"
     )
     error = abs(float(best["accel"]) - ACCEL)
-    assert error < ACCEL_TOL, (
+    tol = ACCEL_TOL_DACCEL * float(best["daccel"])
+    assert error < tol, (
         f"acceleration not recovered: got {best['accel']:.5f}, want {ACCEL:.1f} "
-        f"(error {error:.5f} > {ACCEL_TOL})"
+        f"(error {error:.5f} > {tol:.5f} = {ACCEL_TOL_DACCEL} x daccel "
+        f"{best['daccel']:.3f})"
     )
 
 

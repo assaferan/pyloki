@@ -67,6 +67,11 @@ from pyloki.search import ffa_search
 from pyloki.simulation.pulse import PulseSignalConfig
 from pyloki.utils import np_utils
 
+# Pinned so CI is reproducible. Before the library took a `seed`, the noise and the
+# threshold ladder were drawn from unseeded generators inside pyloki and this file
+# had no way to reach them; see tests/test_rng_seeding.py.
+SEED = 42
+
 DT = 64e-6
 NBINS = 64
 SNR = 20.0  # notebooks use 10; see docstring
@@ -103,6 +108,7 @@ class FfaCase:
             snr=SNR,
             ducy=self.ducy,
             mod_kwargs=dict(self.mod_kwargs),
+            seed=SEED,
         )
         tim_data = cfg.generate(shape="gaussian")
         if self.upper_params is None:
