@@ -14,13 +14,11 @@ Five checks:
 2. Seeding the legacy global RNG does not change that. `np.random.default_rng()`
    ignores `np.random.seed`, which is what makes this defect easy to miss -- the usual
    reflex appears to work and changes nothing.
-3. The same construction **with a seed**, on the default thread count: the ladders
-   **still differ**. This is the limitation, not the fix. `run_stage_legacy` is
-   `@njit(parallel=True)` and draws from the shared generator inside a `prange`, so a
-   seed fixes the stream but not the order threads consume it in.
-4. The same, **single-threaded**: now identical. This is the part the seed does fix,
-   and it locates the residual non-determinism precisely -- in the thread scheduling,
-   not in the seeding.
+3. The same construction **with a seed**: identical every time, on the default thread
+   count. This is the fix.
+4. The same seed forced **single-threaded**: identical to the parallel result. The
+   output does not depend on numba's thread count, which is what a shared generator
+   inside a `prange` could not deliver.
 5. Every `default_rng()` construction is enumerated from the installed source and
    reported as seeded or unseeded, so the site list in the write-up cannot drift from
    the code.
@@ -29,18 +27,21 @@ A threshold ladder is an *input* to a search, not an output of one, which is why
 site is the one worth demonstrating: two searches a user believes are identically
 calibrated were not.
 
-Note what checks 3 and 4 mean together: seeding `DynamicThresholdScheme.__init__` is
-necessary but **not sufficient** to reproduce a ladder under parallel execution. Every
-other seeded path in the library -- `determine_scheme`, `evaluate_scheme` and all four
-`PulseSignalConfig.generate*` methods -- reproduces on 14 threads as well as on one;
-this one site does not. Closing it needs per-iteration generators inside the kernel.
+Checks 3 and 4 together are the point. Seeding `__init__` alone was **not** sufficient
+here: both kernels that draw randomness do so inside a `prange`, so a single shared
+generator left the result dependent on thread scheduling. Each parallel iteration now
+gets its own generator, derived from `(entropy, istage)`, which removes the dependence
+on thread order entirely. Every other seeded path -- `determine_scheme`,
+`evaluate_scheme` and all four `PulseSignalConfig.generate*` methods -- was already
+reproducible and is unchanged.
 
 Usage:
 
     PYTHONPATH=<worktree>/src <repo>/.venv/bin/python rng_reproducibility.py
 
 Against a tree without the fix, checks 3 and 4 fail with a TypeError on the `seed`
-keyword, and check 5 reports eight unseeded sites.
+keyword, and check 5 reports eight unseeded sites. Against a tree that seeds only the
+constructor, check 3 reports differing ladders.
 """
 
 from __future__ import annotations
@@ -155,11 +156,8 @@ def main() -> None:
 
     print(f"\n3. The same, with seed=42, on {numba.get_num_threads()} threads "
           f"({N_SEEDED}x)")
-    ok &= report(
-        "seeded but parallel -- STILL VARIES, this is the limitation",
-        [one_ladder(seed=42) for _ in range(N_SEEDED)],
-        want_identical=False,
-    )
+    parallel = [one_ladder(seed=42) for _ in range(N_SEEDED)]
+    ok &= report("seeded and parallel -- the fix", parallel, want_identical=True)
 
     print(f"\n4. The same, with seed=42, forced single-threaded ({N_SERIAL}x)")
     original = numba.get_num_threads()
@@ -169,8 +167,8 @@ def main() -> None:
     finally:
         numba.set_num_threads(original)
     ok &= report(
-        "seeded and serial -- identical, so the residue is thread order",
-        serial,
+        "seeded and serial -- must match the parallel result above",
+        [*serial, parallel[0]],
         want_identical=True,
     )
 
