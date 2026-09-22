@@ -25,8 +25,9 @@ changes nothing.
 The site that matters most is `DynamicThresholdScheme`, because a threshold ladder is
 an **input** to a search, not an output of one. Two searches a user believes are
 identically calibrated are not. Measured on a small 8-stage configuration: 20 identical
-constructions gave 6 distinct ladders, max per-stage spread 0.798, and seeding the
-legacy global RNG before each construction changed nothing at all.
+constructions gave 6 distinct ladders, with a maximum per-stage spread of 0.798 in S/N
+(thresholds run 0.1 to `snr_final`), and seeding the legacy global RNG before each
+construction changed nothing at all.
 
 This is a reproducibility defect, not a correctness one. Everything downstream of the
 time series is deterministic; the non-determinism is entirely in the *inputs* — the
@@ -49,7 +50,8 @@ config draw the identical realisation every iteration.
 that draw randomness — `run_stage_legacy` and `pre_simulate_stage_folds` — are
 `@njit(parallel=True)` and consume the generator inside a `prange`. A single shared
 generator there leaves the result dependent on thread scheduling: seeded, on 14 threads,
-we still measured 2 distinct ladders in 5 runs. Each parallel iteration now gets its own
+5 runs produced 2 distinct ladders — enough to demonstrate that it happens, and not
+offered as a rate. Each parallel iteration now gets its own
 generator, from `SeedSequence(entropy, spawn_key=(istage,)).spawn(n)`, indexed by the
 loop variable — so iteration `i` always uses generator `i` and the result is independent
 of thread order by construction.
@@ -83,16 +85,22 @@ into the test.
 data files, about 25 s. It demonstrates the defect, the fix, and the thread-count
 independence, and enumerates the call sites from the installed source.
 
-### Note on the example tests
+### Why the example-test tolerance fix is in the same PR
 
-The example tests now pin a seed. That exposed, and this PR also fixes, a tolerance in
-`test_example_ep_jerk.py` that was failing about 1 run in 12: `ACCEL_TOL = 1.0` was
-commented as a ">100x margin" against the observed error spread, but it sits 8x *below*
-one `daccel` grid step. The recovered error is bimodal — the best candidate lands in the
-correct acceleration cell (error ~0.008) or an adjacent one (~8.285, which *is*
-`daccel`) — so an absolute tolerance under one grid step silently required an exact-cell
-hit. Measured 5 failures in 60 unseeded runs before, 0 in 60 after. The check now runs
-against the reported `daccel`.
+The example tests now pin a seed, and this PR also fixes a tolerance in
+`test_example_ep_jerk.py` that was failing **5 times in 60 runs of that test file**
+(unseeded). Those are not two changes. Pinning a seed does not merely *expose* that
+tolerance bug — it would **entomb** it. A 1-in-12 flake becomes deterministic the moment
+the seed is fixed, so a seed that happens to pass freezes the defect permanently out of
+sight and leaves the suite looking healthier than it is. We know which seeds are hard
+because we measured them, so this is concrete rather than hypothetical. Fixing the
+tolerance is what makes the seeding honest rather than cosmetic.
 
-Happy to split that into a separate PR if you would rather keep this one to the RNG
-change.
+The tolerance itself: `ACCEL_TOL = 1.0` was commented as a ">100x margin" against the
+observed error spread, but it sits 8x *below* one `daccel` grid step. The recovered
+error is bimodal — the best candidate lands in the correct acceleration cell (error
+~0.008) or an adjacent one (~8.285, which *is* `daccel`) — so an absolute tolerance
+under one grid step silently required an exact-cell hit. The check now runs against the
+reported `daccel`: 5 failures in 60 runs of the file before, 0 in 60 after, with the
+noise left unseeded in both measurements so it is the tolerance being tested and not the
+pin.
