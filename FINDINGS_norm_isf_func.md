@@ -19,16 +19,39 @@ negative index wraps to the tail of the table. The argument is out of domain
 (`sf = exp(-x) > 1`), so the honest answer is "very negative"; returning the table
 maximum means a non-detection is reported as a maximal detection.
 
-**Reachable.** `src/pyloki/detection/scoring.py:654` computes
+**Reachable from the public API, not from the live search** — read both halves of
+this together; the measurement below means nothing without the second.
+`src/pyloki/detection/scoring.py:654` computes
 `norm_isf_func(max(x_single, x_double))` where each `x` is
 `chi_sq_minus_logsf_func(...) - log2(n_filters)`, routinely negative for noise.
 Measured: 200 pure-Gaussian-noise profiles through
 `MatchedFilter(widths=[1,2,4,8], nbins=64).compute_dot_double` gave **191/200 above
 20 sigma, median 28.01, min -inf**.
 
-**Mitigating:** `compute_dot_double` and `harmonic_summing_score_func` are not called
-anywhere in the repo or the examples, so the live search path does not reach this.
-They are public API, so a user can.
+**Read the predicate.** That is the score the scoring path returns *for pure noise* — a
+false-alarm property of the function. It is **not** a measurement that a full search
+emits a 28 sigma candidate end to end, since a search applies thresholds and a pruning
+tree on top of this. The number must not be quoted without that sentence attached.
+
+*Independently reproduced* by the `injection-design` session (2026-09-22) from the
+docstring rather than from this script, on a different seed: 194/200 above 20 sigma,
+finite median **28.01**, finite min -1.05, max 28.12, one non-finite. The count differs
+by sampling; the median lands to the decimal. Note the input shape is `(nprof, nbins)`
+per the `_compute_snr_double` docstring — passing `(nprof, 2, nbins)` scores the
+variance row as a profile and silently doubles `n`.
+
+**The call graph, verified twice** (independently by this branch and by
+`injection-design`, 2026-09-22). `norm_isf_func` has exactly two callers,
+`scoring.py:654` in `_compute_snr_double` and `scoring.py:670` in
+`harmonic_summing_score_func`. Neither `compute_dot_double` nor
+`harmonic_summing_score_func` is called anywhere in `src/pyloki`. The live search scores
+through `scoring.snr_score_batch_func`, via each dynamic module's `score_func`, which
+never reaches `norm_isf_func`.
+
+So **running a search does not hit this**. A user reaches it only by calling the public
+scoring API directly. Anyone presenting the 28-sigma measurement must carry this
+sentence with it and at the same weight, or the reader will conclude their searches are
+emitting false candidates. They are not.
 
 ## 2. The whole first cell `[0, 0.1)` is non-finite
 
