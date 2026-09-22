@@ -339,10 +339,20 @@ same reason — few segments have been accumulated.
 > pooled 82/120 = 0.683 goes with it.
 >
 > The metric arm alone is 32/60 = 0.533 against my 0.760, Fisher `p` = 0.017 — which
-> looks like a disagreement and is not one: `m <= 1.0` at the last prune level is a
-> stricter predicate than end-to-end recovery from the final periodogram, so a lower
-> rate is expected. That gap is why the two arms must not be pooled, not evidence about
-> either instrument.
+> looks like a disagreement and is not evidence of one. The two criteria are different
+> **norms of the same `delta`**, with independently chosen normalisations: the excursion
+> criterion is `max_t |dPhi(t)|` in units of `tol = eta/nbins` — an L-infinity measure
+> (`sensitivity_loss.py:41-48`) — while the metric criterion is the quadratic form
+> `delta^T g delta` with harmonic weighting (`core/metric.py:152`). Neither implies the
+> other; which is tighter depends on the weighting in `g` and on the `tol` convention.
+> Nor is either nested in end-to-end recovery, which is evaluated after the final ascend
+> and resolve. **No ordering is available in any direction** — and that alone forbids
+> pooling them, with no test needed.
+>
+> (An earlier revision of this box said the metric criterion was "stricter by
+> definition, so a lower rate is expected". It is not: that asserted an ordering these
+> two norms do not have, and it contradicted the paragraph below. Caught by the
+> `overview` session from the code.)
 >
 > Two reasons not to read even the consistency as strong. The runs are **not
 > exchangeable** — `calibrate_scale_on_folds` (`pulse.py:72-110`, `:381`) tunes the
