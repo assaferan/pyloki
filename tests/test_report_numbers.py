@@ -7,9 +7,21 @@ neither, so this does three things --
 1. the cheap groups are recomputed live and must still match the committed JSON;
 2. every headline figure quoted in the report must equal the JSON value it came from,
    at the precision the report prints it;
-3. the `branch_max` verdicts are checked as *booleans* against the report's wording,
-   because "which configurations build" is the claim that was got wrong in prose while
-   the table beside it was right.
+3. the withdrawn `branch_max` verdicts stay withdrawn -- the report must not re-assert
+   which configurations build.
+
+Section 3 used to do the opposite. It checked the `branch_max` verdicts as booleans
+against the report's wording, on the reasoning that "which configurations build" was the
+claim got wrong in prose while the table beside it was right. The table was not right: it
+came from a proxy that does not measure the guarded quantity (D120), so section 3 spent
+five assertions pinning a falsified number to the prose that quoted it, and the suite that
+gave the table its authority became the thing that would have blocked its removal.
+
+The lesson, and the reason this docstring is longer than the tests below: asserting that a
+figure still reproduces is not asserting that it measures the claim, and only the first is
+cheap to automate. A test suite cannot tell you that you computed the wrong quantity. It
+can only stop you from quietly re-adopting one you already withdrew, which is all
+section 3 now attempts.
 """
 
 from __future__ import annotations
@@ -68,6 +80,12 @@ def test_covering_radius_reproduces():
 
 
 def test_branch_max_counts_reproduce():
+    """Pins a SUPERSEDED artifact (D120), not a result.
+
+    `branch_max_counts` does not measure the guarded quantity; its output survives in the
+    JSON only as an audit trail. This test keeps that artifact stable so the withdrawal
+    stays legible -- it asserts nothing about `branch_max` in the shipped code.
+    """
     assert RN.branch_max_counts() == DATA["branch_max"]
 
 
@@ -120,41 +138,45 @@ def test_taylor_advantage_statistics_really_do_differ():
     assert adv["ratio_of_medians"] > 1.5 * adv["per_cell_median"]
 
 
-# --- 3. the branch_max claim, as booleans ---------------------------------------
+# --- 3. the withdrawn branch_max verdicts stay withdrawn -------------------------
 
-@pytest.mark.parametrize("basis", ["taylor", "chebyshev"])
-@pytest.mark.parametrize("strategy", ["aggressive", "quadrature", "conservative"])
-def test_report_wording_matches_build_verdict(basis, strategy):
-    """`num_points > branch_max` is strict, so equality builds.
+# Phrasings that state a per-configuration verdict. The guard's own mechanics ("16
+# builds and 17 raises") are NOT verdicts and must stay sayable -- that sentence is the
+# only part of the section that survived D120.
+VERDICT_MARKERS = ("— raises", "— at the limit", "configuration that builds",
+                   "configurations that build", "unreachable at the default")
 
-    The report must mark a configuration as raising exactly when it does. Getting this
-    backwards for Chebyshev+quadrature (16 of 16, which builds) denied the only
-    configuration with a proven gain that needs no config change.
+
+def _verdict_lines(text: str) -> list[str]:
+    """Paragraphs stating a build verdict OUTSIDE a withdrawal context.
+
+    A withdrawn claim has to be quotable in order to be withdrawn -- the README's
+    withdrawn-table row names it verbatim, and the report's withdrawal paragraph restates
+    it before refuting it -- so a passage is only a violation when it asserts the verdict
+    without marking it as retracted.
+
+    Paragraph granularity, not line: prose here is hard-wrapped, so a claim and the
+    "withdrawn" that governs it routinely sit on different lines.
     """
-    entry = _dig(f"branch_max/{basis}/{strategy}")
-    # Guard the match against a digit to its left: a bare substring test makes
-    # "7 — raises" match inside "27 — raises".
-    marker = rf"(?<!\d){entry['max_per_axis']} — raises"
-    found = re.search(marker, LIVE) is not None
-    if entry["builds"]:
-        assert not found, (
-            f"{basis}/{strategy} builds ({entry['max_per_axis']} <= "
-            f"{entry['branch_max']}) but the report says it raises")
-    else:
-        assert found, (
-            f"{basis}/{strategy} raises ({entry['max_per_axis']} > "
-            f"{entry['branch_max']}) but the report does not say so")
+    blocks = re.split(r"\n\s*\n", text)
+    return [b.strip() for b in blocks
+            if any(m in b for m in VERDICT_MARKERS)
+            and not re.search(r"withdraw|WITHDRAWN|D120|NOT established"
+                              r"|not supported|Do not quote", b)]
 
 
-def test_build_verdict_is_consistent_with_the_guard():
-    for basis, row in DATA["branch_max"].items():
-        for strategy, entry in row.items():
-            assert entry["builds"] == (
-                entry["max_per_axis"] <= entry["branch_max"]), (basis, strategy)
+@pytest.mark.parametrize("doc", ["04_upstream_report.md", "README.md"])
+def test_no_live_branch_max_verdict(doc):
+    """No document may state which configurations build (D120)."""
+    offenders = _verdict_lines((DOCS / doc).read_text())
+    assert offenders == [], (
+        f"{doc} states a withdrawn branch_max verdict:\n" + "\n".join(offenders))
 
 
-def test_only_one_nonaggressive_configuration_builds():
-    """Stated as a test so it cannot be over-generalised in prose again."""
-    builds = {(b, s) for b, row in DATA["branch_max"].items()
-              for s, e in row.items() if e["builds"] and s != "aggressive"}
-    assert builds == {("chebyshev", "quadrature")}
+def test_report_carries_the_withdrawal():
+    """So the section cannot be quietly dropped instead of marked withdrawn."""
+    assert "WITHDRAWN IN FULL" in LIVE
+    assert "D120" in LIVE
+    # The refutation is the load-bearing part: a successor who deletes it loses the
+    # reason and is free to rebuild the same proxy.
+    assert "40 full 63-level prunes" in LIVE

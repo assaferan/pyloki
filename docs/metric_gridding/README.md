@@ -2,8 +2,9 @@
 
 **Status: CLOSED, 2026-09-18.** The injection campaign was cancelled; the branch ends on
 the negative result below. `04_upstream_report.md` is complete and deliberately unposted.
+Reopened twice since, for corrections only: D118 (2026-09-22) and D119-D120 (2026-09-22).
 
-Entry point. `DECISIONS.md` is 2 600+ lines over 41 sessions with 116 numbered
+Entry point. `DECISIONS.md` is 2 700+ lines over 43 sessions with 120 numbered
 decisions and roughly a dozen retractions; read this first or you will cite something
 that was withdrawn. Every claim below points at the decision that carries it.
 
@@ -65,18 +66,36 @@ the shipped boxcar bank and cross-checked against a matched filter. At 10% duty,
 
 **Measured per-stage survival** (`survival_profile.py`). Drives the real pruning loop and
 records the nearest survivor to the truth at every level. **No losses before level 13**,
-across two criteria, two parameter sets and two batches — where a single-leaf model put
-99% of losses in stages 1-10. The decision is made in the middle and late stages. (D101,
-D110)
+across two criteria, two parameter sets and three measurement groups totalling 100 runs —
+where a single-leaf model put 99% of losses in stages 1-10. The decision is made in the
+middle and late stages. (D101, D110)
 
-**`branch_max` at the shipped default of 16**: `aggressive` needs 7 (Taylor) and 9
-(Chebyshev); `quadrature` needs 28 and 16; `conservative` 27 and 20. The guard is strict,
-so **Chebyshev + `quadrature` is the only non-`aggressive` configuration that builds**,
-and it does so with no headroom. (D62, amended)
+| group | criterion | set | N | alive at final | ever lose | of those, by level 10 |
+|---|---|---|---|---|---|---|
+| batch 1 | excursion | A | 40 | 29/40 | 11 | 0/11 |
+| batch 2 | metric `m <= 1.0` | A | 30 | 15/30 | 15 | 0/15 |
+| batch 2 | metric `m <= 1.0` | B | 30 | 17/30 | 13 | 0/13 |
+
+The `0/11`, `0/15`, `0/13` denominators count the runs that **ever** lose a covering leaf,
+not the runs in the group. Quote the **shape**, not the level: the level-13 floor is what
+is robust, while the *location* is criterion-dependent by about 2x — median loss level 27
+under the excursion threshold against 15 under the metric one, because `m <= 1.0` is
+stricter than end-to-end recovery. Never pool alive fractions across the two criteria
+(D119).
+
+**`branch_max`: mechanics only.** The guard is
+`num_points = ceil(dparam_cur/dparam_new)` against `branch_max = len(out_values)`, strict,
+so 16 builds and 17 raises (`utils/psr_utils.py:362-365`). It fires **per leaf inside the
+pruning loop, not at configuration time**: `make_config` constructs for all six
+(basis, strategy) pairs at the default, and a run that will fail starts normally and dies
+partway through pruning. **Which configurations fit is NOT established** — the table that
+claimed it is withdrawn, see below. (D62, withdrawn by D120)
 
 **Report figures are generated, not typed** (`report_numbers.py`,
-`tests/test_report_numbers.py`): the report is bound to computed values, including the
-`branch_max` verdicts as booleans. It caught two defects on its first run. (D63-D65)
+`tests/test_report_numbers.py`): the report is bound to computed values. It caught two
+defects on its first run. But see D120: the harness asserts that a figure still
+*reproduces*, never that the quantity it computes is the one the claim is about, and the
+`branch_max` verdicts it bound as booleans were of the second kind. (D63-D65, D120)
 
 ## Withdrawn — do not cite these
 
@@ -91,7 +110,9 @@ and it does so with no headroom. (D62, amended)
 | D68/D71's pair counts (~290, ~770) | the survival model behind them is **retired** (D95), falsified against a converged measurement (D94) |
 | D77, the pilot "validation" | void — it measured the ratchet, not the ladder (D92) |
 | D78, "inject at S/N 15-17" | D86. Fitted an offset to one point, which cannot separate offset from shape (D85) |
-| D109's "discrepant" label | **D111**: the correct test is two-sample, `p = 0.16`, consistent. The profile is *unvalidated*, not contradicted |
+| D109's "discrepant" label | **D111**: the correct test is two-sample. But D111's own `p = 0.16` is superseded — see the next row |
+| D109/D111's `44/70 = 0.629`, and the `p = 0.16` computed from it | **D119**: the pooling adds an excursion numerator to a metric one, two different predicates, so it measures nothing. On the comparable arm, 29/40 = 0.725 against 38/50, `p = 0.81`. The conclusion (*unvalidated*, not contradicted) stands and strengthens |
+| D62's `branch_max` table, Taylor 7/28/27 and Chebyshev 9/16/20, and "Chebyshev + `quadrature` is the only non-`aggressive` configuration that builds" | **D120**: withdrawn in full, nothing replaces it. The proxy behind it is not the guarded quantity and is falsified by 40 completed prunes. Only the guard's *mechanics* survive |
 | `pruning_multiplicity.py` | `nearest_template.py`. The module is marked superseded in its own docstring |
 
 ## Not established, and why
@@ -102,7 +123,11 @@ and it does so with no headroom. (D62, amended)
   is no affordable buffer at which both arms run at their own calibration. (D91)
 - **The profile's absolute level.** Consistent with an external recovery rate but not
   validated by it; one batch agreeing was never evidence. The *shape* carries the
-  conclusions. (D109, D111)
+  conclusions. Compare only the excursion arm, 29/40 = 0.725 against 38/50, `p` = 0.81;
+  the pooled 44/70 is withdrawn. (D109, D111, D119)
+- **Which configurations fit `branch_max`.** The table that answered this is withdrawn and
+  nothing replaces it; settling it needs `branch_param_padded` instrumented in a real
+  prune. (D120)
 - **A `quadrature` survival profile**, blocked by the same non-convergence (302 s/run at
   2^21).
 - **The circular basis.** Untested throughout.

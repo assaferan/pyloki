@@ -115,10 +115,34 @@ def covering_radius(k_max: int = PO, span: int = 2) -> dict:
 
 
 def branch_max_counts() -> dict:
-    """Max per-axis child count per basis and strategy, and whether it BUILDS.
+    """SUPERSEDED AND UNSOUND (D120). Does NOT measure the guarded quantity.
 
-    The guard is strict (`num_points > branch_max`), so a count equal to `branch_max`
-    is fine. Recorded as a boolean so no sentence has to restate it.
+    Kept, like `pruning_multiplicity.py`, so a successor does not rebuild it believing it
+    new. Its output is retained under the "branch_max" key of `report_numbers.json` as an
+    audit trail. **No conclusion may rest on it**, and nothing in `04_upstream_report.md`
+    quotes it any more.
+
+    What it computes: unique offsets produced by `build_sets` at three sampled stages
+    (10, 30, 62) at a single `f0`. What the guard tests:
+    `ceil(dparam_cur/dparam_new)` per axis per leaf. These differ for two reasons.
+
+    1. `build_sets` applies the shift gate *before* computing `n` and leaves an axis width
+       unnarrowed when the axis does not branch (`nearest_template.py:95-99`), so its
+       running width is not `dparam_cur`. The shipped path calls `branch_param_padded` for
+       every axis at every level unconditionally and gates afterwards, in a separate
+       selection pass (`core/taylor.py:136-145`).
+    2. Three stages of 62 at one `f0` is neither a max over stages nor over leaves.
+
+    The refutation is a reductio: run the same proxy over all 62 stages and 21 `f0` values
+    and it returns 27 for Taylor+`aggressive`, i.e. the shipped default cannot run — while
+    `survival_profile.py` completed 40 full 63-level prunes on exactly that configuration
+    at `branch_max = 16`. A proxy that forbids something already observed is falsified,
+    whatever its test suite says.
+
+    Note for whoever writes the replacement: this function was generated, committed and
+    unit-tested, and survived five rounds of review that caught seven weaker errors. The
+    tests asserted it still *reproduced*; nothing asserted it *measured the claim*. Settle
+    the question by instrumenting `branch_param_padded` in a real prune instead.
     """
     out = {}
     truth = np.array([0.001, 0.05, 1.0, 0.0])

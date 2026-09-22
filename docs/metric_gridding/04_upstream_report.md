@@ -114,13 +114,28 @@ measurement puts 0% there. The decision is made in the middle and late stages.
 
 **What is and is not validated here.** The *shape* is robust: "no losses before level 13"
 holds across two criteria (the excursion threshold above, and the metric mismatch
-`m <= 1.0` this project already uses for recovery), two injected parameter sets and two
-independent batches — 0/11, 0/15 and 0/13 losses by level 10. The *absolute level* is merely
-unvalidated, which is weaker: the final-level alive fraction is 29/40 in one batch and
-15/30 in another, and combined at 44/70 = 0.629 it is **consistent** with an
-independently measured recovery rate of 38/50 = 0.760 (Fisher exact `p` = 0.16; pooled
-82/120 = 0.683). It is unvalidated because one batch agreeing was never evidence, not
-because the two disagree. Note also that this pipeline calibrates the injected amplitude
+`m <= 1.0` this project already uses for recovery), two injected parameter sets and three
+measurement groups totalling 100 runs — 0/11, 0/15 and 0/13 losses by level 10, where each
+denominator counts the runs in that group that **ever** lose a covering leaf, not the runs
+in the group. Grouped: excursion criterion, set A, N=40 (29/40 alive at the final level,
+11 ever lose); metric criterion, set A, N=30 (15/30, 15 ever lose); metric criterion,
+set B, N=30 (17/30, 13 ever lose).
+
+The *absolute level* is merely unvalidated, which is weaker. Taking the arm comparable to
+an external measurement — the excursion criterion, 29/40 = 0.725 — against an
+independently measured recovery rate of 38/50 = 0.760, Fisher exact gives `p` = 0.81:
+consistent, and not because the test is weak. It is unvalidated because one batch agreeing
+was never evidence, not because the two disagree.
+
+> **Correction, 2026-09-22 (D119).** An earlier version of this paragraph quoted a
+> combined `44/70 = 0.629` against 38/50 at `p` = 0.16. That pooling added the excursion
+> criterion's numerator (29/40) to the metric criterion's (15/30). They are different
+> predicates — `m <= 1.0` is stricter than end-to-end recovery, which is why the metric
+> arm sits at 0.50-0.57 — so the pooled fraction does not measure one quantity and must
+> not be quoted or re-tested. The conclusion is unaffected and slightly strengthened: on
+> the comparable arm alone the agreement is `p` = 0.81.
+
+Note also that this pipeline calibrates the injected amplitude
 against each realisation's own noise, so runs are not exchangeable and binomial `p`-values
 here are anti-conservative. The conclusions below rest on *where* losses occur, not on how
 many.
@@ -181,25 +196,45 @@ while the Taylor residual peaks only briefly at the window edge, and what smears
 profile is the residual's distribution, not its peak. On amplitude -- the thing that
 matters -- the two bases are within ~0.3 points of each other.
 
-## One practical point about `branch_max`
+## `branch_max` — WITHDRAWN IN FULL, 2026-09-22 (D120)
 
-Max per-axis child count, against the shipped `branch_max = 16`:
+This section gave a table of max per-axis child counts against the shipped
+`branch_max = 16` — Taylor 7/28/27 and Chebyshev 9/16/20 for
+`aggressive`/`quadrature`/`conservative` — and concluded that three of the four
+non-`aggressive` configurations are unreachable at the default, with
+Chebyshev + `quadrature` the sole exception that builds as shipped, at exactly 16 with no
+headroom. **None of that is supported. Do not quote any of it**, including from
+`report_numbers.json`, where the `branch_max` key is retained only as an audit trail.
 
-| | `aggressive` | `quadrature` | `conservative` |
-|---|---|---|---|
-| Taylor | 7 | **28 — raises** | **27 — raises** |
-| Chebyshev | 9 | 16 — at the limit | **20 — raises** |
+The numbers came from `report_numbers.branch_max_counts()`, which counts unique offsets
+produced by `nearest_template.build_sets` at three sampled stages (10, 30, 62) at a single
+`f0`. That is not the quantity the guard tests, for two independent reasons:
 
-The guard is strict (`num_points > branch_max`, `psr_utils.branch_param_padded:363`), so
-16 builds and 17 does not. Three of the four non-`aggressive` configurations are
-therefore unreachable at the default, and the Taylor gain above needs `branch_max`
-raised. **Chebyshev + `quadrature` is the exception: it builds as shipped**, which makes
-it the only configuration here with a proven gain that costs no config change.
+- `build_sets` applies the shift gate *before* computing `n`, and leaves an axis width
+  unnarrowed when that axis does not branch, so its running width is not the real
+  `dparam_cur` (`nearest_template.py:95-99`). The shipped path calls
+  `branch_param_padded` for **every** axis at **every** level unconditionally and applies
+  the shift gate afterwards, in a separate selection pass (`core/taylor.py:136-145`).
+- Three stages of 62, at one `f0`, is neither a maximum over stages nor over leaves.
+  Re-running the same proxy over all 62 stages and 21 `f0` values returns 27 for
+  Taylor + `aggressive`.
 
-That said, 16 of 16 is *at* the limit with no headroom. `num_points` is
-`ceil(dparam_cur/dparam_new)`, which moves with `poly_order`, `tobs`, `eta` and the
-segment count, so a nearby configuration turns it into a raised `ValueError` rather than
-a slower search. It fits for this configuration; it is not robust.
+That last number is the refutation. It says the shipped default configuration cannot run,
+while `survival_profile.py` completed 40 full 63-level prunes on exactly that
+configuration at `branch_max = 16`. A proxy that forbids something already observed is
+falsified, and every build/no-build verdict resting on it goes with it.
+
+What survives is only the guard's mechanics, read from the source and confirmed
+independently: `num_points = ceil(dparam_cur/dparam_new)` against
+`branch_max = len(out_values)`, strict, so 16 builds and 17 raises
+(`utils/psr_utils.py:362-365`). The failure surfaces **per leaf inside the pruning loop,
+not at configuration time** — `make_config` constructs for all six (basis, strategy) pairs
+at `branch_max = 16`, and both branching-pattern helpers run without raising. `dparam_new`
+comes from a per-leaf `f0`, so `num_points` is leaf-dependent; the magnitude of that
+dependence was measured only through the falsified proxy and is therefore unquantified.
+
+Establishing which configurations actually fit would require instrumenting
+`branch_param_padded` in a real prune, which this branch did not do.
 
 ## Why the advantage is not realisable
 

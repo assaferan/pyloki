@@ -2750,3 +2750,83 @@ Reopened only to correct a figure. The defect stands; the rate was wrong by ~2x.
     could actually fix it.
 Branch remains CLOSED; this changes one figure and its supporting detail, nothing else.
 ```
+
+## 2026-09-22 (ap) — two corrections to a closed branch: a pooled predicate, and a falsified proxy
+Reopened on assaferan's instruction to land two corrections raised by peer review. The
+branch stays closed; no result is added, two are withdrawn.
+  - **D119 — D109/D111's `44/70 = 0.629` is a mixed-predicate figure, and the `p = 0.16`
+    computed from it is void.** The pooling adds batch 1's numerator (29/40, **excursion**
+    criterion) to batch 2's (15/30, **metric** `m <= 1.0`). Those are different
+    predicates: `m <= 1.0` is stricter than end-to-end recovery, which is exactly why the
+    metric arm sits at 0.50-0.57 while the excursion arm sits at 0.725 — D110 says so, two
+    entries after the pooling, without noticing that the pooled number depends on them
+    being the same thing. Tested on the comparable arm alone:
+
+    | comparison | Fisher exact |
+    |---|---|
+    | excursion 29/40 = 0.725 against external 38/50 = 0.760 | **`p` = 0.81** |
+    | pooled 44/70 = 0.629 against 38/50 (**what D111 reported**) | `p` = 0.16 |
+    | excursion 29/40 against metric 15/30 (**the predicates differ**) | `p` = 0.08 |
+
+    D111's *conclusion* is unaffected and slightly strengthened — on the comparable arm
+    the agreement is `p` = 0.81, so "no evidence my instrument disagrees with theirs"
+    holds without any pooling, and the honest label remains **unvalidated**. What is
+    withdrawn is the number and its test.
+  - **The instructive part, and the reason this is an appended entry rather than an edit
+    to D109.** D109 was itself a correction: it fixed a one-sample test that should have
+    been two-sample, and carried the mixed-predicate numerator through the repair
+    untouched. So the fix inherited the defect and then certified it — line 2555 marks the
+    row "**correct**". Line 2559 gets within one word, "because one batch", and stops at
+    heterogeneity without reaching predicate. Repairing 2554-2555 in place would hide the
+    failure mode worth recording: **a correction can launder the error it is correcting**,
+    and a worked correction with the right answer marked is about as trustworthy as a log
+    entry gets. Raised by the overview session, which also reran the three tests above.
+  - **D120 — the `branch_max` table is WITHDRAWN IN FULL, and nothing replaces it.**
+    Taylor 7/28/27, Chebyshev 9/16/20, and the conclusion that Chebyshev+`quadrature` is
+    the only non-`aggressive` configuration that builds: all withdrawn (D62, and the
+    amendment to it). The numbers came from `report_numbers.branch_max_counts()`, which
+    counts unique offsets from `build_sets` at three sampled stages at a single `f0`. That
+    is not the guarded quantity, for two independent reasons:
+    1. `build_sets` applies the shift gate **before** computing `n` and leaves an axis
+       width unnarrowed when it does not branch (`nearest_template.py:95-99`), so its
+       running width is not `dparam_cur`. The shipped path calls `branch_param_padded` for
+       every axis at every level **unconditionally** and gates afterwards, in a separate
+       selection pass (`core/taylor.py:136-145`).
+    2. Three stages of 62 at one `f0` is neither a max over stages nor over leaves. Over
+       all 62 stages and 21 `f0` values the same proxy returns 27 for Taylor+`aggressive`.
+  - **The refutation is a reductio, and it was available the whole time.** 27 for
+    Taylor+`aggressive` says the shipped default cannot run, while `survival_profile.py`
+    completed **40 full 63-level prunes** on exactly that configuration at
+    `branch_max = 16`. A proxy that forbids something already observed is falsified
+    whatever its test suite says. Note the asymmetry: this is a falsifier, not a
+    validation. Had the proxy returned 12 and agreed with those runs, the agreement would
+    have been the same coincidence as the stable 16, and the table would have stood.
+  - What survives is the guard's mechanics only, read from source and confirmed
+    independently: strict `num_points > branch_max` (`utils/psr_utils.py:362-365`), fired
+    **per leaf inside the pruning loop, not at configuration time** — `make_config`
+    constructs for all six (basis, strategy) pairs at the default, so a run that will fail
+    starts normally and dies partway through pruning. `dparam_new` uses a per-leaf `f0`,
+    so `num_points` is leaf-dependent; that dependence was only ever quantified through
+    the falsified proxy and is now unquantified.
+  - **A new class of defect for this branch, kept separate from the other seven.** The
+    catalogued failure is a sound number carried into a frame where its denominator or
+    predicate no longer holds. This is not that: the quantity was wrong from the start,
+    and what made it credible was the harness around it. `report_numbers.py` exists so no
+    figure is typed by hand, and `tests/test_report_numbers.py` asserted the figures still
+    **reproduce** — nothing asserted they **measure the claim**, and only the first is
+    cheap to automate, so it is the one that got automated. That table was generated,
+    committed and unit-tested, and survived five rounds of review that caught seven weaker
+    errors. It was harder to doubt than a hand-typed number would have been.
+  - Consequently `tests/test_report_numbers.py` section 3 is rewritten. It previously
+    pinned the withdrawn verdicts to the report's prose in five assertions, so the suite
+    that gave the table its authority would have blocked its removal. It now asserts the
+    opposite — that no document states a per-configuration build verdict outside a
+    withdrawal context — with a negative control confirming it still flags the old table.
+    `branch_max_counts()` is kept and marked unsound in its own docstring, on the
+    `pruning_multiplicity.py` precedent, so a successor does not rebuild it believing it
+    new; its output stays in `report_numbers.json` as an audit trail only.
+Conventions fixed: a correction must restate the quantity it is correcting, not only the
+  operation — D109 fixed the test and inherited the numerator. And before trusting a
+  generated figure, name the quantity the claim is about and the quantity the code
+  computes, and confirm in words that they are the same one.
+Branch remains CLOSED. Entry point is still `README.md`, which carries both withdrawals.
