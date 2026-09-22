@@ -150,7 +150,11 @@ points elsewhere — `fix-flaky-norm-isf` fixed the same root class at
 real accuracy of the maths lookup tables instead of sampling it"). That branch also
 carries `FINDINGS_norm_isf_func.md`, unreported, on defects found underneath it.
 
-**What a draft would owe the maintainer.** §6.1 of `05_injection_design.md` is titled
+**Drafted, 2026-09-22**, as `08_upstream_rng_seeding.md` with
+`rng_reproducibility.py` beside it — **held for review, not posted.** The rest of this
+section is what that draft had to account for.
+
+**What the draft owed the maintainer.** §6.1 of `05_injection_design.md` is titled
 "Pairing is possible — verified, and it needs no library change", and concludes the
 campaign needs a driver change rather than a library one. That is this branch's own
 finding and it is not wrong: the workaround (generate each ladder once, commit the array,
@@ -270,6 +274,8 @@ the wrong ladders. The correct ones are `schemes/cheby_*.npz`.
     05_injection_design.md          the design, the verdict, the handoff — START HERE (§1, §6.6, §11)
     06_upstream_max_sugg_logging.md the logging patch — SUBMITTED as PR #14 (open, unmerged)
     07_upstream_buffer_policy.md    the buffer-policy issue — POSTED as issue #15
+    08_upstream_rng_seeding.md      the unseeded-RNG family — DRAFT, UNPOSTED, held
+    rng_reproducibility.py          its reproducer; self-contained, runs in seconds
 
     saturation_sweep.py             buffer sweep; the non-convergence result (§6.6)
     ratchet_probe.py                per-level threshold_eff; the direct ratchet measure (§6.7)
