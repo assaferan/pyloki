@@ -732,12 +732,13 @@ class DynamicThresholdScheme:
         wtsp: float = 1.0,
         beam_width: float = 0.7,
         mode: Literal["legacy", "improved"] = "legacy",
+        seed: int | np.random.Generator | None = None,
     ) -> None:
         if mode not in ("legacy", "improved"):
             msg = f"mode must be 'legacy' or 'improved', got {mode!r}"
             raise ValueError(msg)
         self.mode = mode
-        self.rng = np.random.default_rng()
+        self.rng = np.random.default_rng(seed)
         self.branching_pattern = branching_pattern
         self.ref_ducy = ref_ducy
         self.profile = generate_folded_profile(nbins=nbins, ducy=ref_ducy)
@@ -1034,6 +1035,7 @@ def determine_scheme(
     snr_final: float = 8,
     ducy_max: float = 0.2,
     wtsp: float = 1.0,
+    seed: int | np.random.Generator | None = None,
 ) -> StatesInfo:
     if len(survive_probs) != len(branching_pattern):
         msg = "Number of survive_probs must match the number of stages"
@@ -1043,7 +1045,7 @@ def determine_scheme(
     nstages = len(branching_pattern)
     profile = generate_folded_profile(nbins=nbins, ducy=ref_ducy)
     bias_snr = snr_final / np.sqrt(nstages + 1)
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed)
     states: list[np.recarray] = []
     fold_states: list[Folds] = []
     folds = np.zeros((ntrials, len(profile)), dtype=np.float32)
@@ -1086,12 +1088,13 @@ def evaluate_scheme(
     snr_final: float = 8,
     ducy_max: float = 0.2,
     wtsp: float = 1.0,
+    seed: int | np.random.Generator | None = None,
 ) -> StatesInfo:
     var_init = 1.0
     nstages = len(branching_pattern)
     profile = generate_folded_profile(nbins=nbins, ducy=ref_ducy)
     bias_snr = snr_final / np.sqrt(nstages + 1)
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(seed)
     if len(thresholds) != nstages:
         msg = "Number of thresholds must match the number of stages"
         raise ValueError(msg)
