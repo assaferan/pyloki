@@ -167,7 +167,23 @@ def _verdict_lines(text: str) -> list[str]:
 
 @pytest.mark.parametrize("doc", ["04_upstream_report.md", "README.md"])
 def test_no_live_branch_max_verdict(doc):
-    """No document may state which configurations build (D120)."""
+    """No document may state which configurations build (D120).
+
+    Negative control, run by hand 2026-09-22 and recorded here rather than asserted --
+    asserting that a fabricated document fails is itself brittle, and the point is that
+    someone can re-run it:
+
+        >>> _verdict_lines('| Taylor | 7 | **28 - raises** | **27 - raises** |')
+        [ ... one entry ... ]                       # the withdrawn table, caught
+        >>> _verdict_lines('The guard is strict, so 16 builds and 17 raises.')
+        []                                          # the surviving mechanics, permitted
+
+    That second case is why the marker list names verdict phrasings rather than the words
+    "builds" and "raises": the guard's own mechanics sentence must stay sayable. An earlier
+    version of this test was green while BOTH of those returned [] -- it scoped by
+    paragraph, so a table one blank line below its heading escaped. Green here does not
+    mean the guard discriminates; the control above is the only thing that shows it does.
+    """
     offenders = _verdict_lines((DOCS / doc).read_text())
     assert offenders == [], (
         f"{doc} states a withdrawn branch_max verdict:\n" + "\n".join(offenders))
@@ -206,6 +222,14 @@ def test_withdrawn_counts_never_appear_as_live_figures():
     Kept as a distinct check from section 3 because the two fail differently: section 3
     catches a reinstated *verdict*, this catches a reinstated *number* -- e.g. a table
     that quietly restores 28 for Taylor+quadrature without the word "raises" anywhere.
+
+    Negative control, run by hand 2026-09-22: feeding a section containing "branch_max"
+    and a row `| Taylor | 7 | **28** | **27** |` with no withdrawal marker is caught. The
+    first version of this check was NOT -- it scoped by paragraph, so the table escaped
+    its own heading, and it separately false-positived on `| 20 |` in the survival table,
+    where 20 is a prune level and not a branch count. Both failures were invisible from a
+    green run. Hence section scoping, and hence the two conditions below (branch_max
+    context AND the number in a table cell) rather than either alone.
     """
     withdrawn = {(b, s): e["max_per_axis"]
                  for b, row in DATA["branch_max"].items() for s, e in row.items()}
