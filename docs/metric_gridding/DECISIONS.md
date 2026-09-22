@@ -2830,3 +2830,71 @@ Conventions fixed: a correction must restate the quantity it is correcting, not 
   generated figure, name the quantity the claim is about and the quantity the code
   computes, and confirm in words that they are the same one.
 Branch remains CLOSED. Entry point is still `README.md`, which carries both withdrawals.
+
+## 2026-09-22 (aq) — the withdrawn branch_max question, settled by measurement
+Reopened on assaferan's instruction to fill the hole D120 left. One new result; the branch
+stays closed otherwise.
+  - **D121 — all six (basis, `tiling_strategy`) pairs BUILD at the shipped
+    `branch_max = 16`, and the withdrawn table was backwards, not merely unsupported.**
+    Max per-axis `num_points` in a real 63-level prune:
+
+    | | `aggressive` | `quadrature` | `conservative` |
+    |---|---|---|---|
+    | Taylor | 4 | 5 | **7** |
+    | Chebyshev | 4 | 5 | **8** |
+
+    Worst is 8 against a limit of 16, so every configuration runs as shipped with 2x
+    headroom. D62 claimed Taylor 7/28/27 and Chebyshev 9/16/20 and concluded three of the
+    four non-`aggressive` configurations were unreachable, with Chebyshev+`quadrature`
+    scraping in at exactly 16 "with no headroom". Nothing is unreachable, and that cell
+    has the second-largest margin in the table. The ordering `aggressive` < `quadrature`
+    < `conservative` is the only part of D62 that survived.
+  - **Method, chosen so the failure mode of D120 cannot recur: do not model the quantity,
+    read it out of the guard.** The guard is strict, so a full prune that completes at
+    `branch_max = B` and raises at `B-1` fixes max `num_points` at exactly `B`. Bisecting
+    `B` measures it with **no reimplementation of `ceil(dparam_cur/dparam_new)` anywhere
+    in the probe** — which is precisely where the withdrawn proxy went wrong.
+    `docs/metric_gridding/branch_max_probe.py`, committed.
+  - **Two checks, because a single measurement is what got withdrawn last time.**
+    Reproducibility: Taylor+`conservative` returned 7 in two independent runs. Buffer
+    dependence: the maxima are flat across a 16x range of `max_sugg`, so they are not
+    artefacts of how many leaves the buffer kept —
+
+    | | 2^14 | 2^16 | 2^18 |
+    |---|---|---|---|
+    | Taylor/`conservative` | 7 | 7 | 7 |
+    | Taylor/`quadrature` | 5 | 5 | 5 |
+    | Chebyshev/`conservative` | 8 | 8 | 8 |
+
+  - **A trap that produced a plausible non-result first.** `PulsarSearchConfig` validates
+    `branch_max > 10`, so the first bisection floored at 11 and returned 11 for all six —
+    a uniform number across six configurations that differ by orders of magnitude in
+    branching, which is what gave it away. `branch_max` only sizes a padded buffer, so the
+    validator is bypassed in the probe. Worth recording on its own: the validator floor
+    (11) sits **above** every requirement measured here (max 8).
+  - **What this does and does not establish.** Completion is a positive observation: these
+    configurations DO run, which refutes D62's "unreachable". It does **not** bound
+    `num_points` for a configuration nobody ran — a different `poly_order`, `tobs` or
+    segment count is untested. Same asymmetry as D120's reductio, in the other direction:
+    there a proxy forbidding an observed run was falsified outright; here observed runs
+    refute a prohibition and bound nothing beyond themselves.
+  - Recorded in `report_numbers.json` under `branch_max_measured`, explicitly labelled as
+    **recorded, not recomputed** — unlike every other key there, the test suite does not
+    assert it reproduces, because it needs real prunes. `tests/test_report_numbers.py`
+    gains a section 4 that asserts both documents carry the measured rows, that the
+    withdrawn counts never reappear as live figures, and that the buffer rows are flat.
+    Section 3's withdrawal guard had to be widened to admit D121: as written it would have
+    blocked the correction exactly as the original section 3 would have blocked the
+    withdrawal. That is the second time this suite has had to be taught the difference
+    between a claim and its retraction.
+  - **Consequence for `04_upstream_report.md`, which assaferan decided on 2026-09-22 will
+    not be posted.** The withdrawn table was the only user-facing, actionable claim the
+    document had. Its replacement says the shipped default is comfortably sufficient,
+    which asks a maintainer for nothing, so filling the hole confirms the decision rather
+    than reopening it. The report's status header now says WILL NOT BE POSTED with the
+    reasoning, so the question is not re-litigated a third time.
+Conventions fixed: when a measurement is available, prefer reading the quantity out of the
+  shipped code over recomputing it alongside — a bisection on a guard has no second
+  implementation to drift. And check a suspiciously uniform result against the spread of
+  the things it is measuring before believing it.
+Branch remains CLOSED. Entry point is still `README.md`.

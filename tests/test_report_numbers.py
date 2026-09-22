@@ -161,7 +161,7 @@ def _verdict_lines(text: str) -> list[str]:
     blocks = re.split(r"\n\s*\n", text)
     return [b.strip() for b in blocks
             if any(m in b for m in VERDICT_MARKERS)
-            and not re.search(r"withdraw|WITHDRAWN|D120|NOT established"
+            and not re.search(r"withdraw|WITHDRAWN|D120|D121|NOT established"
                               r"|not supported|Do not quote", b)]
 
 
@@ -180,3 +180,79 @@ def test_report_carries_the_withdrawal():
     # The refutation is the load-bearing part: a successor who deletes it loses the
     # reason and is free to rebuild the same proxy.
     assert "40 full 63-level prunes" in LIVE
+
+
+# --- 4. the measured replacement (D121) -----------------------------------------
+
+MEASURED = DATA["branch_max_measured"]
+
+
+def _sections(text: str) -> list[str]:
+    """Split markdown on headings, so a table stays with the prose that frames it."""
+    parts, cur = [], []
+    for line in text.splitlines():
+        if line.startswith("#") and cur:
+            parts.append("\n".join(cur))
+            cur = []
+        cur.append(line)
+    if cur:
+        parts.append("\n".join(cur))
+    return parts
+
+
+def test_withdrawn_counts_never_appear_as_live_figures():
+    """The proxy's numbers may be named as withdrawn, never quoted as the answer.
+
+    Kept as a distinct check from section 3 because the two fail differently: section 3
+    catches a reinstated *verdict*, this catches a reinstated *number* -- e.g. a table
+    that quietly restores 28 for Taylor+quadrature without the word "raises" anywhere.
+    """
+    withdrawn = {(b, s): e["max_per_axis"]
+                 for b, row in DATA["branch_max"].items() for s, e in row.items()}
+    for (basis, strategy), old in withdrawn.items():
+        new = MEASURED[basis][strategy]
+        if old == new:
+            continue        # 7 is both the old Taylor/aggressive and the new conservative
+        for doc in ("04_upstream_report.md", "README.md"):
+            for section in _sections((DOCS / doc).read_text()):
+                # Scope by SECTION, not paragraph. Bare numbers recur everywhere --
+                # "| 20 |" is a prune level in the survival table -- so an unscoped
+                # search reports those. Paragraph scoping is too tight in the other
+                # direction: a table one blank line below its own heading would escape.
+                if "branch_max" not in section and "num_points" not in section:
+                    continue
+                if not re.search(rf"\|\s*\**{old}\**\s*(—|\|)", section):
+                    continue
+                assert re.search(r"withdraw|WITHDRAWN|D120", section), (
+                    f"{doc} quotes the withdrawn count {old} for {basis}/{strategy} "
+                    f"in a live table; the measured value is {new} (D121)")
+
+
+@pytest.mark.parametrize("basis", ["taylor", "chebyshev"])
+def test_docs_quote_the_measured_row(basis):
+    """Both documents must carry the measured row exactly as recorded."""
+    row = [MEASURED[basis][s] for s in ("aggressive", "quadrature", "conservative")]
+    for doc in ("04_upstream_report.md", "README.md"):
+        text = (DOCS / doc).read_text()
+        pattern = r"\|\s*" + basis.capitalize() + r"\s*\|" + "".join(
+            rf"\s*\**{v}\**\s*\|" for v in row)
+        assert re.search(pattern, text), (
+            f"{doc} does not carry the measured {basis} row {row} (D121)")
+
+
+def test_measured_maxima_all_fit_the_shipped_default():
+    """The claim the docs make, as a boolean over the recorded numbers."""
+    worst = max(v for b in ("taylor", "chebyshev")
+                for v in MEASURED[b].values())
+    assert worst <= MEASURED["shipped_branch_max"]
+    assert MEASURED["all_build"] is True
+
+
+def test_measured_maxima_are_not_buffer_limited():
+    """A maximum that moves with max_sugg would make the table conditional."""
+    for cell, row in MEASURED["buffer_dependence"].items():
+        if cell.startswith("_"):
+            continue
+        assert len(set(row)) == 1, (
+            f"{cell} moves with the buffer: {row}; the table is then conditional "
+            "on max_sugg and must say so")

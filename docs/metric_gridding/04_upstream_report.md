@@ -1,11 +1,28 @@
 # 04_upstream_report.md — draft report for pravirkr/pyloki
 
-Status: **draft, unposted, and awaiting human review.** Rewritten again on 2026-09-17
-after session (s) replaced the withdrawn measurement with an exact one. History matters
-here: an earlier version of this file claimed `tiling_strategy` buys no sensitivity
-(refuted), then that `eta` is optimistic by 7.5x (retracted — that figure is a distance
-to the containing cell's centre, not a covering radius). What follows is only what a
-validated method now supports.
+Status: **WILL NOT BE POSTED. Archived 2026-09-22, decided by assaferan.** This is not
+"awaiting review" and the question is settled — do not re-open it, and do not treat any
+section below as a draft pending submission.
+
+Why, so it is not re-litigated: the report's headline is that `quadrature` is
+geometrically better and not worth using, which asks a maintainer to do nothing. Its one
+decision-relevant section, *Why the advantage is not realisable*, is the buffer-ratchet
+finding in a weaker form — its +3.4 score figure is from a shipped-example configuration
+at `max_sugg = 2^10` and is disclaimed in the text as an order-of-magnitude comparison —
+and the measured version of that finding already went upstream separately as PR #14 and
+issue #15. Posting this after it would dilute a measured result with a hand-wavier
+restatement. The only user-facing item it ever had was the `branch_max` table, and that
+was withdrawn in full by D120 as proxy-derived.
+
+The file is kept because the *methods* are worth not rebuilding — the exact search, the
+amplitude conversion, the closed forms — and because the withdrawal history is part of
+the record.
+
+History, retained: an earlier version of this file claimed `tiling_strategy` buys no
+sensitivity (refuted), then that `eta` is optimistic by 7.5x (retracted — that figure is a
+distance to the containing cell's centre, not a covering radius). Rewritten 2026-09-17
+after session (s) replaced the withdrawn measurement with an exact one. What follows is
+only what a validated method supports, with withdrawals marked in place.
 
 ## What the exact search establishes
 
@@ -233,8 +250,37 @@ at `branch_max = 16`, and both branching-pattern helpers run without raising. `d
 comes from a per-leaf `f0`, so `num_points` is leaf-dependent; the magnitude of that
 dependence was measured only through the falsified proxy and is therefore unquantified.
 
-Establishing which configurations actually fit would require instrumenting
-`branch_param_padded` in a real prune, which this branch did not do.
+### Replaced by measurement, 2026-09-22 (D121)
+
+The question was then settled properly, by `branch_max_probe.py`, which does not model the
+quantity at all — it reads it out of the shipped guard. The guard is strict, so a full
+63-level prune that completes at `branch_max = B` and raises at `B-1` fixes max
+`num_points` at exactly `B`. Bisecting `B` gives, with no reimplementation of
+`ceil(dparam_cur/dparam_new)` anywhere:
+
+| | `aggressive` | `quadrature` | `conservative` |
+|---|---|---|---|
+| Taylor | 4 | 5 | **7** |
+| Chebyshev | 4 | 5 | **8** |
+
+**Every (basis, strategy) pair runs at the shipped `branch_max = 16`**, the worst with 2x
+headroom, and the maxima are flat across a 16x range of `max_sugg` (2^14 to 2^18), so they
+are not buffer-limited. The withdrawn table is therefore not merely unsupported but
+backwards: it claimed three of the four non-`aggressive` configurations were unreachable
+and that Chebyshev + `quadrature` scraped in at exactly 16 with no headroom. Nothing is
+unreachable, and its "no headroom" cell has the second-largest margin in the table. The
+ordering `aggressive` < `quadrature` < `conservative` is the only part that survived.
+
+Two incidental notes. `PulsarSearchConfig` validates `branch_max > 10`, so a naive
+bisection floors at 11 and reports 11 for all six — an artefact that looks like a
+measurement; the values above required bypassing that validator, and the floor sits above
+every requirement measured here. And what a completed run establishes is asymmetric: it
+refutes "this configuration cannot run", and it does not bound `num_points` for a
+configuration nobody ran.
+
+**This removes the last item in this report that asked a maintainer for anything.** The
+withdrawn table was the only user-facing, actionable claim the document had; its
+replacement says the shipped default is comfortably sufficient, which asks for nothing.
 
 ## Why the advantage is not realisable
 

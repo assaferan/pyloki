@@ -2,7 +2,8 @@
 
 **Status: CLOSED, 2026-09-18.** The injection campaign was cancelled; the branch ends on
 the negative result below. `04_upstream_report.md` is complete and deliberately unposted.
-Reopened twice since, for corrections only: D118 (2026-09-22) and D119-D120 (2026-09-22).
+Reopened since for corrections and one measurement: D118, D119-D120, and D121, all
+2026-09-22. D121 is the only new result after the close.
 
 Entry point. `DECISIONS.md` is 2 700+ lines over 43 sessions with 120 numbered
 decisions and roughly a dozen retractions; read this first or you will cite something
@@ -83,13 +84,30 @@ under the excursion threshold against 15 under the metric one, because `m <= 1.0
 stricter than end-to-end recovery. Never pool alive fractions across the two criteria
 (D119).
 
-**`branch_max`: mechanics only.** The guard is
-`num_points = ceil(dparam_cur/dparam_new)` against `branch_max = len(out_values)`, strict,
-so 16 builds and 17 raises (`utils/psr_utils.py:362-365`). It fires **per leaf inside the
-pruning loop, not at configuration time**: `make_config` constructs for all six
-(basis, strategy) pairs at the default, and a run that will fail starts normally and dies
-partway through pruning. **Which configurations fit is NOT established** — the table that
-claimed it is withdrawn, see below. (D62, withdrawn by D120)
+**`branch_max`: all six configurations build, measured** (`branch_max_probe.py`). Max
+per-axis `num_points` in a real 63-level prune, read out of the shipped guard itself — a
+prune completes at `branch_max = B` and raises at `B-1`, so the maximum is exactly `B`:
+
+| | `aggressive` | `quadrature` | `conservative` |
+|---|---|---|---|
+| Taylor | 4 | 5 | **7** |
+| Chebyshev | 4 | 5 | **8** |
+
+Against the shipped `branch_max = 16`, so **every** (basis, strategy) pair runs as shipped,
+the worst with 2x headroom. Flat across a 16x range of `max_sugg` (2^14 to 2^18), so these
+are not buffer-limited. This *reverses* the withdrawn table, which claimed three of the
+four non-`aggressive` configurations were unreachable: the ordering `aggressive` <
+`quadrature` < `conservative` was the only part it got right. (D121, superseding D62/D120)
+
+The guard's mechanics, worth keeping because they are counter-intuitive:
+`num_points = ceil(dparam_cur/dparam_new)` against `branch_max = len(out_values)`, strict
+(`utils/psr_utils.py:362-365`), fired **per leaf inside the pruning loop, not at
+configuration time** — so a run that would fail starts normally and dies partway through
+pruning. Note also that `PulsarSearchConfig` validates `branch_max > 10` while nothing here
+needs more than 8; the validator floor sits above every measured requirement.
+
+What this does *not* establish: that no leaf in any configuration ever exceeds 16. A
+completed run refutes "cannot run" and does not bound the untested. (D121)
 
 **Report figures are generated, not typed** (`report_numbers.py`,
 `tests/test_report_numbers.py`): the report is bound to computed values. It caught two
@@ -112,7 +130,7 @@ defects on its first run. But see D120: the harness asserts that a figure still
 | D78, "inject at S/N 15-17" | D86. Fitted an offset to one point, which cannot separate offset from shape (D85) |
 | D109's "discrepant" label | **D111**: the correct test is two-sample. But D111's own `p = 0.16` is superseded — see the next row |
 | D109/D111's `44/70 = 0.629`, and the `p = 0.16` computed from it | **D119**: the pooling adds an excursion numerator to a metric one, two different predicates, so it measures nothing. On the comparable arm, 29/40 = 0.725 against 38/50, `p = 0.81`. The conclusion (*unvalidated*, not contradicted) stands and strengthens |
-| D62's `branch_max` table, Taylor 7/28/27 and Chebyshev 9/16/20, and "Chebyshev + `quadrature` is the only non-`aggressive` configuration that builds" | **D120**: withdrawn in full, nothing replaces it. The proxy behind it is not the guarded quantity and is falsified by 40 completed prunes. Only the guard's *mechanics* survive |
+| D62's `branch_max` table, Taylor 7/28/27 and Chebyshev 9/16/20, and "Chebyshev + `quadrature` is the only non-`aggressive` configuration that builds" | **D120** withdrew it (proxy-derived, falsified by 40 completed prunes); **D121** replaces it with a measured 4/5/7 and 4/5/8, and *reverses* the verdict — all six build at the shipped default |
 | `pruning_multiplicity.py` | `nearest_template.py`. The module is marked superseded in its own docstring |
 
 ## Not established, and why
@@ -125,9 +143,10 @@ defects on its first run. But see D120: the harness asserts that a figure still
   validated by it; one batch agreeing was never evidence. The *shape* carries the
   conclusions. Compare only the excursion arm, 29/40 = 0.725 against 38/50, `p` = 0.81;
   the pooled 44/70 is withdrawn. (D109, D111, D119)
-- **Which configurations fit `branch_max`.** The table that answered this is withdrawn and
-  nothing replaces it; settling it needs `branch_param_padded` instrumented in a real
-  prune. (D120)
+- **An upper bound on `num_points` across untested configurations.** D121 measured the
+  six shipped (basis, strategy) pairs at one configuration and they all fit; it does not
+  bound what a different `poly_order`, `tobs` or segment count would need. A completed run
+  refutes "cannot run" and bounds nothing else. (D121)
 - **A `quadrature` survival profile**, blocked by the same non-convergence (302 s/run at
   2^21).
 - **The circular basis.** Untested throughout.

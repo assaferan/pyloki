@@ -1,369 +1,411 @@
 {
-  "amplitude_chebyshev": {
-    "aggressive": {
-      "ducy_0.05": {
-        "boxcar": 0.063728,
-        "matched": 0.071326
-      },
-      "ducy_0.10": {
-        "boxcar": 0.020321,
-        "matched": 0.018774
-      },
-      "ducy_0.20": {
-        "boxcar": 0.004728,
-        "matched": 0.004753
-      }
+ "amplitude_chebyshev": {
+  "aggressive": {
+   "ducy_0.05": {
+    "boxcar": 0.063728,
+    "matched": 0.071326
+   },
+   "ducy_0.10": {
+    "boxcar": 0.020321,
+    "matched": 0.018774
+   },
+   "ducy_0.20": {
+    "boxcar": 0.004728,
+    "matched": 0.004753
+   }
+  },
+  "cells": 48,
+  "quadrature": {
+   "ducy_0.05": {
+    "boxcar": 0.037364,
+    "matched": 0.039277
+   },
+   "ducy_0.10": {
+    "boxcar": 0.011403,
+    "matched": 0.010124
+   },
+   "ducy_0.20": {
+    "boxcar": 0.002627,
+    "matched": 0.002549
+   }
+  },
+  "quadrature_advantage": {
+   "ducy_0.05": {
+    "boxcar": {
+     "per_cell_median": 0.013772,
+     "ratio_of_medians": 0.028158
     },
-    "cells": 48,
-    "quadrature": {
-      "ducy_0.05": {
-        "boxcar": 0.037364,
-        "matched": 0.039277
-      },
-      "ducy_0.10": {
-        "boxcar": 0.011403,
-        "matched": 0.010124
-      },
-      "ducy_0.20": {
-        "boxcar": 0.002627,
-        "matched": 0.002549
-      }
-    },
-    "quadrature_advantage": {
-      "ducy_0.05": {
-        "boxcar": {
-          "per_cell_median": 0.013772,
-          "ratio_of_medians": 0.028158
-        },
-        "matched": {
-          "per_cell_median": 0.025749,
-          "ratio_of_medians": 0.03451
-        }
-      },
-      "ducy_0.10": {
-        "boxcar": {
-          "per_cell_median": 0.005246,
-          "ratio_of_medians": 0.009103
-        },
-        "matched": {
-          "per_cell_median": 0.007042,
-          "ratio_of_medians": 0.008815
-        }
-      },
-      "ducy_0.20": {
-        "boxcar": {
-          "per_cell_median": 0.001256,
-          "ratio_of_medians": 0.002111
-        },
-        "matched": {
-          "per_cell_median": 0.001794,
-          "ratio_of_medians": 0.002214
-        }
-      }
+    "matched": {
+     "per_cell_median": 0.025749,
+     "ratio_of_medians": 0.03451
     }
-  },
-  "amplitude_taylor": {
-    "aggressive": {
-      "ducy_0.05": {
-        "boxcar": 0.053348,
-        "matched": 0.080007
-      },
-      "ducy_0.10": {
-        "boxcar": 0.017256,
-        "matched": 0.022047
-      },
-      "ducy_0.20": {
-        "boxcar": 0.004023,
-        "matched": 0.005658
-      }
+   },
+   "ducy_0.10": {
+    "boxcar": {
+     "per_cell_median": 0.005246,
+     "ratio_of_medians": 0.009103
     },
-    "cells": 48,
-    "quadrature": {
-      "ducy_0.05": {
-        "boxcar": 0.022627,
-        "matched": 0.040319
-      },
-      "ducy_0.10": {
-        "boxcar": 0.007472,
-        "matched": 0.010538
-      },
-      "ducy_0.20": {
-        "boxcar": 0.001717,
-        "matched": 0.002663
-      }
-    },
-    "quadrature_advantage": {
-      "ducy_0.05": {
-        "boxcar": {
-          "per_cell_median": 0.015591,
-          "ratio_of_medians": 0.032452
-        },
-        "matched": {
-          "per_cell_median": 0.013837,
-          "ratio_of_medians": 0.04314
-        }
-      },
-      "ducy_0.10": {
-        "boxcar": {
-          "per_cell_median": 0.004691,
-          "ratio_of_medians": 0.009956
-        },
-        "matched": {
-          "per_cell_median": 0.004042,
-          "ratio_of_medians": 0.011769
-        }
-      },
-      "ducy_0.20": {
-        "boxcar": {
-          "per_cell_median": 0.001105,
-          "ratio_of_medians": 0.002314
-        },
-        "matched": {
-          "per_cell_median": 0.001097,
-          "ratio_of_medians": 0.003012
-        }
-      }
+    "matched": {
+     "per_cell_median": 0.007042,
+     "ratio_of_medians": 0.008815
     }
-  },
-  "branch_max": {
-    "chebyshev": {
-      "aggressive": {
-        "branch_max": 16,
-        "builds": true,
-        "max_per_axis": 9
-      },
-      "conservative": {
-        "branch_max": 16,
-        "builds": false,
-        "max_per_axis": 20
-      },
-      "quadrature": {
-        "branch_max": 16,
-        "builds": true,
-        "max_per_axis": 16
-      }
+   },
+   "ducy_0.20": {
+    "boxcar": {
+     "per_cell_median": 0.001256,
+     "ratio_of_medians": 0.002111
     },
-    "taylor": {
-      "aggressive": {
-        "branch_max": 16,
-        "builds": true,
-        "max_per_axis": 7
-      },
-      "conservative": {
-        "branch_max": 16,
-        "builds": false,
-        "max_per_axis": 27
-      },
-      "quadrature": {
-        "branch_max": 16,
-        "builds": false,
-        "max_per_axis": 28
-      }
+    "matched": {
+     "per_cell_median": 0.001794,
+     "ratio_of_medians": 0.002214
     }
-  },
-  "config": {
-    "eta": 1.0,
-    "nbins": 64,
-    "nsegments": 64,
-    "period_s": 0.007,
-    "poly_order": 4,
-    "seed": 20260917,
-    "signals": 6,
-    "stages_amplitude": [
-      6,
-      14,
-      22,
-      30,
-      38,
-      46,
-      54,
-      62
-    ],
-    "stages_comparison": [
-      4,
-      8,
-      12,
-      16,
-      20,
-      24,
-      28,
-      32,
-      36,
-      40,
-      44,
-      48,
-      52,
-      56,
-      60
-    ],
-    "tobs_s": 268.4355
-  },
-  "corner_forms": {
-    "chebyshev": {
-      "2": 1.0,
-      "3": 1.5,
-      "4": 2.0,
-      "5": 2.5,
-      "6": 3.0,
-      "7": 3.5,
-      "8": 4.0
-    },
-    "closed_form": {
-      "2": {
-        "chebyshev": 1.0,
-        "taylor": 1.5
-      },
-      "3": {
-        "chebyshev": 1.5,
-        "taylor": 3.5
-      },
-      "4": {
-        "chebyshev": 2.0,
-        "taylor": 7.5
-      },
-      "5": {
-        "chebyshev": 2.5,
-        "taylor": 15.5
-      },
-      "6": {
-        "chebyshev": 3.0,
-        "taylor": 31.5
-      },
-      "7": {
-        "chebyshev": 3.5,
-        "taylor": 63.5
-      },
-      "8": {
-        "chebyshev": 4.0,
-        "taylor": 127.5
-      }
-    },
-    "taylor": {
-      "2": 1.5,
-      "3": 3.5,
-      "4": 7.5,
-      "5": 15.5,
-      "6": 31.5,
-      "7": 63.5,
-      "8": 127.5
-    }
-  },
-  "covering_radius": {
-    "best_half_step": 0.582893,
-    "best_wide_lattice": 0.5,
-    "lattice_span": 2,
-    "own_cell": 7.5
-  },
-  "nearest_template_chebyshev": {
-    "aggressive": {
-      "exact_cells": 90,
-      "max": 1.75349,
-      "median": 0.904452,
-      "min": 0.083394
-    },
-    "cells": 90,
-    "conservative": {
-      "closer": 29,
-      "median_proven_gain": 1.571768,
-      "not_closer": 2,
-      "unresolved": 59
-    },
-    "quadrature": {
-      "closer": 87,
-      "median_proven_gain": 1.563983,
-      "not_closer": 3,
-      "unresolved": 0
-    }
-  },
-  "nearest_template_taylor": {
-    "aggressive": {
-      "exact_cells": 90,
-      "max": 2.114554,
-      "median": 1.06888,
-      "min": 0.2399
-    },
-    "cells": 90,
-    "conservative": {
-      "closer": 28,
-      "median_proven_gain": 2.046782,
-      "not_closer": 0,
-      "unresolved": 62
-    },
-    "quadrature": {
-      "closer": 89,
-      "median_proven_gain": 2.302674,
-      "not_closer": 1,
-      "unresolved": 0
-    }
-  },
-  "stage_split_chebyshev": {
-    "decision": {
-      "aggressive_median": 1.00156,
-      "closer": 54,
-      "median_proven_gain": 1.570723,
-      "not_closer": 0,
-      "stages": [
-        13,
-        47
-      ],
-      "unresolved": 0
-    },
-    "early": {
-      "aggressive_median": 0.581644,
-      "closer": 47,
-      "median_proven_gain": 1.145191,
-      "not_closer": 13,
-      "stages": [
-        1,
-        10
-      ],
-      "unresolved": 0
-    },
-    "late": {
-      "aggressive_median": 0.910102,
-      "closer": 48,
-      "median_proven_gain": 1.721515,
-      "not_closer": 0,
-      "stages": [
-        32,
-        60
-      ],
-      "unresolved": 0
-    }
-  },
-  "stage_split_taylor": {
-    "decision": {
-      "aggressive_median": 1.162411,
-      "closer": 54,
-      "median_proven_gain": 2.471675,
-      "not_closer": 0,
-      "stages": [
-        13,
-        47
-      ],
-      "unresolved": 0
-    },
-    "early": {
-      "aggressive_median": 0.731225,
-      "closer": 47,
-      "median_proven_gain": 1.712092,
-      "not_closer": 13,
-      "stages": [
-        1,
-        10
-      ],
-      "unresolved": 0
-    },
-    "late": {
-      "aggressive_median": 1.029934,
-      "closer": 48,
-      "median_proven_gain": 2.609096,
-      "not_closer": 0,
-      "stages": [
-        32,
-        60
-      ],
-      "unresolved": 0
-    }
+   }
   }
+ },
+ "amplitude_taylor": {
+  "aggressive": {
+   "ducy_0.05": {
+    "boxcar": 0.053348,
+    "matched": 0.080007
+   },
+   "ducy_0.10": {
+    "boxcar": 0.017256,
+    "matched": 0.022047
+   },
+   "ducy_0.20": {
+    "boxcar": 0.004023,
+    "matched": 0.005658
+   }
+  },
+  "cells": 48,
+  "quadrature": {
+   "ducy_0.05": {
+    "boxcar": 0.022627,
+    "matched": 0.040319
+   },
+   "ducy_0.10": {
+    "boxcar": 0.007472,
+    "matched": 0.010538
+   },
+   "ducy_0.20": {
+    "boxcar": 0.001717,
+    "matched": 0.002663
+   }
+  },
+  "quadrature_advantage": {
+   "ducy_0.05": {
+    "boxcar": {
+     "per_cell_median": 0.015591,
+     "ratio_of_medians": 0.032452
+    },
+    "matched": {
+     "per_cell_median": 0.013837,
+     "ratio_of_medians": 0.04314
+    }
+   },
+   "ducy_0.10": {
+    "boxcar": {
+     "per_cell_median": 0.004691,
+     "ratio_of_medians": 0.009956
+    },
+    "matched": {
+     "per_cell_median": 0.004042,
+     "ratio_of_medians": 0.011769
+    }
+   },
+   "ducy_0.20": {
+    "boxcar": {
+     "per_cell_median": 0.001105,
+     "ratio_of_medians": 0.002314
+    },
+    "matched": {
+     "per_cell_median": 0.001097,
+     "ratio_of_medians": 0.003012
+    }
+   }
+  }
+ },
+ "branch_max": {
+  "chebyshev": {
+   "aggressive": {
+    "branch_max": 16,
+    "builds": true,
+    "max_per_axis": 9
+   },
+   "conservative": {
+    "branch_max": 16,
+    "builds": false,
+    "max_per_axis": 20
+   },
+   "quadrature": {
+    "branch_max": 16,
+    "builds": true,
+    "max_per_axis": 16
+   }
+  },
+  "taylor": {
+   "aggressive": {
+    "branch_max": 16,
+    "builds": true,
+    "max_per_axis": 7
+   },
+   "conservative": {
+    "branch_max": 16,
+    "builds": false,
+    "max_per_axis": 27
+   },
+   "quadrature": {
+    "branch_max": 16,
+    "builds": false,
+    "max_per_axis": 28
+   }
+  }
+ },
+ "config": {
+  "eta": 1.0,
+  "nbins": 64,
+  "nsegments": 64,
+  "period_s": 0.007,
+  "poly_order": 4,
+  "seed": 20260917,
+  "signals": 6,
+  "stages_amplitude": [
+   6,
+   14,
+   22,
+   30,
+   38,
+   46,
+   54,
+   62
+  ],
+  "stages_comparison": [
+   4,
+   8,
+   12,
+   16,
+   20,
+   24,
+   28,
+   32,
+   36,
+   40,
+   44,
+   48,
+   52,
+   56,
+   60
+  ],
+  "tobs_s": 268.4355
+ },
+ "corner_forms": {
+  "chebyshev": {
+   "2": 1.0,
+   "3": 1.5,
+   "4": 2.0,
+   "5": 2.5,
+   "6": 3.0,
+   "7": 3.5,
+   "8": 4.0
+  },
+  "closed_form": {
+   "2": {
+    "chebyshev": 1.0,
+    "taylor": 1.5
+   },
+   "3": {
+    "chebyshev": 1.5,
+    "taylor": 3.5
+   },
+   "4": {
+    "chebyshev": 2.0,
+    "taylor": 7.5
+   },
+   "5": {
+    "chebyshev": 2.5,
+    "taylor": 15.5
+   },
+   "6": {
+    "chebyshev": 3.0,
+    "taylor": 31.5
+   },
+   "7": {
+    "chebyshev": 3.5,
+    "taylor": 63.5
+   },
+   "8": {
+    "chebyshev": 4.0,
+    "taylor": 127.5
+   }
+  },
+  "taylor": {
+   "2": 1.5,
+   "3": 3.5,
+   "4": 7.5,
+   "5": 15.5,
+   "6": 31.5,
+   "7": 63.5,
+   "8": 127.5
+  }
+ },
+ "covering_radius": {
+  "best_half_step": 0.582893,
+  "best_wide_lattice": 0.5,
+  "lattice_span": 2,
+  "own_cell": 7.5
+ },
+ "nearest_template_chebyshev": {
+  "aggressive": {
+   "exact_cells": 90,
+   "max": 1.75349,
+   "median": 0.904452,
+   "min": 0.083394
+  },
+  "cells": 90,
+  "conservative": {
+   "closer": 29,
+   "median_proven_gain": 1.571768,
+   "not_closer": 2,
+   "unresolved": 59
+  },
+  "quadrature": {
+   "closer": 87,
+   "median_proven_gain": 1.563983,
+   "not_closer": 3,
+   "unresolved": 0
+  }
+ },
+ "nearest_template_taylor": {
+  "aggressive": {
+   "exact_cells": 90,
+   "max": 2.114554,
+   "median": 1.06888,
+   "min": 0.2399
+  },
+  "cells": 90,
+  "conservative": {
+   "closer": 28,
+   "median_proven_gain": 2.046782,
+   "not_closer": 0,
+   "unresolved": 62
+  },
+  "quadrature": {
+   "closer": 89,
+   "median_proven_gain": 2.302674,
+   "not_closer": 1,
+   "unresolved": 0
+  }
+ },
+ "stage_split_chebyshev": {
+  "decision": {
+   "aggressive_median": 1.00156,
+   "closer": 54,
+   "median_proven_gain": 1.570723,
+   "not_closer": 0,
+   "stages": [
+    13,
+    47
+   ],
+   "unresolved": 0
+  },
+  "early": {
+   "aggressive_median": 0.581644,
+   "closer": 47,
+   "median_proven_gain": 1.145191,
+   "not_closer": 13,
+   "stages": [
+    1,
+    10
+   ],
+   "unresolved": 0
+  },
+  "late": {
+   "aggressive_median": 0.910102,
+   "closer": 48,
+   "median_proven_gain": 1.721515,
+   "not_closer": 0,
+   "stages": [
+    32,
+    60
+   ],
+   "unresolved": 0
+  }
+ },
+ "stage_split_taylor": {
+  "decision": {
+   "aggressive_median": 1.162411,
+   "closer": 54,
+   "median_proven_gain": 2.471675,
+   "not_closer": 0,
+   "stages": [
+    13,
+    47
+   ],
+   "unresolved": 0
+  },
+  "early": {
+   "aggressive_median": 0.731225,
+   "closer": 47,
+   "median_proven_gain": 1.712092,
+   "not_closer": 13,
+   "stages": [
+    1,
+    10
+   ],
+   "unresolved": 0
+  },
+  "late": {
+   "aggressive_median": 1.029934,
+   "closer": 48,
+   "median_proven_gain": 2.609096,
+   "not_closer": 0,
+   "stages": [
+    32,
+    60
+   ],
+   "unresolved": 0
+  }
+ },
+ "branch_max_measured": {
+  "_method": "Max per-axis num_points, read out of the shipped guard itself: a full 63-level prune completes at branch_max=B and raises at B-1, so max num_points == B exactly. Bisected by docs/metric_gridding/branch_max_probe.py. No reimplementation of ceil(dparam_cur/dparam_new) is involved.",
+  "_not_recomputed_by_report_numbers": "Unlike every other key here, this one is NOT regenerated by report_numbers.py and is not asserted to reproduce by the test suite: it needs real prunes (~2 min). It is a RECORDED measurement. Regenerate with `python docs/metric_gridding/branch_max_probe.py --buffers`. The distinction is the point of D120: a test that a figure reproduces is not a test that it measures the claim.",
+  "_config": "phase3_config.make_config, poly_order=4, 64 segments, 268.4 s, nbins=64, eta=1, injection (accel 1.0, jerk 0.05, snap 0.001), S/N 14",
+  "_max_sugg": 16384,
+  "_supersedes": "the withdrawn `branch_max` key (D120), retained above as an audit trail",
+  "taylor": {
+   "aggressive": 4,
+   "quadrature": 5,
+   "conservative": 7
+  },
+  "chebyshev": {
+   "aggressive": 4,
+   "quadrature": 5,
+   "conservative": 8
+  },
+  "shipped_branch_max": 16,
+  "all_build": true,
+  "buffer_dependence": {
+   "_note": "flat across a 16x range, so the maxima are not buffer-limited",
+   "_buffers": [
+    16384,
+    65536,
+    262144
+   ],
+   "taylor/conservative": [
+    7,
+    7,
+    7
+   ],
+   "taylor/quadrature": [
+    5,
+    5,
+    5
+   ],
+   "chebyshev/conservative": [
+    8,
+    8,
+    8
+   ]
+  }
+ }
 }
