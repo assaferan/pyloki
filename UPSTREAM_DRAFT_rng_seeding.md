@@ -1,6 +1,6 @@
 # DRAFT — PR description: seedable RNGs
 
-**NOT POSTED.** Held for assaferan. Branch: `assaferan:fix-flaky-norm-isf`.
+**NOT POSTED.** Held for assaferan. Branch: `assaferan:seedable-rngs`.
 
 ---
 
@@ -9,13 +9,17 @@
 ### The problem
 
 `np.random.default_rng()` is called with no argument in eight places, and no public
-entry point accepts a `seed` or an `rng`:
+entry point accepts a `seed` or an `rng`. Permalinks are pinned to `main` at
+`18d04b3`, so they stay valid however the line numbers move:
 
-    simulation/pulse.py        220, 228, 261, 338
-    detection/thresholding.py  740, 1046, 1094
-    sensitivity/sim_ffa.py     198
-
-(line numbers against `main` at `18d04b3`)
+- [`simulation/pulse.py:220`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/simulation/pulse.py#L220) — `generate_simple()` — the injected noise
+- [`simulation/pulse.py:228`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/simulation/pulse.py#L228) — `generate_noise()`
+- [`simulation/pulse.py:261`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/simulation/pulse.py#L261) — `generate_old()`
+- [`simulation/pulse.py:338`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/simulation/pulse.py#L338) — `generate()` — the current path
+- [`detection/thresholding.py:740`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/thresholding.py#L740) — `DynamicThresholdScheme.__init__` → `self.rng`
+- [`detection/thresholding.py:1046`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/thresholding.py#L1046) — `determine_scheme()`
+- [`detection/thresholding.py:1094`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/thresholding.py#L1094) — `evaluate_scheme()`
+- [`sensitivity/sim_ffa.py:198`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/sensitivity/sim_ffa.py#L198) — `TestFFASensitivity.__init__`
 
 So a run cannot be repeated: same inputs, same configuration, different output. And
 `np.random.seed` does not help, because `default_rng` ignores the legacy global seed —

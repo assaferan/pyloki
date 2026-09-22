@@ -1,5 +1,12 @@
 # flaky-test — brief for an incoming agent
 
+**Branch renamed** `fix-flaky-norm-isf` → `seedable-rngs` (2026-09-22). The old name
+described the first two commits, not the library work that followed. The worktree
+directory is still `flaky-test` and the memory facts are still `wt-fix-flaky-norm-isf-*`:
+both were deliberately left alone, the directory because other sessions and `memctl
+link-worktrees` resolve it by path, and the fact slugs because
+`wt-injection-design-injections-cannot-be-seeded` links to them by name.
+
 The library-wide RNG work this file used to describe as "what is left" is **done**.
 Read `FINDINGS_rng_seeding.md` for the record, `FINDINGS_norm_isf_func.md` for the
 earlier `test_maths.py` work, and this file for what remains.

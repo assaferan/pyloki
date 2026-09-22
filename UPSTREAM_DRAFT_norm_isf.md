@@ -6,7 +6,7 @@
 
 ## `norm_isf_func` returns ~+28 sigma for negative input (public scoring API; not reached by a search)
 
-`utils/maths.py:80-89`. For `minus_logsf < 0` the table index goes negative and Python
+[`utils/maths.py:80-89`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/utils/maths.py#L80-L89). For `minus_logsf < 0` the table index goes negative and Python
 wraps it to the tail of the table, so the function returns close to its **maximum**
 value where the correct answer is its minimum:
 
@@ -18,8 +18,9 @@ value where the correct answer is its minimum:
 
 ### Scope first: a search does not reach this
 
-`norm_isf_func` has exactly two callers, `scoring.py:654` in `_compute_snr_double` and
-`scoring.py:670` in `harmonic_summing_score_func`. Neither `compute_dot_double` (the
+`norm_isf_func` has exactly two callers, [`scoring.py:654`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/scoring.py#L654)
+in `_compute_snr_double` and [`scoring.py:670`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/scoring.py#L670) in
+`harmonic_summing_score_func`. Neither `compute_dot_double` (the
 public `MatchedFilter` method that reaches the first) nor `harmonic_summing_score_func`
 is called anywhere in `src/pyloki`. The live search scores through
 `scoring.snr_score_batch_func` and never reaches `norm_isf_func`.
@@ -48,7 +49,7 @@ multiplies it by a zero weight, giving NaN under `fastmath`.
 
 ### Negative input is the ordinary case on that path, not an edge case
 
-`detection/scoring.py:649-654` computes
+[`detection/scoring.py:649-654`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/scoring.py#L649-L654) computes
 
     x_single = chi_sq_minus_logsf_func(scores_max_single, 1) - lee_penalty_single
     x_double = chi_sq_minus_logsf_func(scores_max_double, 2) - lee_penalty_double
@@ -77,8 +78,9 @@ prefer.
 
 ### Secondary, on the same code path — mixed log bases?
 
-**This shares the scope above:** `lee_penalty` appears at exactly four places,
-`scoring.py:619, 620, 649, 652`, all inside `_compute_snr_double` — the same function
+**This shares the scope above:** `lee_penalty` appears at exactly four places —
+[`scoring.py:619-620`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/scoring.py#L619-L620) and
+[`:649-652`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/scoring.py#L649-L652) — all inside `_compute_snr_double` — the same function
 nothing in `src/pyloki` calls. So this too cannot affect a search, and it is raised as a
 consistency question rather than as a live-scoring concern.
 
