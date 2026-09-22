@@ -30,6 +30,11 @@ different output. And `np.random.seed` did not help, because `default_rng` ignor
 legacy global seed — which is what made this easy to miss, since the usual reflex
 appears to work and changes nothing.
 
+Seeding closes this at seven of the eight sites. It does **not** close
+`DynamicThresholdScheme.run()`, for a reason that is about parallelism rather than
+seeding; that is measured and explained under **Limitation** below, and it is a real
+qualification on everything else in this file.
+
 It is a **reproducibility** defect, not a correctness one. The search itself is
 deterministic downstream of the time series; the non-determinism is entirely in the
 *inputs* — the noise realisation and the threshold ladder.
@@ -146,7 +151,13 @@ those rates only loosely (0/60 is consistent with anything under ~6%).
 
 ## What this does and does not fix
 
-- It **does** make a pyloki run reproducible, at every generator in the library.
+- It **does** let every generator in the library be steered from its caller, and it
+  makes `determine_scheme`, `evaluate_scheme` and all four `PulseSignalConfig.generate*`
+  paths reproduce exactly, on 14 threads as well as on one.
+- It does **not** make `DynamicThresholdScheme.run()` reproducible under parallel
+  execution — see the limitation section below. A seed there fixes the stream but not
+  the order threads consume it in. This is the one site where seeding is necessary but
+  not sufficient, and it is the site the original draft called the most important one.
 - It **does** fix the `ep_jerk` flake, and by the tolerance rather than by the pin — see
   the unseeded re-measurement below, which holds the new tolerance and lets the noise
   vary.
@@ -181,3 +192,56 @@ consistency check on that reasoning, not independent proof of it.
 
 Both measurements used one warm numba cache per tree throughout, so no denominator moved
 mid-measurement.
+
+## Limitation: a seed is not sufficient at `DynamicThresholdScheme.run()`
+
+Found by the reproducer after the fix was written, and it corrects a claim this file
+made in an earlier revision.
+
+`run_stage_legacy` is `@njit(cache=True, parallel=True)` and draws from the shared
+generator **inside a `prange`** (`thresholding.py:597`, loop at `:616`, `rng` consumed at
+`:639`). A seed fixes the stream; it does not fix the order threads consume it in. So a
+seeded `DynamicThresholdScheme.run()` still produces different ladders:
+
+| seed | numba threads | distinct ladders | max per-stage spread |
+|---|---|---|---|
+| none | 14 | 5 / 10 | 0.798 |
+| none, after `np.random.seed(42)` | 14 | 5 / 10 | 0.798 |
+| **42** | **14** | **2 / 5** | **0.080** |
+| 42 | 1 | 1 / 3 | 0.000 |
+
+Seeding removes most of the spread (0.798 → 0.080) but not all of it, and the residue is
+thread scheduling: forced single-threaded, the same seed reproduces exactly. That
+localises the remaining non-determinism precisely and rules out the seed as its source.
+
+**Every other seeded path reproduces under parallelism.** `determine_scheme`,
+`evaluate_scheme`, and all four `PulseSignalConfig.generate*` methods were each checked
+6x on 14 threads and gave bit-identical output. The limitation is this one site.
+
+Closing it needs per-iteration generators inside the kernel — deriving a child generator
+from `(seed, ibeam_cur)` so the result is independent of which thread runs which
+iteration — which is a change to a numba kernel rather than a signature, and is **not
+done here**.
+
+### How this got past the first round of testing
+
+The original regression test asserted that `scheme.rng` produced the same draws for the
+same seed. That is a **proxy**: it tests that the seed reached the generator, not that
+the ladder reproduces. It passed while the thing it was supposed to guarantee was false.
+
+`test_run_reproduces_single_threaded` now exercises `run()` itself. Getting it
+non-vacuous took a second correction: comparing `states["threshold"]` also passes
+trivially, because thresholds come off a fixed `np.linspace` and are identical even
+unseeded. The field that carries the noise is `success_h0`. Checked both ways — two
+unseeded single-threaded runs differ in it, two seeded runs do not.
+
+The parallel case is deliberately **not** asserted anywhere. A test asserting that two
+runs *differ* would itself be flaky, which is the defect this branch exists to remove.
+
+## Note on the site count
+
+The library had eight bare `default_rng()` calls; the fixed tree has five seeded ones.
+The four in `pulse.py` collapsed into the single construction in
+`__attrs_post_init__`, since the generator is now built once per config instead of once
+per `generate*` call. Nothing was dropped — `rng_reproducibility.py` enumerates the
+sites from the source, so the count is checkable rather than asserted.

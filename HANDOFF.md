@@ -47,6 +47,13 @@ the reported per-parameter uncertainty, not to the observed spread. See
   `norm_isf_func(-0.5)` returning ~+28 sigma, reachable from `scoring.py:654` on ordinary
   noise, and `norm_isf_func(0)` returning NaN. Those are correctness bugs, unlike
   anything in this file, and they are the stronger upstream item.
+- **`DynamicThresholdScheme.run()` is still not reproducible under parallelism.** A
+  seed reaches its generator, but `run_stage_legacy` is `@njit(parallel=True)` and
+  consumes that generator inside a `prange`, so thread order still moves the ladder
+  (2 distinct ladders in 5 seeded runs on 14 threads; 1 in 3 forced single-threaded).
+  Closing it means deriving a per-iteration generator from `(seed, ibeam_cur)` inside
+  the kernel. Every other seeded path reproduces on 14 threads. Measured in
+  `FINDINGS_rng_seeding.md`; run `rng_reproducibility.py` to see it in 25 s.
 - The accel one-cell miss still happens on roughly 1 realisation in 12. The test now
   accepts it because the search never claimed better. Whether the search *should* do
   better at this configuration is unexamined.

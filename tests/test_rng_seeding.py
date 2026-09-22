@@ -14,6 +14,11 @@ library deterministic for callers who never asked for it.
 `test_no_bare_default_rng_in_library` enumerates the call sites from the source
 rather than from a list typed here, so a new unseeded generator fails this file
 instead of going unnoticed.
+
+**Known limitation.** A seed does not make `DynamicThresholdScheme.run()`
+reproducible under parallel execution -- see
+`TestThresholding.test_run_reproduces_single_threaded`. Every other seeded path
+here reproduces on 14 threads as well as on one.
 """
 
 from __future__ import annotations
@@ -22,6 +27,7 @@ import ast
 import pathlib
 from typing import TYPE_CHECKING
 
+import numba
 import numpy as np
 import pytest
 
@@ -162,7 +168,9 @@ class TestThresholding:
         second = thresholding.evaluate_scheme(ladder, seed=3, **SCHEME_KW)
         np.testing.assert_array_equal(_survival(first), _survival(second))
 
-    def test_dynamic_threshold_scheme_same_seed_reproduces(self) -> None:
+    def test_dynamic_threshold_scheme_seeds_its_generator(self) -> None:
+        """The seed reaches `self.rng`. That is NOT the same as `run()` reproducing."""
+
         def draws(seed: int | None) -> np.ndarray:
             scheme = thresholding.DynamicThresholdScheme(
                 nthresholds=20, seed=seed, **SCHEME_KW,
@@ -171,6 +179,50 @@ class TestThresholding:
 
         np.testing.assert_array_equal(draws(5), draws(5))
         assert not np.array_equal(draws(None), draws(None))
+
+    def test_run_reproduces_single_threaded(self) -> None:
+        """`run()` reproduces under a seed **only** when numba is single-threaded.
+
+        `run_stage_legacy` is `@njit(parallel=True)` and draws from the shared
+        generator inside a `prange`, so which thread takes which draw depends on
+        scheduling. A seed fixes the stream, not the order it is consumed in, and the
+        ladder therefore still varies under parallel execution -- measured at 2
+        distinct ladders in 4 runs on 14 threads, against 1 in 4 on one thread.
+
+        Seeding `__init__` is necessary but not sufficient at this site. Closing it
+        needs per-iteration generators inside the kernel, which is a separate change.
+        The single-threaded case is pinned because it is the part the seed does fix.
+        The parallel case is deliberately not asserted: a test asserting that two runs
+        *differ* would itself be flaky.
+        """
+        original = numba.get_num_threads()
+        numba.set_num_threads(1)
+        try:
+            states = []
+            for _ in range(2):
+                scheme = thresholding.DynamicThresholdScheme(
+                    np.array([4.0, 2.0, 2.0]),
+                    ref_ducy=0.1,
+                    nbins=32,
+                    ntrials=256,
+                    nprobs=8,
+                    nthresholds=20,
+                    snr_final=8.0,
+                    seed=11,
+                )
+                scheme.run(thres_neigh=5)
+                # The whole state record, not `threshold` alone: thresholds come off
+                # a fixed linspace and are identical even unseeded, so comparing them
+                # would pass vacuously. `success_h0` is the field that carries the
+                # noise -- it differs between two unseeded single-threaded runs.
+                states.append(scheme.states.copy())
+        finally:
+            numba.set_num_threads(original)
+        np.testing.assert_array_equal(
+            states[0]["success_h0"],
+            states[1]["success_h0"],
+            err_msg="seeded run() is not reproducible even on a single thread",
+        )
 
 
 class TestSimFFA:
