@@ -116,12 +116,52 @@ Both went out after assaferan reviewed them, and both are about the buffer:
   Posted 2026-09-22 from `07_upstream_buffer_policy.md`, essentially verbatim. The branch
   is pushed to the `assaferan` fork so #15's reproducer links resolve.
 
-**Still unreported, and the one postable item left**: the posted #15 cut the draft's
-closing note that `DynamicThresholdScheme.__init__` (`thresholding.py:740`) does not seed
-its RNG, so two scheme runs with identical arguments give different ladders and any
-comparison varying one scheme parameter must take every ladder from a single `run()`.
-Cutting it from #15 was right — it is a reproducibility defect, not a design call — but
-it deserves its own issue, not an addition to that one.
+### Still unreported: unseeded RNGs across the library
+
+The one postable item this branch has left, cut from #15 (rightly — it is a
+reproducibility defect, not a design call). Status checked against the tracker and every
+local branch on **2026-09-22**: **no issue, no PR, open or closed; no branch modifies any
+of it; and it has been diagnosed independently on three branches without ever being
+reported.** `injection-design` (§6.1 here, `thresholding.py:740` and `pulse.py:338`), `Chebyshev`
+(`HANDOFF.md:170` for `PulseSignalConfig`, `:490` for `determine_scheme` — it caches
+`make_thresholds.py` output "because re-deriving per replicate would inject threshold
+noise into a paired comparison") and `metric-gridding` (`README.md:141`, the
+`tests/test_maths.py:10` flake) each found it separately, at a different site, and each
+wrote a workaround instead. Line numbers verified on those branches 2026-09-22.
+
+It is a **family, not a site** — eight unseeded `np.random.default_rng()` constructions
+in three files, verified present on `main` today:
+
+    detection/thresholding.py:740     DynamicThresholdScheme.__init__ (self.rng)
+    detection/thresholding.py:1046    module-level, in a scheme routine
+    detection/thresholding.py:1094    module-level, in a scheme routine
+    simulation/pulse.py:220, 228, 261, 338
+    sensitivity/sim_ffa.py:198
+
+A report naming only `:740` leaves the rest, and a maintainer who fixes `:740` alone has
+not made the library reproducible. `np.random.seed` does not help at any of them —
+`default_rng` ignores the legacy global seed, which is what makes the defect non-obvious.
+
+**The fix is cheap and the plumbing exists**: everything downstream of `__init__` already
+takes `rng` as an explicit parameter (`thresholding.py:50, 393, 445, 544, 610`), so a
+`seed`/`rng` kwarg threaded to `:740` is small. But note the project's one precedent
+points elsewhere — `fix-flaky-norm-isf` fixed the same root class at
+`tests/test_maths.py:10` by **removing** the sampling rather than seeding it ("Pin the
+real accuracy of the maths lookup tables instead of sampling it"). That branch also
+carries `FINDINGS_norm_isf_func.md`, unreported, on defects found underneath it.
+
+**What a draft would owe the maintainer.** §6.1 of `05_injection_design.md` is titled
+"Pairing is possible — verified, and it needs no library change", and concludes the
+campaign needs a driver change rather than a library one. That is this branch's own
+finding and it is not wrong: the workaround (generate each ladder once, commit the array,
+reuse) does achieve *pairability*. Reproducibility for a user who does not know the
+workaround is a different goal, and a report has to say so explicitly or a maintainer who
+reads §6.1 will ask why we are proposing a change we said was unnecessary.
+
+Corroboration worth carrying if it is ever written up: `metric-gridding`'s D33 recorded
+`P_d` of **0.040–0.25 across repeat runs of the same strategy** with the scheme's RNG
+unseeded at `ntrials = 1024` — a louder measurement of the consequence than anything on
+this branch.
 
 **Deliberately not sent.** Anything about tiling. Per §8 nothing in this document
 supports an upstream sentence about it, and the buffer result is stronger standing alone.

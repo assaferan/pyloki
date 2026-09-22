@@ -3,8 +3,11 @@
 **Status: POSTED as [issue #15](https://github.com/pravirkr/pyloki/issues/15)**, by
 assaferan on 2026-09-22, after review. This file is the source; the posted version drops
 this banner, rewrites `upstream/main`/`PR #14` for tracker context, and **cuts the
-closing note on `DynamicThresholdScheme.__init__`'s unseeded RNG** — that defect is
-unreported and belongs in its own issue, not as an addition to #15. The supporting branch
+closing note on `DynamicThresholdScheme.__init__`'s unseeded RNG** — rightly, since that
+is a reproducibility defect and not a design call. Its status, checked 2026-09-22:
+**diagnosed independently on three branches, never reported, never fixed** (see the
+README's *Still unreported* section for the full picture and the one reconciliation a
+draft would owe). The supporting branch
 is pushed to `assaferan/pyloki` so the reproducer links below resolve. Proposed as an
 *issue* — a question about pruning semantics — rather than a patch, because the fix is a
 design call. Successor to [PR #14](https://github.com/pravirkr/pyloki/pull/14), which
