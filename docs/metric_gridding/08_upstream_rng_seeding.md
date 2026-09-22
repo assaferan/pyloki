@@ -113,8 +113,18 @@ We have no strong view, and the choice interacts with API taste:
 3. **A module-level default generator** that a user can set once. Least invasive at the
    call sites, worst for concurrent use.
 
-If (1) is the preferred shape we are happy to prepare it, including the remaining seven
-sites and a regression test that asserts two identical constructions agree.
+**We have implemented (1) in our own tree** across all eight sites — a
+`seed: int | np.random.Generator | None = None` keyword defaulting to `None`, so current
+behaviour is unchanged for every existing caller. It is not proposed here as a patch
+because the choice between the three shapes is yours; say which you prefer and we will
+open it as a PR, with a regression test asserting that two identical constructions agree.
+
+One design point that came out of doing it, in case it informs the choice:
+`PulseSignalConfig` holds its `Generator` for the object's lifetime, so a seed fixes the
+*sequence* rather than each call — two `generate()` calls on one config still differ,
+while two configs built from the same seed agree call-for-call. That is the right
+semantics for common random numbers, but it is a behaviour worth naming in the docstring
+rather than leaving a caller to discover.
 
 ## Reproducing
 
