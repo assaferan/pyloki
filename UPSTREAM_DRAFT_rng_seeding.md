@@ -9,8 +9,15 @@
 ### The problem
 
 `np.random.default_rng()` is called with no argument in eight places, and no public
-entry point accepts a `seed` or an `rng`. Permalinks are pinned to `main` at
-`18d04b3`, so they stay valid however the line numbers move:
+entry point accepts a `seed` or an `rng`.
+
+So a run cannot be repeated: same inputs, same configuration, different output. And
+`np.random.seed` does not help, because `default_rng` ignores the legacy global seed —
+which is what makes this easy to miss, since the usual reflex appears to work and
+changes nothing.
+
+The eight sites, as permalinks pinned to `main` at `18d04b3` so they stay valid
+however the line numbers move:
 
 - [`simulation/pulse.py:220`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/simulation/pulse.py#L220) — `generate_simple()`, the injected noise
 - [`simulation/pulse.py:228`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/simulation/pulse.py#L228) — `generate_noise()`
@@ -20,11 +27,6 @@ entry point accepts a `seed` or an `rng`. Permalinks are pinned to `main` at
 - [`detection/thresholding.py:1046`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/thresholding.py#L1046) — `determine_scheme()`
 - [`detection/thresholding.py:1094`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/detection/thresholding.py#L1094) — `evaluate_scheme()`
 - [`sensitivity/sim_ffa.py:198`](https://github.com/pravirkr/pyloki/blob/18d04b3c9c028debb2e8045adddcb04b821e4479/src/pyloki/sensitivity/sim_ffa.py#L198) — `TestFFASensitivity.__init__`
-
-So a run cannot be repeated: same inputs, same configuration, different output. And
-`np.random.seed` does not help, because `default_rng` ignores the legacy global seed —
-which is what makes this easy to miss, since the usual reflex appears to work and
-changes nothing.
 
 The site that matters most is `DynamicThresholdScheme`, because a threshold ladder is
 an **input** to a search, not an output of one. Two searches a user believes are
