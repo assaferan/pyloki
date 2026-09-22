@@ -63,7 +63,17 @@ the reported per-parameter uncertainty, not to the observed spread. See
 
 ## What is left
 
-- **Nothing has gone upstream**, and nothing should until assaferan has read it. There is
+- **The RNG work IS upstream now.** pravirkr/pyloki **#16** (library) and **#17**
+  (example tests, stacked on #16), opened 2026-09-22 with assaferan's approval, from
+  `seedable-rngs-lib` and `seedable-rngs-tests`. Do not re-report it.
+  **This working branch must never be the head of a PR** — it carries FINDINGS, this
+  handoff and the drafts, and a PR from it would put a brief written to another agent
+  session in front of the maintainer. Diff against `upstream/main` and read the *file
+  list* before opening anything.
+- **The `norm_isf` issue is still held**, deliberately sequenced after the PRs: it is
+  the lowest-severity item here (no search reaches it) and #11, #13, #14 were already
+  open and unreviewed since 2026-09-17. Draft is `UPSTREAM_DRAFT_norm_isf.md`.
+- Older note, now partly superseded: there is
   a drafted note on the `injection-design` branch
   (`docs/metric_gridding/08_upstream_rng_seeding.md`) with its own reproducer; it was
   written before this fix existed and offers to prepare shape (1), which is what was
