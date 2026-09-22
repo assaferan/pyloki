@@ -99,7 +99,7 @@ class FfaCase:
     upper_params: tuple[float, ...] | None = None
     upper_range: tuple[float, float] | None = None
 
-    def build(self):
+    def build(self, seed: int = SEED):
         """Simulate and configure exactly as the notebook does."""
         cfg = PulseSignalConfig(
             period=self.period,
@@ -108,7 +108,7 @@ class FfaCase:
             snr=SNR,
             ducy=self.ducy,
             mod_kwargs=dict(self.mod_kwargs),
-            seed=SEED,
+            seed=seed,
         )
         tim_data = cfg.generate(shape="gaussian")
         if self.upper_params is None:
@@ -166,11 +166,9 @@ CASES = (
 )
 
 
-@pytest.fixture(scope="module", params=CASES, ids=lambda c: c.name)
-def ffa_result(request) -> dict:
-    """Run `ffa_search` once per case, on both backends, over the same data."""
-    case: FfaCase = request.param
-    cfg, tim_data, param_limits, truth = case.build()
+def _run_case(case: FfaCase, seed: int) -> dict:
+    """Run `ffa_search` for one case at one noise realisation, on both backends."""
+    cfg, tim_data, param_limits, truth = case.build(seed)
 
     results = {}
     for use_fourier in BACKENDS:
@@ -189,7 +187,13 @@ def ffa_result(request) -> dict:
             tim_data, search_cfg, quiet=True, show_progress=False
         )
         results[use_fourier] = pgram
-    return {"case": case, "truth": truth, "pgrams": results}
+    return {"case": case, "truth": truth, "pgrams": results, "seed": seed}
+
+
+@pytest.fixture(scope="module", params=CASES, ids=lambda c: c.name)
+def ffa_result(request) -> dict:
+    """Run the pinned realisation once per case; the fast tests share it."""
+    return _run_case(request.param, SEED)
 
 
 def _index_offsets(pgram, truth: dict[str, float]) -> dict[str, int]:
