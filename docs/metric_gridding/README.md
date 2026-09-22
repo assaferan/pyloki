@@ -137,14 +137,20 @@ and it does so with no headroom. (D62, amended)
 
 ## Incidental finding, not about tiling
 
-`tests/test_maths.py` is **flaky at about 1.4% per run**, and it is upstream's test rather
-than this branch's. `tests/test_maths.py:10` uses an unseeded `np.random.default_rng()`,
-so `test_norm_isf_func` draws a fresh `minus_logsf = uniform(0, 10)` each run, while
-`maths.norm_isf_func` exceeds the test's `decimal=2` tolerance on `[0.1065, 0.1905]`
-(max error 0.0269) and `[0.2225, 0.2730]` (0.0101) — 1.35% of the sampled range, so
-roughly 1 CI run in 70 fails spuriously. `norm_isf_func(0)` also returns NaN. Relevant
-because PR #4 added a CI suite and #12 proposes extending it, so the failure will be
-attributed to whatever change is in flight. Not reported upstream. (D117)
+`tests/test_maths.py` is **flaky at about 0.66% per run**, and it is upstream's test
+rather than this branch's. `tests/test_maths.py:10` uses an unseeded
+`np.random.default_rng()`, so `test_norm_isf_func` draws a fresh
+`minus_logsf = uniform(0, 10)` each run, while `maths.norm_isf_func` exceeds the test's
+tolerance on **one** interval, `[0.1139, 0.1802]`, with a maximum error of **0.0269** —
+so roughly **1 CI run in 150** fails spuriously.
+
+Cause: `norm_isf_func` (`utils/maths.py:80-89`) is a linear interpolation into a table of
+resolution `minus_logsf_res = 0.1`, and the failing interval sits in the first table cells
+where `norm.isf(exp(-x))` is steepest, so the interpolation error is largest there.
+`norm_isf_func(0)` also returns NaN.
+
+Relevant because PR #4 added a CI suite and #12 proposes extending it, so the failure
+will be attributed to whatever change is in flight. Not reported upstream. (D117, D118)
 
 ## Files
 

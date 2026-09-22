@@ -2714,4 +2714,39 @@ the corrections here were of the second kind — a correct number presented in a
 where it did not hold. If there is one thing to carry forward it is the habit that caught
 them: state what the number is *of*, and check that the comparison datum measures the
 same thing, before interpreting the residual.
+
+## 2026-09-22 (ao) — D117's rate corrected: 0.66%, not 1.4%
+Reopened only to correct a figure. The defect stands; the rate was wrong by ~2x.
+  - **D118 — D117's flake rate is 0.66% (1 run in ~150), not 1.4%, and there is ONE
+    failing interval, not two.** Raised by the Overview session and verified here.
+    My error: `np.testing.assert_almost_equal(decimal=2)` compares
+    `abs(diff) < 1.5 * 10**-decimal = 1.5e-2`; my script tested against `1.5e-2 / 2`,
+    i.e. **half** the real tolerance. Confirmed against numpy directly — a difference of
+    0.0149 passes and 0.0151 fails. Recomputed on a 10^6-point grid over `[0, 10]`:
+
+    | tolerance | rate | failing intervals |
+    |---|---|---|
+    | **1.5e-2 (what numpy uses)** | **0.664%** | **[0.1139, 0.1802]** |
+    | 1.0e-2 | 0.888% | [0.1085, 0.1876], [0.2422, 0.2517] |
+    | 7.5e-3 (what I used) | 1.355% | [0.1061, 0.1910], [0.2224, 0.2730] |
+
+    So D117's second interval was spurious: its maximum error is 0.0101, which clears
+    1.5e-2 comfortably. Their figures reproduce to the digit.
+  - Cause confirmed, and worth recording because it explains the localisation:
+    `norm_isf_func` (`utils/maths.py:80-89`) linearly interpolates a table of resolution
+    `minus_logsf_res = 0.1`, and the failing interval lies in the first table cells where
+    `norm.isf(exp(-x))` is steepest — so that is where the interpolation error peaks.
+    The unseeded RNG, the 0.0269 maximum error and the NaN at zero all stand.
+  - **The correction is an instance of this branch's own conclusion 2**, which the
+    Overview session pointed out and which I am recording rather than smoothing over:
+    *a number can be correct in its own frame and wrong in the frame it is presented in.*
+    0.0075 was a real tolerance and 1.355% was its correct rate; neither was numpy's.
+    That is the sixth instance, and the first to arrive after the conclusion was written
+    down — which is the argument for it being in the README rather than only here.
+  - Also noted: the Overview session initially misattributed D117 to the injection
+    session, which checked its own documents, found nothing it had authored on
+    `norm_isf_func`, and declined authorship rather than accepting a number it had not
+    measured. The right call, and the reason the correction reached the session that
+    could actually fix it.
+Branch remains CLOSED; this changes one figure and its supporting detail, nothing else.
 ```
