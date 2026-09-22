@@ -28,6 +28,20 @@ those generators, and fixed the tolerance that the seeding exposed.
 `test_no_bare_default_rng_in_library`, which walks the AST of every module under `src/`
 and fails on any argument-less `default_rng()`. A new unseeded generator fails the suite.
 
+## Seed sweeps
+
+All four example tests pin a seed for CI and carry a `slow` sweep over measured-hard
+realisations, skipped unless `--runslow` (see `tests/conftest.py`). Suite: 181 tests,
+55 s default, 123 s with the sweeps.
+
+The seeds are **measured, not chosen** — each example was swept 20-40 times first, and
+the seeds pinned are the worst observed cases. `FINDINGS_rng_seeding.md` has the table.
+Every sweep has a recorded negative control showing it fails when its claim is false.
+
+Margins, worst error/tolerance ratio observed: `ffa` 0.667 (one bin — the tightest),
+`ep_circular` 0.386, `ep_accel` 0.14 (two distinct outcomes in 40 seeds; genuinely
+realisation-insensitive). `ep_jerk` was the one that actually failed, at 1.00.
+
 ## The finding worth carrying forward
 
 The `ep_jerk` flake was **not** an RNG defect. Seeding only made it reproducible; the
@@ -52,7 +66,12 @@ the reported per-parameter uncertainty, not to the observed spread. See
   `norm_isf_func(-0.5)` returning ~+28 sigma, reachable from `scoring.py:654` on ordinary
   noise, and `norm_isf_func(0)` returning NaN. Those are correctness bugs, unlike
   anything in this file, and they are the stronger upstream item.
-- The accel one-cell miss still happens on roughly 1 realisation in 12. The test now
+- **Do not convert `ep_circular` to grid-relative tolerances** the way `ep_jerk` was,
+  without re-deriving them. Its reported uncertainties are optimistic: measured error
+  exceeds the reported `d<param>` at every seed, by up to 2.10x for `freq`, 1.79x for
+  `accel`, 1.34x for `jerk`. `error < d<param>` would fail today on most seeds. The
+  `ep_jerk` lesson is "size against the grid", not "divide by the reported uncertainty".
+- The accel one-cell miss in `ep_jerk` still happens on roughly 1 realisation in 12. The test now
   accepts it because the search never claimed better. Whether the search *should* do
   better at this configuration is unexamined.
 
