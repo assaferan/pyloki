@@ -113,7 +113,10 @@ the reported per-parameter uncertainty, not to the observed spread. See
 
 Full suite: 159 tests. One run of `test_example_ep_jerk.py` is ~15 s warm, ~48 s cold.
 State the denominator and the predicate with any fraction you quote; see
-`upstream-posts-held-for-review` in shared memory. The scripts used for the measurements
-in `FINDINGS_rng_seeding.md` are in this session's scratchpad, not committed — they run
-a tree copy so `src/` can be edited while a measurement is in flight, which is worth
-reproducing rather than measuring against a tree you are also changing.
+`upstream-posts-held-for-review` in shared memory. The scripts behind every number in
+`FINDINGS_rng_seeding.md` are committed under `measurements/`, with a README covering
+the two rules that cost time here: one warm numba cache per tree throughout, and run
+against a tree *copy* so `src/` can be edited mid-measurement without moving the
+denominator. `measurements/margin_sweep.py` is the one to reach for first — it chose
+every seed in the `SEED_SWEEP` tuples, and it is what you run before adding a sweep to
+any other test.
