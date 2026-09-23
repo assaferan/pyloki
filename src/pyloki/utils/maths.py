@@ -83,6 +83,13 @@ max_minus_logsf = 400
 minus_logsf_res = 0.1
 chi_sq_minus_logsf_table = gen_chi_sq_minus_logsf_table(64, chi_sq_max, chi_sq_res)
 norm_isf_table = gen_norm_isf_table(max_minus_logsf, minus_logsf_res)
+# Highest abscissa each table actually carries. ``np.arange(0, stop, step)`` stops
+# one step short of ``stop``, so the top node sits at ``stop - step``, not at
+# ``stop``. Interpolating anywhere above it reads one entry past the end of the
+# table -- these functions are njit'd, so that read is unchecked -- and the tail
+# extrapolations below are anchored here so they meet the table without a step.
+norm_isf_x_max = (len(norm_isf_table) - 1) * minus_logsf_res
+chi_sq_x_max = (chi_sq_minus_logsf_table.shape[1] - 1) * chi_sq_res
 
 
 @njit(cache=True, fastmath=True)
@@ -107,24 +114,24 @@ def norm_isf_func(minus_logsf: float) -> float:
         # domain.
         return norm_isf_table[0] + pos * (norm_isf_table[1] - norm_isf_table[0])
     frac_pos = pos % 1
-    if minus_logsf < max_minus_logsf:
+    if minus_logsf < norm_isf_x_max:
         return (
             norm_isf_table[int(pos)] * (1 - frac_pos)
             + norm_isf_table[int(pos) + 1] * frac_pos
         )
-    return norm_isf_table[-1] * (minus_logsf / max_minus_logsf) ** 0.5
+    return norm_isf_table[-1] * (minus_logsf / norm_isf_x_max) ** 0.5
 
 
 @njit(cache=True, fastmath=True)
 def chi_sq_minus_logsf_func(chi_sq_score: float, df: int) -> float:
     tab_pos = chi_sq_score / chi_sq_res
     frac_pos = tab_pos % 1
-    if chi_sq_score < chi_sq_max:
+    if chi_sq_score < chi_sq_x_max:
         return (
             chi_sq_minus_logsf_table[df, int(tab_pos)] * (1 - frac_pos)
             + chi_sq_minus_logsf_table[df, int(tab_pos) + 1] * frac_pos
         )
-    return chi_sq_minus_logsf_table[df, -1] * chi_sq_score / chi_sq_max
+    return chi_sq_minus_logsf_table[df, -1] * chi_sq_score / chi_sq_x_max
 
 
 def gen_chebyshev_polys_table_np(order_max: int, n_derivs: int) -> np.ndarray:

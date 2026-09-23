@@ -100,6 +100,74 @@ class TestMaths:
             f"out-of-domain input scored {result}, at or above the x = 0 value"
         )
 
+    def test_norm_isf_func_is_monotonic(self) -> None:
+        """Increasing evidence must never decrease the score, and vice versa.
+
+        Spans the out-of-domain region, the extrapolated first cell, the table and
+        the ``max_minus_logsf`` tail extrapolation in one sweep, which is what
+        catches an index that wraps or a seam that steps the wrong way.
+        """
+        x = np.linspace(-10, 500, 100_001)
+        got = np.array([maths.norm_isf_func(val) for val in x])
+        assert np.isfinite(got).all()
+        np.testing.assert_array_less(
+            -1e-9,
+            np.diff(got),
+            err_msg="norm_isf_func decreased as minus_logsf increased",
+        )
+
+    @pytest.mark.parametrize("minus_logsf", [399.91, 399.95, 399.99])
+    def test_norm_isf_func_last_cell_stays_inside_the_table(
+        self,
+        minus_logsf: float,
+    ) -> None:
+        """The top cell used to read one entry past the end of the table.
+
+        ``np.arange(0, max_minus_logsf, minus_logsf_res)`` stops one step short, so
+        the top node is at 399.9, not 400. The guard tested ``minus_logsf <
+        max_minus_logsf``, so [399.9, 400) still interpolated and reached
+        ``norm_isf_table[4000]`` in a 4000-entry table. These functions are njit'd
+        and unchecked, so that read returned whatever was in memory -- ~1.6e185.
+        """
+        result = maths.norm_isf_func(minus_logsf)
+        assert np.isfinite(result)
+        np.testing.assert_allclose(result, maths.norm_isf_table[-1], atol=1e-2)
+
+    @pytest.mark.parametrize("df", [1, 2, 3, 32, 64])
+    @pytest.mark.parametrize("chi_sq", [299.6, 299.9, 299.99])
+    def test_chi_sq_minus_logsf_func_last_cell_stays_inside_its_row(
+        self,
+        chi_sq: float,
+        df: int,
+    ) -> None:
+        """The top cell used to read across into the next ``df`` row.
+
+        Same off-by-one-cell as ``norm_isf_func``, but the table is 2-D and C
+        contiguous, so ``[df, 600]`` in a (65, 600) table silently returned row
+        ``df + 1``'s first entry: ``chi_sq_minus_logsf_func(299.9, 2)`` gave 29.95
+        where the true value is ~149.95. At ``df = 64``, the last row, the read
+        left the array entirely.
+        """
+        result = maths.chi_sq_minus_logsf_func(chi_sq, df)
+        assert np.isfinite(result)
+        # Measured: the table's own worst relative error over these points is
+        # 1.05e-3, at df = 64 on the tail extrapolation. The cross-row read this
+        # guards against was wrong by 0.80 relative, so 2e-3 clears the accuracy
+        # floor by 2x and still catches the defect with ~400x to spare.
+        np.testing.assert_allclose(result, -stats.chi2.logsf(chi_sq, df), rtol=2e-3)
+
+    @pytest.mark.parametrize("df", [1, 2, 3, 32, 64])
+    def test_chi_sq_minus_logsf_func_is_monotonic(self, df: int) -> None:
+        """Sweeps the table, the top seam and the tail extrapolation together."""
+        x = np.linspace(0, 600, 50_001)
+        got = np.array([maths.chi_sq_minus_logsf_func(val, df) for val in x])
+        assert np.isfinite(got).all()
+        np.testing.assert_array_less(
+            -1e-9,
+            np.diff(got),
+            err_msg=f"chi_sq_minus_logsf_func(df={df}) decreased as chi_sq increased",
+        )
+
     def test_norm_isf_func_below_first_node_is_approximate(self) -> None:
         """Pin how wrong the first cell still is, so "finite" is not read as "right".
 
