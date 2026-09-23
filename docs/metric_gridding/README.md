@@ -145,20 +145,32 @@ not made the library reproducible. `np.random.seed` does not help at any of them
 **The fix is cheap and the plumbing exists**: everything downstream of `__init__` already
 takes `rng` as an explicit parameter (`thresholding.py:50, 393, 445, 544, 610`), so a
 `seed`/`rng` kwarg threaded to `:740` is small. But note the project's one precedent
-points elsewhere — `fix-flaky-norm-isf` fixed the same root class at
-`tests/test_maths.py:10` by **removing** the sampling rather than seeding it ("Pin the
-real accuracy of the maths lookup tables instead of sampling it"). That branch also
-carries `FINDINGS_norm_isf_func.md`, unreported, on defects found underneath it.
+points elsewhere — the `seedable-rngs` branch (renamed from `fix-flaky-norm-isf`) fixed
+the same root class at `tests/test_maths.py:10` by **removing** the sampling rather than
+seeding it ("Pin the real accuracy of the maths lookup tables instead of sampling it").
+That branch also carries `FINDINGS_norm_isf_func.md`, still unreported, on defects found
+underneath it.
 
-**Drafted here 2026-09-22, then handed over.** `08_upstream_rng_seeding.md` and
-`rng_reproducibility.py` are **superseded**: the fix, an extended reproducer and
-`FINDINGS_rng_seeding.md` live on **`fix-flaky-norm-isf`**, which owns this. Seven of the
-eight sites are closed there; the eighth, `DynamicThresholdScheme.run()`, is not — it
-draws from the shared generator inside an `@njit(parallel=True)` `prange`
-(`thresholding.py:597`), so a seed fixes the stream but not the thread order. **Pairing
-on one ladder still requires committing the array**, seed or no seed. The rest of this
-section is what the draft had to account for, kept because it is still what a report
-would owe.
+**Now resolved upstream:** the seeding work is filed as pravirkr/pyloki #16 and #17
+(2026-09-23). The paragraph above is kept as the state of play when this was written.
+
+**Drafted here 2026-09-22, handed over, and now upstream.** `08_upstream_rng_seeding.md`
+and `rng_reproducibility.py` are **superseded**: the work is filed as pravirkr/pyloki
+**#16** (library) and **#17** (example tests, stacked), and the fix, an extended
+reproducer and `FINDINGS_rng_seeding.md` live on the **`seedable-rngs`** branch, which
+owns this.
+
+**All eight sites are closed.** An earlier version of this paragraph said seven, because
+`DynamicThresholdScheme.run()` drew from the shared generator inside an
+`@njit(parallel=True)` `prange` (`thresholding.py:597`), so a seed fixed the stream but
+not the thread order. That is now fixed too: each parallel iteration gets its own
+generator, indexed by the loop variable, which makes the result independent of thread
+order by construction.
+
+**So pairing on one ladder no longer requires committing the array** — on that branch, a
+seed reproduces the ladder. On `main`, and until #16 merges, committing the array is
+still the only option. The rest of this section is what the draft had to account for,
+kept because it is still what a report would owe.
 
 **What the draft owed the maintainer.** §6.1 of `05_injection_design.md` is titled
 "Pairing is possible — verified, and it needs no library change", and concludes the
@@ -287,8 +299,8 @@ the wrong ladders. The correct ones are `schemes/cheby_*.npz`.
     05_injection_design.md          the design, the verdict, the handoff — START HERE (§1, §6.6, §11)
     06_upstream_max_sugg_logging.md the logging patch — SUBMITTED as PR #14 (open, unmerged)
     07_upstream_buffer_policy.md    the buffer-policy issue — POSTED as issue #15
-    08_upstream_rng_seeding.md      SUPERSEDED — the RNG story is on fix-flaky-norm-isf
-    rng_reproducibility.py          its reproducer; absorbed and extended on that branch
+    08_upstream_rng_seeding.md      SUPERSEDED — filed upstream as PRs #16 and #17
+    rng_reproducibility.py          its reproducer; absorbed and extended on seedable-rngs
 
     saturation_sweep.py             buffer sweep; the non-convergence result (§6.6)
     ratchet_probe.py                per-level threshold_eff; the direct ratchet measure (§6.7)

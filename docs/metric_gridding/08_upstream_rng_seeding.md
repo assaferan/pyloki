@@ -1,28 +1,38 @@
 # A pyloki run cannot be reproduced: `default_rng()` is unseeded in eight places
 
-> ## ⚠ SUPERSEDED — owned by `fix-flaky-norm-isf`, 2026-09-22
+> ## ⚠ SUPERSEDED — the work is upstream, 2026-09-23
 >
-> This draft and `rng_reproducibility.py` were written here before the fix existed, and
-> the whole RNG story now lives on **`fix-flaky-norm-isf`**: the implementation, an
-> extended five-check reproducer, and `FINDINGS_rng_seeding.md`. **Read those, not this.**
-> Kept unedited below for provenance.
+> This draft and `rng_reproducibility.py` were written here before the fix existed. The
+> RNG work is now **filed upstream** as pravirkr/pyloki **#16** (the library) and **#17**
+> (the example tests, stacked on #16). Read those, not this. Kept unedited below for
+> provenance.
 >
-> **One claim in the text below is now known false.** It says shape (1) was implemented
-> across all eight sites. Running this reproducer against the fix found that
-> `DynamicThresholdScheme.run()` still produces different ladders when seeded:
-> `run_stage_legacy` is `@njit(parallel=True)` (`thresholding.py:597`) and draws from the
-> shared generator inside a `prange`, so a seed fixes the stream but not the order the
-> threads consume it. Seeding cuts the spread from 0.798 to 0.080 and forcing one thread
-> removes it entirely, which locates the residue in scheduling rather than in the seed.
-> The honest summary is **seven of eight closed; the eighth needs per-iteration
-> generators inside the kernel** — not "fixed".
+> The working material lives on the **`seedable-rngs`** branch (renamed from
+> `fix-flaky-norm-isf`, which no longer exists): `FINDINGS_rng_seeding.md`, the extended
+> five-check reproducer, and the measurement harness under `measurements/`.
+>
+> **Two claims in the text below are now false.**
+>
+> 1. It says shape (1) was implemented across all eight sites. At the time of the first
+>    supersede note that was wrong in the other direction too: `DynamicThresholdScheme.run()`
+>    still varied when seeded, because `run_stage_legacy` and `pre_simulate_stage_folds`
+>    are `@njit(parallel=True)` and consume the generator inside a `prange`, so a seed
+>    fixed the stream but not the order threads consumed it.
+> 2. **That gap is now closed**, so the "seven of eight" summary this banner used to
+>    carry is also out of date. Each parallel iteration gets its own generator, from
+>    `SeedSequence(entropy, spawn_key=(istage,)).spawn(n)` indexed by the loop variable,
+>    which makes the result independent of thread order by construction. Verified in both
+>    `legacy` and `improved` modes and across thread counts. Removing the shared
+>    generator also removed a contention point: `run()` over 32 stages went 8.589 s ->
+>    2.172 s in `legacy` mode. **All eight sites reproduce.**
 >
 > The framing that survives, and the reason this draft is kept at all:
 > **`DynamicThresholdScheme` is the site that matters most, because a ladder is an input
-> to a search.** That is still true, and it is now the site with a known-open gap.
+> to a search.** That is still true, and it turned out to be the one site where a
+> constructor seed was not sufficient.
 
-**Status: draft, NOT POSTED, and now superseded.** Held pending assaferan's review, like
-every other upstream item from this branch.
+**Status: superseded. This draft itself was never posted**; the work it describes went
+upstream as #16 and #17 on 2026-09-23, with assaferan's approval.
 
 *All line numbers refer to `main` at `18d04b3`, and are enumerated from the source by the
 reproducer rather than typed, so they cannot drift.*
