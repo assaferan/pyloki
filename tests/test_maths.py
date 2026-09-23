@@ -15,8 +15,9 @@ from pyloki.utils import maths, transforms
 #     [0.2, 0.3)  max |err| 1.0e-2
 #     [0.3, 1.0)  max |err| 5.4e-3
 #     [1.0, 10]   max |err| 7.5e-4
-# Below 0.1 the function is not usable at all, see
-# ``TestMaths.test_norm_isf_func_below_first_table_node``.
+# Below the first node the table cannot follow the divergence to -inf at x = 0;
+# the values there are finite and monotonic but only qualitative, see
+# ``TestMaths.test_norm_isf_func_below_first_node_is_approximate``.
 # The points are deliberately off the 0.1-spaced table nodes, where the error is
 # identically zero and the test would prove nothing.
 NORM_ISF_POINTS = [
@@ -64,20 +65,61 @@ class TestMaths:
             atol=atol,
         )
 
-    @pytest.mark.parametrize("minus_logsf", [0.0, 1e-9, 0.05, 0.099])
-    def test_norm_isf_func_below_first_table_node(self, minus_logsf: float) -> None:
-        """Pin the current behaviour below the first table node.
+    def test_norm_isf_table_is_finite(self) -> None:
+        """Entry 0 used to be ``norm.isf(exp(-0)) == norm.isf(1) == -inf``."""
+        assert np.isfinite(maths.norm_isf_table).all()
 
-        ``gen_norm_isf_table`` starts at x = 0, where ``norm.isf(exp(-0)) == -inf``,
-        so every interpolation inside the first cell [0, ``minus_logsf_res``) mixes
-        in that infinity and comes back non-finite. The true values there are
-        perfectly finite (e.g. ~-1.66 at x = 0.05), so this is a defect of the
-        table's lower edge rather than an interpolation limit; callers must keep
-        ``minus_logsf >= maths.minus_logsf_res``. If the table gains a usable first
-        entry, this test is the one to delete.
+    @pytest.mark.parametrize("minus_logsf", [0.0, 1e-9, 0.05, 0.099])
+    def test_norm_isf_func_first_cell_is_finite(self, minus_logsf: float) -> None:
+        """The first cell [0, ``minus_logsf_res``) used to come back non-finite.
+
+        ``gen_norm_isf_table`` starts at x = 0, where the tabulated function is
+        ``-inf``, and that infinity propagated through every interpolation in the
+        first cell. Entry 0 now carries the extrapolation of the first two finite
+        nodes, so the cell is finite. It is not accurate -- see
+        ``test_norm_isf_func_below_first_node_is_approximate``.
         """
         result = maths.norm_isf_func(minus_logsf)
-        assert not np.isfinite(result), f"expected non-finite, got {result}"
+        assert np.isfinite(result), f"expected finite, got {result}"
+        assert result < 0, f"expected a non-detection, got {result}"
+
+    @pytest.mark.parametrize("minus_logsf", [-1e-9, -0.5, -1.0, -10.0])
+    def test_norm_isf_func_out_of_domain_is_negative(self, minus_logsf: float) -> None:
+        """Negative input is out of domain and must not read as a detection.
+
+        ``sf = exp(-minus_logsf) > 1`` here, so the honest answer is "very
+        negative". ``pos`` went negative, ``int(pos)`` truncated towards zero and
+        the negative index wrapped to the tail of the table, so these inputs came
+        back at ~+28 sigma -- a non-detection reported as a maximal detection.
+        Reachable from ``scoring.py`` via ``chi_sq_minus_logsf_func(...) -
+        lee_penalty``, which is routinely negative on noise.
+        """
+        result = maths.norm_isf_func(minus_logsf)
+        assert np.isfinite(result), f"expected finite, got {result}"
+        assert result < maths.norm_isf_func(0.0), (
+            f"out-of-domain input scored {result}, at or above the x = 0 value"
+        )
+
+    def test_norm_isf_func_below_first_node_is_approximate(self) -> None:
+        """Pin how wrong the first cell still is, so "finite" is not read as "right".
+
+        ``norm.isf(exp(-x))`` diverges to -inf at x = 0, so no finite entry on a
+        uniform ``minus_logsf_res`` grid can follow it. The extrapolated entry 0
+        keeps the cell finite and monotonic and is right to ~0.5 sigma over most of
+        it, but reads high without bound as x -> 0. A finer table below x = 1 is
+        what would fix this; if one lands, this test is the one to update.
+        """
+        x = np.linspace(1e-12, maths.minus_logsf_res, 2001, endpoint=False)
+        err = np.array([maths.norm_isf_func(val) for val in x]) - stats.norm.isf(
+            np.exp(-x),
+        )
+        assert np.isfinite(err).all()
+        # High, not low: the approximation overstates significance here.
+        np.testing.assert_array_less(-1e-9, err)
+        np.testing.assert_array_less(1.0, err.max(), err_msg="first cell now accurate")
+        assert err.max() < 6.0
+        # ...but it is usable over most of the cell.
+        assert err[x >= 0.02].max() < 0.5
 
     def test_norm_isf_func_first_cell_accuracy_limit(self) -> None:
         """Characterise the error spike in the first *finite* table cell.

@@ -54,7 +54,15 @@ def nbinom(n: int, k: int) -> int:
 
 def gen_norm_isf_table(max_minus_logsf: float, minus_logsf_res: float) -> np.ndarray:
     x_arr = np.arange(0, max_minus_logsf, minus_logsf_res)
-    return stats.norm.isf(np.exp(-x_arr))
+    table = stats.norm.isf(np.exp(-x_arr))
+    # Entry 0 is norm.isf(exp(-0)) = norm.isf(1) = -inf. Left in place, that
+    # infinity propagates through every interpolation in the first cell, so the
+    # whole of [0, minus_logsf_res) comes back NaN. The tabulated function really
+    # does diverge at x = 0, so no finite entry is correct there; extrapolating
+    # the first two finite nodes keeps the table finite and monotonic, which is
+    # what callers need. See norm_isf_func for the accuracy that leaves.
+    table[0] = 2 * table[1] - table[2]
+    return table
 
 
 def gen_chi_sq_minus_logsf_table(
@@ -79,7 +87,25 @@ norm_isf_table = gen_norm_isf_table(max_minus_logsf, minus_logsf_res)
 
 @njit(cache=True, fastmath=True)
 def norm_isf_func(minus_logsf: float) -> float:
+    """Interpolate norm.isf(exp(-minus_logsf)) from norm_isf_table.
+
+    Accuracy is set by minus_logsf_res: ~7.5e-4 above x = 1, ~2.7e-2 in the first
+    finite cell, where the tabulated function is steepest. Below the first node it
+    is only qualitative -- the function diverges to -inf at x = 0 and a table on a
+    uniform grid cannot follow it, so [0, minus_logsf_res) is the extrapolated
+    first-cell line and reads up to ~5.3 sigma high at the very bottom. Finite,
+    monotonic and negative there, but not precise; a caller that needs the deep
+    non-detection regime resolved needs a finer table, not this function.
+    """
     pos = minus_logsf / minus_logsf_res
+    if minus_logsf < 0:
+        # Out of domain: sf = exp(-minus_logsf) > 1. int(pos) truncates towards
+        # zero and the negative index wraps to the tail of the table, which
+        # reported these inputs as ~+28 sigma -- a non-detection returned as a
+        # maximal detection. Continue the first cell's line downwards instead, so
+        # the result stays finite and falls as the input gets further out of
+        # domain.
+        return norm_isf_table[0] + pos * (norm_isf_table[1] - norm_isf_table[0])
     frac_pos = pos % 1
     if minus_logsf < max_minus_logsf:
         return (
