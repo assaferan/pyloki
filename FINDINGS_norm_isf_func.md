@@ -1,8 +1,19 @@
-# `norm_isf_func` table-edge defects — not fixed here, written up for the maintainer
+# `norm_isf_func` table-edge defects — fixed on `fix-norm-isf-table-edges`
 
-Found while making `tests/test_maths.py` deterministic (commit `00e04e5`). The test
-change pins the current behaviour; **no library code was touched**. These are the
-reasons to consider changing it. All against `upstream/main` at `18d04b3`.
+**Status, 2026-09-23.** Sections 1, 2 and 5 are fixed on branch
+`fix-norm-isf-table-edges`, head `d403373`, two commits on top of `00e04e5`. Nothing
+is pushed and nothing is upstream. Sections 3 and 4 are **not** fixed and are still
+accurate; so is the closing note on unseeded RNGs, which was dealt with separately
+(#16, #17).
+
+**Section 5 was found after this file was first written, and it is the severe one.**
+It is an unchecked out-of-bounds read, it also affects `chi_sq_minus_logsf_func`, and
+anyone who read an earlier copy of this file has not seen it.
+
+Found while making `tests/test_maths.py` deterministic (commit `00e04e5`). That test
+change pinned the behaviour below without touching library code; sections 1, 2 and 5
+record the reasons the behaviour was then changed. All measurements against
+`upstream/main` at `18d04b3` unless stated otherwise.
 
 `norm_isf_func` (`src/pyloki/utils/maths.py:80-89`) linearly interpolates
 `norm_isf_table`, built by `gen_norm_isf_table` at resolution `minus_logsf_res = 0.1`
@@ -76,14 +87,74 @@ of which ~1.0% was the non-finite cell.
 near x = 0.12, above `1.5e-2` out to x ~ 0.47 — it would fail ~4.7% of a uniform [0,10]
 draw. `df = 3` is next at 1.12e-2. Other `df` values tested are comfortable.
 
-## Suggested fix (all in `maths.py`; (1) and (2) are the ones with teeth)
+## 5. Both tables interpolate one entry past their last node
 
-1. Guard `minus_logsf <= 0` and return a large negative sentinel rather than indexing —
-   kills the negative-index wrap and the `-inf` at entry 0.
-2. Start `gen_norm_isf_table` at `minus_logsf_res`, or overwrite entry 0 with
-   `norm.isf(1 - eps)`, removing the non-finite cell.
-3. Optional: a 10x finer grid below x = 1 costs ~100 entries and cuts the interpolation
-   error about 100x (error scales as h^2), to ~3e-4.
+**Found 2026-09-23, after sections 1-4 were written.** Not a lower-edge defect: this
+one is at the top of the score range, and it is a memory-safety bug rather than an
+accuracy one.
+
+`np.arange(0, stop, step)` stops one step short of `stop`, so `norm_isf_table`'s top
+node is at 399.9 and `chi_sq_minus_logsf_table`'s is at 299.5. Both guards tested
+against `stop`, so the top cell still took the interpolation branch and read
+`table[int(pos) + 1]` — one entry past the end. **Both functions are `njit`'d, so that
+read is not bounds-checked**: it is undefined behaviour, not an `IndexError`.
+
+    norm_isf_func(399.95)             =  1.649639e+185   (4000-entry table, index 4000)
+    chi_sq_minus_logsf_func(299.9, 2) =  29.95           (true value ~149.95)
+
+The chi-square case is the worse of the two. That table is 2-D and C-contiguous, so
+`[df, 600]` in a `(65, 600)` table silently returns **row `df + 1`'s first entry** — a
+wrong but entirely plausible number, where `norm_isf_func` at least returned obvious
+garbage. At `df = 64`, the last row, the read leaves the array altogether.
+
+**Reachability is the same as section 1, and the same caveat applies.** Both functions
+are reached only from `scoring.py`'s `_compute_snr_double` and
+`harmonic_summing_score_func`, neither of which is called anywhere in `src/pyloki`. A
+user meets this through the public scoring API, not through a search. It also needs an
+extreme score to trigger: `minus_logsf >= 399.9`, or `chi_sq >= 299.5`.
+
+**How it was found.** Not by reading the code. A monotonicity sweep spanning the
+out-of-domain region, the table and the tail extrapolation in one `linspace` failed at
+one index in 100000. Tests that check each branch separately all passed — the defect
+is at the *seams* between branches. The fix also had to re-anchor the tail
+extrapolations at the last tabulated abscissa rather than at `stop`; fixing the guard
+alone leaves a small backwards step at the seam.
+
+**Scanned for the same pattern elsewhere: it is confined to these two functions.**
+`src/pyloki/kepler.py:730` uses the same `np.arange(0, ...)` idiom but iterates the
+result rather than indexing into it. No other module-level table in `src/pyloki` is
+read with an `int(pos) + 1` index.
+
+## What was done (all in `maths.py`), and what was not
+
+Implemented on `fix-norm-isf-table-edges`:
+
+1. **(section 1, 2)** Entry 0 of `gen_norm_isf_table` now carries the extrapolation of
+   the first two finite nodes, and negative input continues that line downwards instead
+   of indexing. Kills both the negative-index wrap and the `-inf` cell.
+2. **(section 5)** Both guards now stop at the last tabulated abscissa, and both tail
+   extrapolations are anchored there too, so they meet their table without a step.
+
+Measured effect on the section 1 reproducer — 200 pure-noise profiles through
+`compute_dot_double`, same seed: **193/200 above 20 sigma before, 0/200 after**; one
+non-finite before, none after; finite median 28.019 to -14.384. Carry the section 1
+predicate with that number or it will be read as "searches emit false candidates",
+which it is not.
+
+Verification: 37 new cases in `tests/test_maths.py` plus a new `tests/test_scoring.py`
+(the repo had no scoring tests). Every one was run against an unfixed tree first and
+every one failed there — 14/14 for the lower edge, 23/23 for the seam. Full suite 169
+passed from a cold numba cache, and each commit passes standalone.
+
+**Not done, deliberately:**
+
+3. A 10x finer grid below x = 1 (~100 entries, error scales as h^2, would cut it about
+   100x to ~3e-4). Declined as out of scope. Without it, sections 3 and 4 stand, and
+   the first cell — although now finite and monotonic — still reads up to **5.3 sigma
+   high** as x approaches 0, because the true function diverges there and no finite
+   entry on a uniform 0.1 grid can follow it. That limit is pinned by
+   `test_norm_isf_func_below_first_node_is_approximate` rather than left implicit. **Do
+   not describe the first cell as fixed.**
 
 **Precedent.** Commit "Stop trials_scheme returning -inf before the search has branched"
 fixed the same `norm.isf(1) = -inf` trap in `thresholding.py`. This is that trap one

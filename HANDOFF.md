@@ -79,10 +79,21 @@ the reported per-parameter uncertainty, not to the observed spread. See
   written before this fix existed and offers to prepare shape (1), which is what was
   built here. If assaferan clears an upstream post, that draft and these two FINDINGS
   files are the material, and the offer should become "here is the PR".
-- `FINDINGS_norm_isf_func.md` records real library defects still unfixed —
-  `norm_isf_func(-0.5)` returning ~+28 sigma, reachable from `scoring.py:654` on ordinary
-  noise, and `norm_isf_func(0)` returning NaN. Those are correctness bugs, unlike
-  anything in this file, and they are the stronger upstream item.
+- **The `norm_isf_func` defects are now fixed** on branch `fix-norm-isf-table-edges`
+  (head `d403373`, 2026-09-23), which sits on `00e04e5` rather than on `upstream/main`
+  directly, because the `test_maths.py` pinning went into neither #16 nor #17.
+  `FINDINGS_norm_isf_func.md` has been rewritten to match and is the current record.
+  Nothing is pushed and nothing is upstream.
+  **There were three defects, not the two originally written up.** The third is
+  section 5: both lookup tables interpolated one entry past their last node, which in
+  `njit` is an unchecked read, and in `chi_sq_minus_logsf_func` it silently returned
+  the next `df` row's value (`chi_sq_minus_logsf_func(299.9, 2)` gave 29.95 against a
+  true ~149.95). It is the strongest of the three and the one a reader of an older
+  copy will not know about.
+  **`UPSTREAM_DRAFT_norm_isf.md` is now understated and was left alone on purpose.**
+  It describes two defects and offers to prepare a fix; there are three and the fix
+  exists. Rewriting a maintainer-facing draft without review is assaferan's call, not
+  a tidy-up — see `upstream-posts-held-for-review` in shared memory.
 - **Do not convert `ep_circular` to grid-relative tolerances** the way `ep_jerk` was,
   without re-deriving them. Its reported uncertainties are optimistic: measured error
   exceeds the reported `d<param>` at every seed, by up to 2.10x for `freq`, 1.79x for
